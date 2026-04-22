@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # --- 业务数据库 ---
+  mysql:
+    image: mysql:8.0
+    container_name: ai-investor-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: ai_investor
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+
+  # --- 消息队列 (RabbitMQ) ---
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ai-investor-rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./data/rabbit:/var/lib/rabbitmq

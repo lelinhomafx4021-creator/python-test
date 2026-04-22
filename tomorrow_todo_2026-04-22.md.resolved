@@ -1,0 +1,27 @@
+# 📋 AI Investor 明日开工指南 (2026-04-22)
+
+## 📌 当前状态回顾
+- **Java 网关**：8080 端口运行中，跨域已开启，核心 API 逻辑已对齐。
+- **Python 引擎**：8000 端口运行中，Tavily 搜索和结构化输出已打通。
+- **前端页面**：5173 端口运行中，标签报错已修复，API 请求已指向 8080。
+
+## 🎯 明日核心任务：登录与个性化
+
+### 1. 登录功能全链路闭环
+- [ ] **Java 端**：在 `AiAuthController` (如果还没写的话) 实现 `/login` 接口，返回用户基本信息。
+- [ ] **权限拦截**：完善 [LoginInterceptor](file:///d:/ai-investor/java-ai-gateway/src/main/java/com/aiinvestor/gateway/interceptor/LoginInterceptor.java#24-83)。目前接口上有 `@LoginRequired`，需要确保请求头中的 `Authorization` 或 `X-User-Id` 能被正确解析并塞入 [UserContext](file:///d:/ai-investor/java-ai-gateway/src/main/java/com/aiinvestor/gateway/context/UserContext.java#14-35)。
+- [ ] **前端对接**：在 [App.vue](file:///d:/ai-investor/frontend/src/App.vue) 中处理未登录状态，自动跳转到登录弹窗。
+
+### 2. 投研画像动态注入
+- [ ] **数据库同步**：在 MySQL 中为测试账号设置不同的 `risk_level` (如：保守型、成长型)。
+- [ ] **Python 联动**：在 Java 调用 Python 接口时，将用户的风险偏好字段传过去，让 AI 给出更具针对性的建议。
+
+### 3. UI/UX 体验升级
+- [ ] **结构化渲染**：解析 Python 返回的 [StructuredInvestmentAnalysis](file:///d:/ai-investor/aipy2/app/schemas/analysis_schema.py#4-14) JSON，在对话框中展示“核心结论、风险预警、推荐板块”等漂亮的小组件，而不仅是纯文本。
+
+## 💡 面试加分点准备 (明天可以重点思考)
+- **“如何保证 AI 调用的安全性？”** —— 讲解网关层的拦截器设计。
+- **“如何处理大模型的长时间等待？”** —— 讲解 SSE 流式输出与前端响应式的结合。
+
+---
+**🌅 明天见！带着最棒的代码逻辑，冲刺项目完结！**

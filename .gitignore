@@ -1,0 +1,31 @@
+# --- Python 相关 ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+*.log
+*.db
+dist/
+build/
+*.egg-info/
+
+# --- Java 相关 ---
+target/
+*.class
+.mvn/
+.idea/
+*.iml
+*.log
+
+# --- Frontend / Node 相关 ---
+node_modules/
+dist/
+.DS_Store
+
+# --- 项目特定路径 (aipy2) ---
+/aipy2/.env
+/aipy2/aipy2.log*
+/aipy2/app/db/aipy2.db
