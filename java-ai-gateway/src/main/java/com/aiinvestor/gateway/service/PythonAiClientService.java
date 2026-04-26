@@ -1,13 +1,13 @@
 package com.aiinvestor.gateway.service;
 
 import com.aiinvestor.gateway.dto.PythonChatRequest;
-import com.aiinvestor.gateway.dto.PythonChatResponseDTO;
 import com.aiinvestor.gateway.mq.AiChatAuditEvent;
 import com.aiinvestor.gateway.mq.AiChatAuditProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import java.time.Instant;
@@ -55,17 +55,21 @@ public class PythonAiClientService {
         
         return pythonAiWebClient.post()
                 .uri("/ai/v1/chat/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new PythonChatRequest(message, userId + ":" + sessionId, traceId))
                 .retrieve()
-                .bodyToFlux(String.class)
-                .doOnNext(chunk -> {
-                    String preview = chunk == null ? "null" : (chunk.length() > 500 ? chunk.substring(0, 500) + "...(truncated)" : chunk);
-                    log.info("[streamChatSse] python->java chunk: {}", preview);
+                .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {})
+                .doOnNext(event -> {
+                    String data = event.data();
+                    String preview = data == null ? "null" : (data.length() > 500 ? data.substring(0, 500) + "...(truncated)" : data);
+                    log.info("[streamChatSse] python->java event={}, data={}", event.event(), preview);
                 })
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .event("message")
-                        .data(chunk)
+                .filter(event -> event.data() != null && !event.data().isBlank())
+                .map(event -> ServerSentEvent.<String>builder()
+                        .event(event.event() == null || event.event().isBlank() ? "message" : event.event())
+                        .id(event.id())
+                        .data(event.data())
                         .build())
                 .doFinally(signalType -> {
                     try {

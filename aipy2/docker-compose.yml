@@ -1,31 +1,70 @@
-# AI-Investor 开发环境 - Docker Compose
-# 一个命令拉起所有基础设施: docker-compose up -d
+# AI-Investor 全能版开发环境 (同步自 Aipy2)
+# 集成：Postgres(向量) + MySQL(业务) + RabbitMQ(消息) + LangFuse(观测) + Redis(缓存)
 
 services:
-  # ============================================================
-  # PostgreSQL 16 + pgvector 扩展
-  # ============================================================
-  # 用官方的 pgvector 镜像，自带 vector 扩展，不需要手动安装
-  # 一个库搞定：关系型数据 + 向量检索 + 对话记录 + AgentState
+  # --- 1. 向量数据库 (PostgreSQL 16 + pgvector) ---
   postgres:
     image: pgvector/pgvector:pg16
     container_name: ai_investor_pg
     ports:
-      - "5432:5432"
+      - "5433:5432" # 外部映射到 5433，解决 5432 冲突
     environment:
-      POSTGRES_DB: ai_investor         # 自动创建的数据库名
-      POSTGRES_USER: postgres          # 用户名
-      POSTGRES_PASSWORD: "123456"      # 密码（生产环境要用强密码）
+      POSTGRES_DB: ai_investor
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "123456"
     volumes:
-      # 数据持久化：容器删了数据还在
-      # 用 named volume 比挂载目录更安全
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
-  # ============================================================
-  # Redis 7
-  # ============================================================
-  # 用途：语义缓存 + 会话管理 + 限流（后续用）
+  # --- 2. 业务数据库 (MySQL 8.0) ---
+  mysql:
+    image: mysql:8.0
+    container_name: ai_investor_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: ai_investor
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    restart: unless-stopped
+
+  # --- 3. 消息队列 (RabbitMQ) ---
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ai_investor_rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
+
+  # --- 4. AI 可观测性平台 (LangFuse) ---
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: ai-investor-langfuse
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # 容器内通信使用服务名 postgres 和默认端口 5432
+      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/ai_investor
+      - NEXTAUTH_SECRET=my_super_secret_key
+      - NEXTAUTH_URL=http://localhost:3000
+      - SALT=my_super_secret_salt
+      - ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - TELEMETRY_ENABLED=false
+      # 初始化的管理员账号配置
+      - LANGFUSE_INIT_ORG_NAME=AI-Investor-Org
+      - LANGFUSE_INIT_PROJECT_NAME=Investor-Agent
+      - LANGFUSE_INIT_USER_EMAIL=admin@example.com
+      - LANGFUSE_INIT_USER_PASSWORD=12345678
+
+  # --- 5. 高性能缓存 (Redis 7) ---
   redis:
     image: redis:7-alpine
     container_name: ai_investor_redis
@@ -33,6 +72,5 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
-# named volume 定义
 volumes:
   pgdata:

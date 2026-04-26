@@ -1,34 +1,30 @@
+﻿"""Alembic 迁移环境配置。"""
+
 import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
 from alembic import context
+from sqlalchemy import engine_from_config, pool
+from sqlmodel import SQLModel
 
-# Add project root to sys.path
+# 将项目根目录加入导入路径，保证 Alembic 能加载应用模块
 sys.path.append(os.getcwd())
 
-from sqlmodel import SQLModel
 from app.core.config import settings
-# Import models for Alembic to detect tables
-import app.models.user_profile 
+import app.models.agent_run_audit  # 确保模型元数据被加载
 
-# 1. Get Alembic config
 config = context.config
-
-# 2. Dynamically get DB URL from settings
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
-# 3. Configure logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# 4. Set target metadata
 target_metadata = SQLModel.metadata
 
+
 def run_migrations_offline() -> None:
-    """Offline migration mode"""
+    """离线模式迁移：仅生成 SQL，不建立数据库连接。"""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -40,8 +36,9 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def run_migrations_online() -> None:
-    """Online migration mode"""
+    """在线模式迁移：连接数据库并直接执行迁移。"""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -49,13 +46,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

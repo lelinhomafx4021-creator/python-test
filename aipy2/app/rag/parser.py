@@ -26,9 +26,12 @@ A: .docx 本质是一个 ZIP 压缩包，里面是 XML 文件。
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# pymupdf 安装的包名是 pymupdf，但 import 时叫 fitz
-# 这是历史遗留问题，fitz 是底层 C 引擎 MuPDF 中一个模块的名字
-import fitz
+# 【教学修改】这里不用 `import fitz`，改用更稳的 `import pymupdf as fitz`。
+# 原因：
+# 1. 你的环境里已经装了官方的 PyMuPDF 包
+# 2. 但同时还存在一个同名的 `fitz` 命名空间，直接 `import fitz` 会导错包
+# 3. 所以这里明确从 pymupdf 导入，避免歧义
+import pymupdf as fitz
 
 # python-docx 的 Document 和我们自己定义的 DocChunk 重名了
 # 所以 import 时重命名为 WordDoc，避免混淆
@@ -79,6 +82,7 @@ def parse_pdf(file_path: str) -> list[DocChunk]:
     file_name = Path(file_path).name
 
     chunks = []
+    total_pages = len(doc)
 
     # enumerate(doc, start=1) 遍历每一页
     # start=1 让页码从 1 开始（人类习惯），而不是程序员的 0
@@ -105,7 +109,7 @@ def parse_pdf(file_path: str) -> list[DocChunk]:
             metadata={
                 "source": file_name,           # 来源文件名
                 "page": page_num,              # 第几页
-                "total_pages": len(doc),        # 总页数
+                "total_pages": total_pages,     # 总页数
                 "file_type": "pdf",            # 文件类型标记
             }
         ))
@@ -114,7 +118,7 @@ def parse_pdf(file_path: str) -> list[DocChunk]:
     # 不关的话可能会内存泄漏（虽然 Python 有 GC，但 C 层资源不受 GC 管）
     doc.close()
 
-    print(f"[PDF解析] {file_name}: 共 {len(doc)} 页，提取了 {len(chunks)} 个文本块")
+    print(f"[PDF解析] {file_name}: 共 {total_pages} 页，提取了 {len(chunks)} 个文本块")
     return chunks
 
 
@@ -196,6 +200,7 @@ def parse_file(file_path: str) -> list[DocChunk]:
         return parse_docx(file_path)
 
     elif ext in {".txt", ".md"}:
+        # 文本类文件直接整体读入，后续再由 chunker 统一切片。
         with open(file_path, "r", encoding="utf-8") as f:
             text = f.read()
         return [DocChunk(text=text, metadata={"source": Path(file_path).name, "file_type": ext[1:]})]
@@ -254,6 +259,7 @@ def parse_dir(dir_path: str) -> list[DocChunk]:
     all_chunks = []
     for file in files:
         try:
+            # 单文件解析：把 Path 转成 str，兼容下游函数签名
             chunks = parse_file(str(file))
             all_chunks.extend(chunks)
         except Exception as e:

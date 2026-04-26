@@ -7,7 +7,6 @@
 from pathlib import Path
 import sys
 
-# pyright: reportMissingModuleSource=false
 import psycopg2
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -49,8 +48,10 @@ ALTER TABLE ai_chat_turns
 
 
 if __name__ == "__main__":
+    # 连接数据库执行 DDL，确保聊天历史表和索引存在
     with psycopg2.connect(settings.database_url) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
+            # 一次性执行建表 + 索引 + 兼容性 ALTER
             cur.execute(DDL)
     print("ai_chat_turns 初始化/升级完成。")

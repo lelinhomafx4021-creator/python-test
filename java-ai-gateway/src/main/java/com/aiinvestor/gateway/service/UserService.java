@@ -25,17 +25,4 @@ public class UserService {
         return userMapper.selectById(id);
     }
 
-    /**
-     * 判断用户是否有效且存在
-     */
-    public boolean isValidUser(String userId) {
-        try {
-            Long id = Long.parseLong(userId);
-            UserDO user = userMapper.selectById(id);
-            // 用户存在且状态为 1（正常）才视为有效
-            return user != null && user.getStatus() == 1;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
 }

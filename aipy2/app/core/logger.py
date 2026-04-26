@@ -1,50 +1,62 @@
-"""
-企业级日志配置。
-知识点：在 Linux 环境下，通常输出为 JSON 格式以便阿里云/ELK 采集。
-本地开发则采用彩色格式。
-"""
-# d:\ai-investor\aipy2\app\core\logger.py
+﻿"""应用日志初始化模块。"""
+
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
 from app.core.config import settings
 
 
+class SafeConsoleStream:
+    """控制台安全输出包装器，避免编码不一致导致日志写入失败。"""
+
+    def __init__(self, stream):
+        """保存原始输出流并记录其编码信息。"""
+        self._stream = stream
+        self.encoding = getattr(stream, "encoding", None) or "utf-8"
+
+    def write(self, text):
+        """将无法编码的字符转义后再写入控制台。"""
+        safe_text = text.encode(self.encoding, errors="backslashreplace").decode(
+            self.encoding,
+            errors="ignore",
+        )
+        return self._stream.write(safe_text)
+
+    def flush(self):
+        """透传 flush，保证日志及时刷到终端/文件。"""
+        return self._stream.flush()
+
+
 def setup_logger() -> logging.Logger:
-    # 1️⃣ 创建（或获取）同名 logger，整个进程共享
+    """创建并返回全局日志器（控制台 + 轮转文件）。"""
     logger = logging.getLogger("aipy2")
     logger.setLevel(logging.INFO if not settings.is_dev else logging.DEBUG)
 
-    # 2️⃣ 统一的日志格式
+    # 统一日志格式：时间 + 级别 + 模块名 + 消息
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] [%(name)s] - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # 3️⃣ 控制台输出（开发时最常用）
-    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler = logging.StreamHandler(SafeConsoleStream(sys.stdout))
     console_handler.setFormatter(formatter)
 
-    # 4️⃣ 文件输出（写到项目根目录）
-    #    - 文件名 aipy2.log
-    #    - 每 10 MB 自动切分，保留最近 5 份
-    log_path = Path(__file__).resolve().parents[2] / "aipy2.log"   # 项目根目录
+    log_path = Path(__file__).resolve().parents[2] / "aipy2.log"
     file_handler = RotatingFileHandler(
         filename=log_path,
-        maxBytes=10 * 1024 * 1024,   # 10 MB
+        maxBytes=10 * 1024 * 1024,
         backupCount=20,
         encoding="utf-8",
     )
     file_handler.setFormatter(formatter)
 
-    # 5️⃣ 防止重复添加 handler（关键！）
     if not logger.handlers:
-        logger.addHandler(console_handler)   # 控制台
-        logger.addHandler(file_handler)      # 文件
+        logger.addHandler(console_handler)
+        logger.addHandler(file_handler)
 
     return logger
 
 
-# 模块加载时直接实例化，供全局使用
 logger = setup_logger()

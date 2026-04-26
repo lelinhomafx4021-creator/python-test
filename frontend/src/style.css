@@ -2,10 +2,16 @@
 @config "../tailwind.config.js";
 
 @layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+
   body {
     @apply bg-light-bg text-slate-800 antialiased;
     background: radial-gradient(circle at top right, #ffffff, #f1f5f9);
-    min-height: 100vh;
+    overflow: hidden;
   }
 }
 

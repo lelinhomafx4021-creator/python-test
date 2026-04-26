@@ -1,15 +1,18 @@
+"""FastAPI 主入口：负责应用启动、路由注册和全局中间件。"""
+
 import time
 import uuid
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 
 import traceback
 from app.core.logger import logger
 from app.core.llm import init_llm_components
+from app.core.db import init_tables
 from app.api.v1.chat import router as chat_router
 from app.api.v1.util import router as util_router
+from app.models.agent_run_audit import AgentRunAudit
 from app.rag.vector_store import VectorStore
 from app.core.config import settings
 
@@ -35,12 +38,13 @@ async def lifespan(app: FastAPI):
     # 我们不需要在 Navicat 里手动敲 SQL。Alembic 会自动对比代码类和数据库，
     # 发现不一致就自动 ALTER TABLE。
     try:
-        # from alembic.config import Config
-        # from alembic import command
-        # alembic_cfg = Config("alembic.ini")
-        # command.upgrade(alembic_cfg, "head") # 告诉数据库：升级到代码要求的最新版本
+        # 若需要启用 Alembic 自动迁移，可在此处接入迁移执行逻辑，
+        # 目标是把数据库升级到代码要求的最新版本。
         # --- 自动初始化 LangGraph 记忆表 ---
+        # 这一步会初始化 LLM 相关的异步资源（连接池、checkpointer）。
         await init_llm_components()
+        init_tables(AgentRunAudit.__table__)
+        logger.info(">>> AI 技术审计表初始化成功 (ai_agent_runs)")
         
         # --- 自动初始化 RAG 向量检索表 ---
         # 知识点：以前需要手动运行脚本，现在集成到启动流程，实现“开箱即用”
@@ -57,6 +61,9 @@ async def lifespan(app: FastAPI):
         logger.error(f">>> 数据库同步失败: {e}")
         traceback.print_exc()
         
+    # `yield` 是 FastAPI 生命周期钩子的分界线：
+    # - yield 之前：启动阶段（做初始化）
+    # - yield 之后：关闭阶段（做清理）
     yield # 这里是分界线，程序在此处开始正常提供服务
     
     logger.info(">>> AI-Investor Core 正在优雅离场...")
@@ -73,7 +80,7 @@ app = FastAPI(
 app.include_router(chat_router)   # 核心聊天模块
 app.include_router(util_router)   # 通用工具模块 (比如生成标题)
 
-# 2. 全局链路拦截器 (Middleware)
+# 2. 全局链路拦截器（中间件）
 @app.middleware("http")
 async def trace_middleware(request: Request, call_next):
     """
@@ -86,13 +93,16 @@ async def trace_middleware(request: Request, call_next):
     request.state.trace_id = trace_id
     start_time = time.perf_counter()
     
-    # 核心步骤：让请求去跑真正的 API 逻辑
+    # 核心步骤：让请求去跑真正的接口逻辑
+    # `call_next` 会把请求继续传给后续路由函数执行。
+    # await 完成后拿到业务响应对象。
     response = await call_next(request)
     
     # 计算耗时并记入日志，这是性能调优的原始数据
     process_time = int((time.perf_counter() - start_time) * 1000)
+    # 把 trace_id 回传给调用方，前后端就能用同一个 ID 对齐日志。
     response.headers["X-Trace-Id"] = trace_id
-    logger.info(f"DONE | Path: {request.url.path} | Time: {process_time}ms | Trace: {trace_id}")
+    logger.info(f"请求完成 | 路径: {request.url.path} | 耗时: {process_time}ms | 追踪ID: {trace_id}")
     return response
 
 # 程序主入口

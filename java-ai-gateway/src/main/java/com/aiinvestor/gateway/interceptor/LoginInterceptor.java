@@ -13,11 +13,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 【企业级安全】用户登录拦截器
  * 
  * 知识点 (面试必问)：
- * 1. Interceptor vs Filter 区别？ 
+ * 1. Interceptor vs Filter 区别？
  *    - Filter 是 Servlet 规范，Interceptor 是 Spring 规范。
- *    - Interceptor 能拿到 HandlerMethod，能读到方法上的自定义注解（比如 @LoginRequired）。
+ *    - Interceptor 在 Spring MVC 层执行，适合做上下文注入和请求前置处理。
  * 2. 这里的逻辑：
- *    - 只有带了 @LoginRequired 标识的内容才会强制校验 X-User-Id。
+ *    - 尝试读取 X-User-Id 并注入 UserContext，失败时走匿名兜底。
  */
 @Slf4j
 @Component

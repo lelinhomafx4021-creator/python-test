@@ -4,6 +4,7 @@ services:
   # --- 业务数据库 ---
   mysql:
     image: mysql:8.0
+    restart: always
     container_name: ai-investor-mysql
     environment:
       MYSQL_ROOT_PASSWORD: "123456"
@@ -16,6 +17,7 @@ services:
   # --- 消息队列 (RabbitMQ) ---
   rabbitmq:
     image: rabbitmq:3-management
+    restart: always
     container_name: ai-investor-rabbit
     environment:
       RABBITMQ_DEFAULT_USER: guest
@@ -25,3 +27,37 @@ services:
       - "15672:15672"
     volumes:
       - ./data/rabbit:/var/lib/rabbitmq
+
+  # --- 向量数据库 (PostgreSQL + pgvector) ---
+  postgres:
+    image: ankane/pgvector:latest
+    restart: always
+    container_name: ai-investor-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "123456"
+      POSTGRES_DB: ai_investor
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+
+  # --- LangFuse AI 可观测性平台 ---
+  langfuse:
+    image: langfuse/langfuse:2
+    restart: always
+    container_name: ai-investor-langfuse
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/ai_investor
+      - NEXTAUTH_SECRET=my_super_secret_key
+      - NEXTAUTH_URL=http://localhost:3000
+      - TELEMETRY_ENABLED=false
+      - LANGFUSE_INIT_ORG_NAME=AI-Investor-Org
+      - LANGFUSE_INIT_PROJECT_NAME=Investor-Agent
+      - LANGFUSE_INIT_USER_EMAIL=admin@example.com
+      - LANGFUSE_INIT_USER_PASSWORD=123456
