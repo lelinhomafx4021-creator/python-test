@@ -1,111 +1,146 @@
-"""FastAPI 主入口：负责应用启动、路由注册和全局中间件。"""
+"""FastAPI 主入口。
 
+这个文件可以理解成整个 Python 服务的“启动总控台”。
+它主要负责：
+1. 应用启动时做初始化
+2. 注册路由
+3. 加中间件
+4. 本地开发时启动 uvicorn
+"""
+
+import asyncio
+import sys
 import time
+import traceback
 import uuid
-import uvicorn
 from contextlib import asynccontextmanager
+
+import uvicorn
 from fastapi import FastAPI, Request
 
-import traceback
-from app.core.logger import logger
-from app.core.llm import init_llm_components
-from app.core.db import init_tables
 from app.api.v1.chat import router as chat_router
 from app.api.v1.util import router as util_router
-from app.models.agent_run_audit import AgentRunAudit
-from app.rag.vector_store import VectorStore
+from app.core import llm as llm_core
 from app.core.config import settings
+from app.core.logger import logger
+from app.rag.vector_store import VectorStore
 
-# /**
-#  * -----------------------------------------------------------
-#  * 【Python 核心指挥中心：main.py】
-#  * -----------------------------------------------------------
-#  * 这个文件是 Python AI 服务的入口。
-#  * 哪怕你是新手，看到这个文件也应该能明白整个服务的血液循环。
-#  */
+
+# [教学修改] Windows 下 psycopg 的异步连接池和默认 ProactorEventLoop 不兼容。
+# 如果不切换事件循环策略，应用启动时会报：
+# "Psycopg cannot use the 'ProactorEventLoop' to run in async mode"
+# 这一行的作用，就是把本机开发环境切到更兼容的 SelectorEventLoop。
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    【生命周期管理器】
-    知识点：这类似于汽车的“点火”和“熄火”过程。
-    由于项目涉及数据库 (Postgres) 和大型模型 (LLM)，
-    我们必须在启动时建立连接，并在退出时回收资源，否则会发生成内存泄漏。
+    """应用生命周期钩子。
+
+    `yield` 之前：
+    - 属于“启动阶段”
+    - 适合初始化数据库连接、LLM 组件、检查业务表等
+
+    `yield` 之后：
+    - 属于“关闭阶段”
+    - 适合释放资源、打印退出日志等
     """
     logger.info(">>> AI-Investor Core 启动中...")
-    
-    # --- 知识点：自动让代码去改数据库 (Alembic) ---
-    # 我们不需要在 Navicat 里手动敲 SQL。Alembic 会自动对比代码类和数据库，
-    # 发现不一致就自动 ALTER TABLE。
-    try:
-        # 若需要启用 Alembic 自动迁移，可在此处接入迁移执行逻辑，
-        # 目标是把数据库升级到代码要求的最新版本。
-        # --- 自动初始化 LangGraph 记忆表 ---
-        # 这一步会初始化 LLM 相关的异步资源（连接池、checkpointer）。
-        await init_llm_components()
-        init_tables(AgentRunAudit.__table__)
-        logger.info(">>> AI 技术审计表初始化成功 (ai_agent_runs)")
-        
-        # --- 自动初始化 RAG 向量检索表 ---
-        # 知识点：以前需要手动运行脚本，现在集成到启动流程，实现“开箱即用”
-        v_store = VectorStore(
-            db_url=settings.DATABASE_URL,
-            api_key=settings.DASH_API_KEY
-        )
-        try:
-            v_store.create_collection()
-            logger.info(">>> RAG 向量检索表初始化成功 (pgvector/HNSW)")
-        finally:
-            v_store.close()
-    except Exception as e:
-        logger.error(f">>> 数据库同步失败: {e}")
-        traceback.print_exc()
-        
-    # `yield` 是 FastAPI 生命周期钩子的分界线：
-    # - yield 之前：启动阶段（做初始化）
-    # - yield 之后：关闭阶段（做清理）
-    yield # 这里是分界线，程序在此处开始正常提供服务
-    
-    logger.info(">>> AI-Investor Core 正在优雅离场...")
 
-# 实例化主应用
+    try:
+        # 初始化 LangGraph 相关的数据库持久化组件。
+        # 注意：这里初始化的是框架自带的 checkpoint 表，不是你们业务表。
+        await llm_core.init_llm_components()
+        if llm_core.checkpointer is None:
+            logger.info(">>> LangGraph 已切换为内存记忆模式")
+        else:
+            logger.info(">>> LangGraph checkpoint ready")
+
+        # 校验 RAG 相关业务表是否已经通过 Alembic 建好。
+        # 这里不再偷偷建表，而是要求正式先执行 `alembic upgrade head`。
+        if settings.is_dev and not llm_core.can_reach_postgres():
+            logger.warning(">>> PostgreSQL 当前不可达，已跳过 RAG schema 校验")
+        else:
+            v_store = VectorStore(
+                db_url=settings.DATABASE_URL,
+                api_key=settings.DASH_API_KEY,
+            )
+            try:
+                v_store.create_collection()
+                logger.info(">>> RAG schema verified")
+            finally:
+                # 无论校验成功还是失败，都要关闭同步 PostgreSQL 连接。
+                v_store.close()
+    except Exception as e:
+        # 初始化失败时，打印错误和完整堆栈，方便排查。
+        logger.error(f">>> 数据库或启动组件初始化失败: {e}")
+        traceback.print_exc()
+
+    # 到这里表示启动准备阶段结束，FastAPI 开始正式对外提供服务。
+    yield
+
+    # 应用退出时打印收尾日志。
+    await llm_core.shutdown_llm_components()
+    logger.info(">>> AI-Investor Core 正在优雅退出...")
+
+
+# 创建 FastAPI 应用对象。
 app = FastAPI(
-    title="AI-Investor-Core", 
+    title="AI-Investor-Core",
     version="1.0.0-PRO",
     description="专业金融投研 AI 核心 (FastAPI + LangGraph + RAG)",
-    lifespan=lifespan # 把刚才写的“点火熄火”逻辑注册进去
+    lifespan=lifespan,
 )
 
-# 1. 注册功能模块 (挂载路由)
-app.include_router(chat_router)   # 核心聊天模块
-app.include_router(util_router)   # 通用工具模块 (比如生成标题)
+# 注册聊天相关路由。
+app.include_router(chat_router)
+# 注册工具类路由，例如标题生成之类的小接口。
+app.include_router(util_router)
 
-# 2. 全局链路拦截器（中间件）
+
 @app.middleware("http")
 async def trace_middleware(request: Request, call_next):
+    """全局链路追踪中间件。
+
+    作用：
+    1. 给每个请求分配一个 TraceId
+    2. 统计本次请求耗时
+    3. 把 TraceId 回传给调用方，便于前后端和日志对齐
     """
-    【企业级中间件：链路追踪】
-    逻辑：请求进来 -> 给它一个 DNA 编号 (TraceId) -> 执行业务 -> 计算耗时 -> 返回
-    这样即使云服务器有成千上万个请求，我们也能靠这个 ID 锁定特定的一次访问。
-    """
-    # 如果 Java 端传了 ID 过来我们就用 Java 的，否则自己生一个
+    # 优先复用上游传来的 TraceId；如果没有，就现场生成一个。
     trace_id = request.headers.get("X-Trace-Id", str(uuid.uuid4()))
     request.state.trace_id = trace_id
+
+    # 记录请求开始时间。
     start_time = time.perf_counter()
-    
-    # 核心步骤：让请求去跑真正的接口逻辑
-    # `call_next` 会把请求继续传给后续路由函数执行。
-    # await 完成后拿到业务响应对象。
+
+    # 继续把请求交给后续路由处理。
     response = await call_next(request)
-    
-    # 计算耗时并记入日志，这是性能调优的原始数据
+
+    # 计算总耗时，单位毫秒。
     process_time = int((time.perf_counter() - start_time) * 1000)
-    # 把 trace_id 回传给调用方，前后端就能用同一个 ID 对齐日志。
+
+    # 把 TraceId 放回响应头，方便调用方排查问题。
     response.headers["X-Trace-Id"] = trace_id
-    logger.info(f"请求完成 | 路径: {request.url.path} | 耗时: {process_time}ms | 追踪ID: {trace_id}")
+    logger.info(
+        f"请求完成 | 路径: {request.url.path} | 耗时: {process_time}ms | TraceId: {trace_id}"
+    )
     return response
 
-# 程序主入口
+
 if __name__ == "__main__":
-    # 启动进程。 reload=True 意味着你修改代码存盘时，程序会自动重启（开发神器）
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Windows 本地开发时，热重载会额外拉起子进程。
+    # 当前项目里同时用了 LangGraph 的 PostgreSQL 记忆层和异步连接池，
+    # 在 Windows + reload 组合下容易出现：
+    # 1. 记忆连接池卡死，回答刚 accepted 就报错
+    # 2. 子进程继承旧环境，导致配置看起来“改了但没生效”
+    # 所以本地 Windows 默认关闭 reload，优先保证链路稳定。
+    enable_reload = settings.is_dev and not sys.platform.startswith("win")
+    if settings.is_dev and sys.platform.startswith("win"):
+        logger.info(">>> Windows 本地开发默认关闭热重载，优先保证 AI 链路稳定")
+
+    # 非热重载模式下直接传 app 对象，避免 Uvicorn 再次导入 main 模块，
+    # 减少本地开发阶段的额外进程和初始化歧义。
+    app_target = "main:app" if enable_reload else app
+    uvicorn.run(app_target, host="0.0.0.0", port=8000, reload=enable_reload)

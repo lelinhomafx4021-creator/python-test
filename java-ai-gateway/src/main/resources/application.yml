@@ -4,8 +4,8 @@
 spring:
   application:
     name: java-ai-gateway
-  
-  # --- 数据库连接池优化 (面试加分点：懂连接池管理) ---
+
+  # --- 数据库连接池优化（主业务真相存储） ---
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/ai_investor?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
     username: root
@@ -17,7 +17,20 @@ spring:
       connection-timeout: 30000      # 等待连接池分配连接的最大时长（30秒）
       max-lifetime: 1800000          # 一个连接在池里的最长存活时间
       idle-timeout: 600000           # 连接退出的闲置时长
-  
+
+  # --- Redis：登录态、热点行情、配额计数、分布式锁 ---
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password:
+      timeout: 5s
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 1
+
   # --- Flyway 自动化建表配置 ---
   flyway:
     baseline-on-migrate: true
@@ -32,8 +45,20 @@ spring:
   rabbitmq:
     host: 127.0.0.1
     port: 5672
-    username: rabbitmq
-    password: rabbitmq
+    username: guest
+    password: guest
+
+  cloud:
+    # 本地开发阶段先关闭 Spring Cloud 与 Spring Boot 的版本拦截，
+    # 避免 Sentinel 接入时因为版本校验阻塞整套项目启动。
+    compatibility-verifier:
+      enabled: false
+    sentinel:
+      transport:
+        dashboard: 127.0.0.1:8858
+      eager: true
+      filter:
+        enabled: true
 mybatis-plus:
   configuration:
     map-underline-to-camel-case: true
@@ -49,6 +74,9 @@ python:
     base-url: http://localhost:8000
 
 app:
+  cache:
+    market-quote-ttl-seconds: 30
+    account-lock-seconds: 10
   mq:
     audit-exchange: ai.chat.audit.exchange
     audit-routing-key: ai.chat.audit.routing
@@ -59,6 +87,12 @@ management:
       exposure:
         include: health,info,metrics
 
-
-
+sa-token:
+  token-name: satoken
+  timeout: 2592000
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  token-style: uuid
+  is-log: false
 

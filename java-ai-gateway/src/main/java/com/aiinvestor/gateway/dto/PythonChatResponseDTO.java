@@ -6,49 +6,91 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 数据传输对象 (DTO)：专门用来承接从 Python AI 引擎返回的 JSON 数据
- * 
+ * ============================================================
+ * Python AI 引擎返回的聊天响应 - 数据传输对象 (DTO)
+ * ============================================================
+ *
+ * 架构说明：
+ *   Python 的 AI 引擎（基于 LangGraph）分析完毕后，
+ *   返回结构化的投研结果。本类就是这套结果在 Java 侧的"翻译"。
+ *
  * 面试要点：
- * 1. 为什么用 DTO 而不是直接用 Map？—— 因为 DTO 提供类型检查，代码更健壮，易于维护。
- * 2. 字段映射：通过 @JsonProperty 解决 Java(驼峰) 与 Python(下划线) 的命名差异。
+ *   为什么用 DTO 而不是直接 Map<String, Object>？
+ *   1. 类型安全：编译期就能发现字段拼写错误，Map 要到运行时才报错
+ *   2. 自文档化：字段名 + 注释就是 API 文档
+ *   3. IDE 友好：自动补全、重构、查找引用
+ *   4. 维护性：字段变更时编译器会告诉你哪里需要改
+ *
+ * @author AI Investor Team
  */
 @Data
 public class PythonChatResponseDTO {
-    // 状态码：200 表示成功，其他表示失败
+
+    /** 状态码：200 表示成功，其他表示失败 */
     private int code;
-    // 提示信息
+
+    /** 状态描述信息 */
     private String message;
-    // 核心业务数据部分
+
+    /** 核心业务数据（嵌套对象，见下方 DataResult） */
     private DataResult data;
 
+    /**
+     * 响应数据的具体内容。
+     * 使用静态内部类是为了保持命名空间的整洁。
+     */
     @Data
     public static class DataResult {
-        // AI 链路追踪唯一标识
+
+        /** 全链路追踪 ID（与请求中的 trace_id 对应） */
         @JsonProperty("trace_id")
         private String traceId;
-        
-        // AI 给出的回答原文（支持 Markdown 格式）
+
+        /** AI 生成的最终回答（支持 Markdown 格式渲染） */
         private String answer;
-        
-        // 回答依据的来源（比如：研报文件名、网页链接）
+
+        /** 回答的数据来源（如：研报文件名、网页链接） */
         private String source;
-        
-        // 意图识别结果（由 Python 的 IntentNode 识别得出）
+
+        /**
+         * 意图识别结果。
+         * Python 的 IntentNode（LangGraph 的一个节点）会先判断用户
+         * 是想"投资分析"还是"闲聊"，从而走不同的处理分支。
+         */
         private String intent;
-        
-        // 评审是否通过：LangGraph 中的 Critic 节点会判断回答是否含有幻觉
+
+        /**
+         * 幻觉检测结果。
+         * LangGraph 中的 Critic 节点（评审员）会检查 AI 回答是否
+         * 包含虚假信息。这里存入 JSON 时用下划线风格。
+         */
         @JsonProperty("review_passed")
         private boolean reviewPassed;
-        
-        // 评审未通过的原因（如果有幻觉，这里会说明原因）
+
+        /** 如果 review_passed=false，这里会说明检测到的具体问题 */
         @JsonProperty("review_reason")
         private String reviewReason;
 
-        // A2A 消息详情：多智能体之间思考和对话的过程
+        /**
+         * A2A（Agent-to-Agent）消息记录。
+         * 多智能体协作时，各个 Agent 之间的思考对话过程会记录在这里。
+         * 每个 Map 代表一个 Agent 的一次发言。
+         */
         @JsonProperty("a2a_messages")
         private List<Map<String, Object>> a2aMessages;
 
-        // --- 核心：AI 提取出来的结构化投研指标 (如结论、风险点) ---
+        /**
+         * 【核心】AI 从非结构化文本中提取的结构化投研指标。
+         *
+         * 例如：
+         * {
+         *   "conclusion": "建议买入，目标价 150 元",
+         *   "risk_points": ["行业竞争加剧", "政策不确定性"],
+         *   "financial_metrics": {"pe": 25.3, "roe": 0.18}
+         * }
+         *
+         * 这些结构化数据可供前端渲染成图表或卡片。
+         */
         @JsonProperty("structured_data")
         private Map<String, Object> structuredData;
     }

@@ -73,50 +73,44 @@ def parse_pdf(file_path: str) -> list[DocChunk]:
     返回: DocChunk 列表，每个元素对应一页的文本
     """
 
-    # fitz.open() 打开 PDF 文件
-    # 底层是 C 代码在解析，速度是纯 Python 库（比如 PyPDF2）的 10-50 倍
-    doc = fitz.open(file_path)
-
     # Path 是 pathlib 模块的路径对象，比 os.path 更现代
     # .name 属性取文件名（不含目录），比如 "研报.pdf"
     file_name = Path(file_path).name
-
     chunks = []
-    total_pages = len(doc)
 
-    # enumerate(doc, start=1) 遍历每一页
-    # start=1 让页码从 1 开始（人类习惯），而不是程序员的 0
-    for page_num, page in enumerate(doc, start=1):
+    # 用 with 管理 PDF 句柄：即使中途报错，也能自动释放底层资源。
+    # 对 C 扩展库（PyMuPDF）尤为重要。
+    with fitz.open(file_path) as doc:
+        total_pages = len(doc)
 
-        # get_text("text") 提取该页的纯文本
-        # 其他选项：
-        #   "html"  → 带格式的 HTML
-        #   "dict"  → 详细的文本块信息（坐标、字体等）
-        #   "blocks" → 文本块列表
-        # 我们只需要纯文本，所以用 "text"
-        text = page.get_text("text")
+        # enumerate(doc, start=1) 遍历每一页
+        # start=1 让页码从 1 开始（人类习惯），而不是程序员的 0
+        for page_num, page in enumerate(doc, start=1):
+            # get_text("text") 提取该页的纯文本
+            # 其他选项：
+            #   "html"  → 带格式的 HTML
+            #   "dict"  → 详细的文本块信息（坐标、字体等）
+            #   "blocks" → 文本块列表
+            # 我们只需要纯文本，所以用 "text"
+            text = page.get_text("text")
 
-        # strip() 去掉首尾空白符（空格、换行、制表符等）
-        # 有些 PDF 页面可能是空白页（比如封面背面），需要过滤掉
-        text = text.strip()
-        if not text:
-            continue
+            # strip() 去掉首尾空白符（空格、换行、制表符等）
+            # 有些 PDF 页面可能是空白页（比如封面背面），需要过滤掉
+            text = text.strip()
+            if not text:
+                continue
 
-        # 构造 DocChunk，带上元数据
-        # 元数据非常重要！检索到这段文本后，用户想知道"这段话来自哪个文件的第几页"
-        chunks.append(DocChunk(
-            text=text,
-            metadata={
-                "source": file_name,           # 来源文件名
-                "page": page_num,              # 第几页
-                "total_pages": total_pages,     # 总页数
-                "file_type": "pdf",            # 文件类型标记
-            }
-        ))
-
-    # 关闭文件，释放 C 层的内存
-    # 不关的话可能会内存泄漏（虽然 Python 有 GC，但 C 层资源不受 GC 管）
-    doc.close()
+            # 构造 DocChunk，带上元数据
+            # 元数据非常重要！检索到这段文本后，用户想知道"这段话来自哪个文件的第几页"
+            chunks.append(DocChunk(
+                text=text,
+                metadata={
+                    "source": file_name,           # 来源文件名
+                    "page": page_num,              # 第几页
+                    "total_pages": total_pages,     # 总页数
+                    "file_type": "pdf",            # 文件类型标记
+                }
+            ))
 
     print(f"[PDF解析] {file_name}: 共 {total_pages} 页，提取了 {len(chunks)} 个文本块")
     return chunks
@@ -201,7 +195,7 @@ def parse_file(file_path: str) -> list[DocChunk]:
 
     elif ext in {".txt", ".md"}:
         # 文本类文件直接整体读入，后续再由 chunker 统一切片。
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             text = f.read()
         return [DocChunk(text=text, metadata={"source": Path(file_path).name, "file_type": ext[1:]})]
 
@@ -246,6 +240,8 @@ def parse_dir(dir_path: str) -> list[DocChunk]:
         f for f in dir_p.iterdir()
         if f.is_file() and f.suffix.lower() in supported
     ]
+    # 固定排序，保证同一批文件多次运行时输出顺序一致（便于调试与对比）。
+    files.sort(key=lambda item: item.name.lower())
 
     if not files:
         print(f"[警告] 目录 {dir_path} 下没有找到 PDF/DOCX 文件")

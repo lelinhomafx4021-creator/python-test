@@ -7,26 +7,76 @@ from langchain_core.tools import tool
 from tavily import TavilyClient
 
 from app.core.config import settings
+from app.core.logger import logger
 from app.rag.vector_store import VectorStore
 
 
-# 本地知识库入口。
-# 这里会连 PostgreSQL + pgvector，去 doc_chunks 里查相似内容。
-my_vector = VectorStore(
-    db_url=settings.DATABASE_URL,
-    api_key=settings.DASH_API_KEY,
-    collection_name="doc_chunks",
-)
+# 本地知识库入口做成懒加载。
+# 这样即使数据库暂时不可用，也不会在 import 阶段直接把整个服务拖死。
+_vector_store: VectorStore | None = None
+
+# 联网客户端做成模块级缓存，避免每次请求都重复初始化。
+_tavily_client: TavilyClient | None = None
+
+
+def _get_vector_store() -> VectorStore | None:
+    """懒加载本地向量库；连接失败时返回 None。"""
+    global _vector_store
+    if _vector_store is not None:
+        return _vector_store
+
+    try:
+        _vector_store = VectorStore(
+            db_url=settings.DATABASE_URL,
+            api_key=settings.DASH_API_KEY,
+            collection_name="doc_chunks",
+        )
+    except Exception as exc:
+        logger.warning("本地向量库初始化失败，已跳过本地检索：%s", exc)
+        _vector_store = None
+    return _vector_store
+
+
+def _clamp_top_k(top_k: int, *, min_k: int = 1, max_k: int = 8) -> int:
+    """约束 top_k 的范围，避免传入异常值导致检索开销失控。"""
+    try:
+        normalized = int(top_k)
+    except (TypeError, ValueError):
+        normalized = min_k
+    return max(min_k, min(max_k, normalized))
+
+
+def _get_tavily_client() -> TavilyClient | None:
+    """懒加载 Tavily 客户端；未配置 Key 时返回 None。"""
+    global _tavily_client
+    if _tavily_client is not None:
+        return _tavily_client
+
+    api_key = settings.SEARCHER_API
+    if not api_key:
+        return None
+
+    _tavily_client = TavilyClient(api_key=api_key)
+    return _tavily_client
 
 
 async def _search_local_async(query: str, top_k: int = 3) -> str:
     """先查本地知识库。"""
-    loop = asyncio.get_event_loop()
-    # my_vector.search 是同步函数，这里放线程池，避免阻塞异步主循环。
-    results = await loop.run_in_executor(
-        None,
-        lambda: my_vector.search(query, top_k=top_k),
-    )
+    vector_store = _get_vector_store()
+    if vector_store is None:
+        return ""
+
+    loop = asyncio.get_running_loop()
+    try:
+        # VectorStore.search 是同步函数，这里放线程池，避免阻塞异步主循环。
+        results = await loop.run_in_executor(
+            None,
+            lambda: vector_store.search(query, top_k=top_k),
+        )
+    except Exception as exc:
+        logger.warning("本地向量库检索失败，已回退为无结果：%s", exc)
+        return ""
+
     if not results:
         return ""
 
@@ -36,11 +86,10 @@ async def _search_local_async(query: str, top_k: int = 3) -> str:
 
 async def _search_web_async(query: str, top_k: int = 3) -> str:
     """本地没有时，再走联网搜索。"""
-    api_key = settings.SEARCHER_API
-    if not api_key:
+    client = _get_tavily_client()
+    if client is None:
         return ""
 
-    client = TavilyClient(api_key=api_key)
     try:
         # Tavily 官方 SDK 是同步接口。
         # 这里丢到线程里跑，避免卡住 async 主流程。
@@ -78,6 +127,22 @@ def _clean_queries(queries: list[str]) -> list[str]:
     return cleaned
 
 
+async def _first_non_empty_result(
+    queries: list[str],
+    search_fn,
+    top_k: int,
+) -> str:
+    """并发执行多条查询，按原查询顺序返回第一条非空结果。"""
+    tasks = [asyncio.create_task(search_fn(query, top_k=top_k)) for query in queries]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # 保持“输入优先级”语义：即使并发执行，也按原顺序挑第一条可用结果。
+    for result in results:
+        if isinstance(result, str) and result.strip():
+            return result
+    return ""
+
+
 async def run_retrieval_async(
     queries: list[str],
     mode: Literal["local", "web", "auto"] = "auto",
@@ -94,37 +159,41 @@ async def run_retrieval_async(
     cleaned_queries = _clean_queries(queries)
     if not cleaned_queries:
         return ""
+    normalized_top_k = _clamp_top_k(top_k)
 
     if mode == "local":
-        # 仅本地模式：命中即返回，减少不必要查询。
-        for query in cleaned_queries:
-            local_result = await _search_local_async(query, top_k=min(top_k, 3))
-            if local_result:
-                return local_result
-        return ""
+        # 仅本地模式：并发查多条 query，返回第一条命中结果。
+        return await _first_non_empty_result(
+            cleaned_queries,
+            _search_local_async,
+            top_k=min(normalized_top_k, 3),
+        )
 
     if mode == "web":
         # 仅联网模式：适合知识库尚未导入或需要最新资讯。
-        for query in cleaned_queries:
-            web_result = await _search_web_async(query, top_k=min(top_k, 3))
-            if web_result:
-                return web_result
-        return ""
+        return await _first_non_empty_result(
+            cleaned_queries,
+            _search_web_async,
+            top_k=min(normalized_top_k, 3),
+        )
 
     # auto 模式不要再“自己调自己”了。
     # 这里直接写顺序逻辑，新手读起来更直观：
     # 先本地，没查到再联网。
-    for query in cleaned_queries:
-        local_result = await _search_local_async(query, top_k=min(top_k, 3))
-        if local_result:
-            return local_result
+    local_result = await _first_non_empty_result(
+        cleaned_queries,
+        _search_local_async,
+        top_k=min(normalized_top_k, 3),
+    )
+    if local_result:
+        return local_result
 
-    for query in cleaned_queries:
-        web_result = await _search_web_async(query, top_k=min(top_k, 3))
-        if web_result:
-            return web_result
-
-    return ""
+    web_result = await _first_non_empty_result(
+        cleaned_queries,
+        _search_web_async,
+        top_k=min(normalized_top_k, 3),
+    )
+    return web_result
 
 
 @tool

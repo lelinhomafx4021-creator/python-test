@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  # --- 业务数据库 ---
+  # 主业务数据库：Java 侧的业务真相存储
   mysql:
     image: mysql:8.0
     restart: always
@@ -12,9 +10,19 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./data/mysql:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
 
-  # --- 消息队列 (RabbitMQ) ---
+  # 缓存与分布式锁：登录态、行情缓存、配额计数
+  redis:
+    image: redis:7
+    restart: always
+    container_name: ai-investor-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # 消息队列：异步审计与后续事件消费
   rabbitmq:
     image: rabbitmq:3-management
     restart: always
@@ -26,9 +34,9 @@ services:
       - "5672:5672"
       - "15672:15672"
     volumes:
-      - ./data/rabbit:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq
 
-  # --- 向量数据库 (PostgreSQL + pgvector) ---
+  # 向量数据库：Python 侧的检索与 Langfuse 依赖的 Postgres
   postgres:
     image: ankane/pgvector:latest
     restart: always
@@ -40,9 +48,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
 
-  # --- LangFuse AI 可观测性平台 ---
+  # AI 观测平台：链路追踪、时延诊断、调试分析
   langfuse:
     image: langfuse/langfuse:2
     restart: always
@@ -60,4 +68,18 @@ services:
       - LANGFUSE_INIT_ORG_NAME=AI-Investor-Org
       - LANGFUSE_INIT_PROJECT_NAME=Investor-Agent
       - LANGFUSE_INIT_USER_EMAIL=admin@example.com
-      - LANGFUSE_INIT_USER_PASSWORD=123456
+      - LANGFUSE_INIT_USER_PASSWORD=12345678
+
+  # 流控与降级控制台：给 Java 的 Sentinel 接入使用
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.8
+    restart: always
+    container_name: ai-investor-sentinel
+    ports:
+      - "8858:8858"
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
+  postgres_data:

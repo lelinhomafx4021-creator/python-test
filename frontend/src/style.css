@@ -9,18 +9,15 @@
   }
 
   body {
-    @apply bg-light-bg text-slate-800 antialiased;
-    background: radial-gradient(circle at top right, #ffffff, #f1f5f9);
+    @apply antialiased;
+    color: #0f172a;
+    background: linear-gradient(180deg, #eef4fb 0%, #f7f9fc 100%);
     overflow: hidden;
   }
 }
 
-.glass-panel {
-  @apply bg-white/70 border border-white/20 backdrop-blur-xl shadow-lg;
-}
-
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -28,16 +25,21 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(51, 65, 85, 0.16);
   border-radius: 10px;
 }
 
 .markdown-body {
-  @apply leading-relaxed space-y-4;
+  @apply text-zinc-800;
 }
 
-.markdown-body p { @apply my-2; }
-.markdown-body code { @apply bg-white/10 px-1 rounded text-primary text-sm; }
-.markdown-body ul { @apply list-disc list-inside; }
-.markdown-body h1 { @apply text-xl font-bold border-b border-white/10 pb-2; }
-.markdown-body h2 { @apply text-lg font-bold; }
+.markdown-body p { @apply my-4 leading-8; }
+.markdown-body code { @apply rounded bg-slate-100 px-1.5 py-0.5 text-[0.92em] text-slate-900; }
+.markdown-body pre { @apply my-5 overflow-x-auto rounded-[24px] bg-slate-950 p-4 text-slate-100; }
+.markdown-body pre code { @apply bg-transparent p-0 text-zinc-100; }
+.markdown-body ul { @apply my-4 list-disc space-y-2 pl-6; }
+.markdown-body ol { @apply my-4 list-decimal space-y-2 pl-6; }
+.markdown-body h1 { @apply mb-4 mt-8 text-2xl font-semibold text-slate-950; }
+.markdown-body h2 { @apply mb-3 mt-7 text-xl font-semibold text-slate-950; }
+.markdown-body h3 { @apply mb-2 mt-6 text-lg font-semibold text-slate-900; }
+.markdown-body blockquote { @apply my-4 border-l-2 border-slate-300 pl-4 text-slate-500; }

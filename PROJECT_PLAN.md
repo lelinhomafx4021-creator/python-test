@@ -1,156 +1,124 @@
-# AI Investor 智能投研助手 · 项目规划书
+# AI 投顾会员终端一期计划书
 
-> 定位：校招面试级全栈 AI Agent 项目，展示 LLM 应用工程化能力
+## 一期目标
 
----
+把当前仓库从“AI 问答演示项目”升级为“可持续扩展的投顾会员终端”。
 
-## 一、项目概述
+一期主打四个能力面：
 
-AI Investor 是一款基于 **LangGraph + FastAPI + Vue 3** 的智能投研助手。
-核心能力：用户提出投研问题 → AI 自动检索多路数据源 → 生成报告 → 专家评审 → 自动纠错。
+- 会员身份与配额
+- 行情与自选
+- AI 投研副驾
+- 模拟交易
 
-### 技术亮点（面试专用）
-| 模块 | 技术方案 | 面试谈资 |
-|------|---------|---------|
-| Agent 架构 | LangGraph StateGraph + 条件边 | Self-RAG 闭环纠错 |
-| 检索引擎 | Vector + BM25 混合检索 | RRF 融合算法 |
-| 流式输出 | FastAPI SSE + Vue EventSource | 全异步生成器 |
-| 前端交互 | Gemini 风格居中式 UI | 思考过程可视化 |
-| 安全防护 | CSS user-select + JS 事件拦截 | 投研内容保护 |
+同时保留人工兜底能力，形成 `AI -> 转人工 -> 工单可见` 的业务闭环。
 
----
+## 业务域拆分
 
-## 二、系统架构
+Java 主工程按模块化单体推进，当前规划为：
 
-```
-用户浏览器 (Vue 3 / Vite)
-    │  SSE 流式
-    ▼
-Java 网关 (Spring Boot WebFlux)
-    │  鉴权 / 限流 / 审计
-    ▼
-Python AI 服务 (FastAPI async)
-    │
-    ├── LangGraph 工作流
-    │     ├── rewrite_node  (问题重写)
-    │     ├── search_node   (混合检索)
-    │     ├── answer_node   (报告生成)
-    │     └── critic_node   (专家评审) ──┐
-    │            ▲                      │
-    │            └──── 打回重做 ─────────┘
-    │
-    ├── RAG 引擎
-    │     ├── Vector Store (语义检索)
-    │     ├── BM25 Scorer  (关键词检索)
-    │     ├── RRF Fusion   (结果融合)
-    │     └── Rerank        (精选重排)
-    │
-    └── 数据入库
-          ├── PDF 解析
-          └── Semantic Chunking (语义切分)
-```
+- `identity`
+- `membership`
+- `market`
+- `watchlist`
+- `papertrading`
+- `ai`
+- `ops`
+- `shared`
 
----
+Python 继续作为 AI 侧车存在，专注：
 
-## 三、目录结构
+- 流式问答
+- 投研解释
+- 标题摘要
+- 行情适配
 
-```
-ai-investor/
-├── frontend/                # Vue 3 + Vite 前端
-│   └── src/
-│       ├── App.vue          # Gemini 风格主页面
-│       └── style.css        # 全局样式 + 防复制
-│
-├── aipy2/                   # Python AI 核心服务
-│   ├── main.py              # FastAPI 启动入口
-│   ├── app/
-│   │   ├── core/
-│   │   │   ├── config.py          # 配置管理
-│   │   │   ├── llm.py             # LLM 初始化
-│   │   │   └── multi_graph_agent.py  # ★ LangGraph 工作流
-│   │   ├── api/healthy/
-│   │   │   └── chat.py            # SSE 流式接口
-│   │   ├── tools/
-│   │   │   └── retriever_tool.py  # ★ 混合检索引擎
-│   │   └── rag/
-│   │       └── vector_store.py    # 向量库封装
-│   └── scripts/
-│       └── ingest_docs.py         # 语义切分入库脚本
-│
-└── gateway/                 # Java Spring Boot 网关
-    └── (鉴权/限流/审计)
-```
+## 一期主业务模型
 
----
+### 用户与会员
 
-## 四、核心模块说明
+- `users`
+- `user_profiles`
+- `membership_plans`
+- `user_memberships`
+- `user_feature_quotas`
 
-### 4.1 LangGraph 自反思工作流 (`multi_graph_agent.py`)
-- **AgentState**: 包含 `messages`(消息流)、`queries`(子查询)、`knowledge`(检索知识)、`retry_count`(重试计数)、`review_status`(评审结论)
-- **节点链路**: `rewrite → search → answer → critic → (pass→END / fail→rewrite)`
-- **防死循环**: `retry_count >= 3` 时强制通过
+### 行情与自选
 
-### 4.2 混合检索引擎 (`retriever_tool.py`)
-- **三路并发**: Vector + BM25 + Web 同时执行
-- **RRF 融合**: `Score = Σ 1/(k + rank)`，k=60
-- **BM25 公式**: `Score = Σ IDF × (TF×(k1+1)) / (TF + k1×(1-b+b×L/avgL))`
+- `stocks`
+- `sectors`
+- `market_quotes`
+- `watchlists`
+- `watchlist_items`
 
-### 4.3 Gemini 风格前端 (`App.vue`)
-- **双视图模式**: Splash(居中搜索) ↔ Chat(对话流) 平滑切换
-- **思考过程**: 可折叠的 Thought Process 面板，展示 LangGraph 节点状态
-- **SSE 解析**: JSON 格式解析 `{ stage, data }` 结构化事件
+### 模拟交易
 
----
+- `paper_accounts`
+- `paper_positions`
+- `paper_orders`
+- `paper_trades`
+- `paper_daily_assets`
 
-## 五、环境配置
+### AI 与运营
 
-### 依赖
-```
-# Python
-fastapi, uvicorn, langchain, langgraph, httpx, pydantic
+- `ai_chat_turns`
+- `ai_chat_audit`
+- `ai_handoff_tickets`
+- `ai_sessions`
+- `ai_usage_records`
+- `system_configs`
 
-# Frontend
-vue@3, vite, markdown-it, lucide-vue-next
-```
+## 一期接口规划
 
-### 环境变量 (.env)
-```
-DASH_API_KEY=xxx          # 通义千问 API
-SERPER_API_KEY=xxx        # 联网搜索
-DATABASE_URL=postgresql+psycopg://...
-```
+### 用户与会员
 
-### 启动命令
-```bash
-# 后端
-cd aipy2 && python -m uvicorn main:app --port 8000
+- `GET /api/v1/users/me`
+- `GET /api/v1/memberships/me`
+- `GET /api/v1/quotas/me`
 
-# 前端
-cd frontend && npm run dev
-```
+### 行情与自选
 
----
+- `GET /api/v1/market/quotes`
+- `GET /api/v1/sectors`
+- `GET /api/v1/watchlists`
+- `POST /api/v1/watchlists`
+- `POST /api/v1/watchlists/{id}/items`
+- `DELETE /api/v1/watchlists/{id}/items/{itemId}`
 
-## 六、已完成 & 待办
+### 模拟交易
 
-### ✅ 已完成
-- [x] 全异步 FastAPI + LangGraph 架构
-- [x] Self-RAG 闭环 (Critic Node + Conditional Edge)
-- [x] BM25 + Vector 混合检索 + RRF 融合
-- [x] Rerank 重排序
-- [x] 语义切分 (Semantic Chunking)
-- [x] Gemini 风格 UI + 思考过程可视化
-- [x] 内容安全防护 (防复制粘贴)
-- [x] SSE 流式输出全链路打通
+- `GET /api/v1/paper/accounts/me`
+- `GET /api/v1/paper/accounts/{id}/positions`
+- `GET /api/v1/paper/accounts/{id}/orders`
+- `POST /api/v1/paper/orders`
+- `POST /api/v1/paper/orders/{id}/cancel`
 
-### 🔲 后续可拓展
-- [ ] 接入真实 PDF 解析库 (PyMuPDF)
-- [ ] 接入真实 Rerank 模型 (如 bge-reranker)
-- [ ] 增加多轮对话记忆 (LangGraph Checkpointer)
-- [ ] Java 网关完整鉴权链路
-- [ ] Docker Compose 一键部署
-- [ ] 前端暗色/亮色主题切换
+### AI 副驾
 
----
+- `POST /api/v1/ai/chat`
+- `POST /api/v1/ai/chat/stream`
+- `GET /api/v1/ai/handoff-tickets`
 
-> 📌 本文档是项目的核心参考，新会话中可直接阅读此文件恢复上下文。
+## 基础设施口径
+
+- `MySQL`：业务真相
+- `Redis`：缓存、登录态、锁、配额
+- `RabbitMQ`：异步任务与审计
+- `Postgres + pgvector`：向量检索
+- `Langfuse`：观测
+- `Sentinel`：流控与降级
+
+## 一期原则
+
+- 不做真实券商接入
+- 不做复杂撮合引擎
+- 不做完整 CMS / 后台运营平台
+- 先把“可演示、可扩展、可继续开发”的主链路做扎实
+
+## 后续二期建议
+
+- 接入更完整的会员权益后台
+- 增加提醒中心与异步任务编排
+- 完善 AI 使用量计费与统计
+- 引入更细的风控规则与人工处理台
+- 逐步拆出行情采集服务与策略服务

@@ -2,18 +2,84 @@
 
 本模块当前提供：
 - `/ai/v1/util/generate_title`：根据用户问题自动生成简短标题。
+- `/ai/v1/util/health`：用于本地启动脚本探活。
+- `/ai/v1/util/market/quotes`：给 Java 主业务服务提供统一行情适配接口。
 
 典型用途：
 - 聊天列表页第一轮对话结束后，异步请求标题用于展示会话名称。
 """
 
-from fastapi import APIRouter, Request
+import json
+
+from fastapi import APIRouter, Query, Request
 
 from app.core.llm import llm
 from app.core.logger import logger
 from app.prompts.investor_prompts import GENERATE_TITLE_PROMPT, TITLE_PARSER
+from app.tools.stockdata_tool import get_stock_quote_core
 
 router = APIRouter(prefix="/ai/v1/util", tags=["AI通用工具接口"])
+
+
+@router.get("/health")
+async def health():
+    """轻量健康检查接口。"""
+    return {"code": 200, "data": {"status": "ok"}, "message": "成功"}
+
+
+@router.get("/market/quotes")
+async def market_quotes(symbols: str = Query(..., description="多个股票代码，使用逗号分隔")):
+    """批量获取股票行情。
+
+    这是给 Java 主业务侧调用的内部适配接口，统一返回稳定的英文键名，
+    这样 Java 不需要直接感知第三方行情源的原始字段结构。
+    """
+    result = []
+    for raw_symbol in symbols.split(","):
+        symbol = raw_symbol.strip()
+        if not symbol:
+            continue
+
+        try:
+            payload = json.loads(get_stock_quote_core.invoke({"symbol": symbol}))
+            if payload.get("error"):
+                result.append(
+                    {
+                        "symbol": symbol,
+                        "status": "error",
+                        "message": payload["error"],
+                    }
+                )
+                continue
+
+            result.append(
+                {
+                    "symbol": payload.get("代码") or symbol,
+                    "name": payload.get("名称") or symbol,
+                    "lastPrice": payload.get("最新价"),
+                    "highPrice": payload.get("最高价"),
+                    "lowPrice": payload.get("最低价"),
+                    "openPrice": payload.get("今开"),
+                    "changePercent": payload.get("涨跌幅(%)"),
+                    "changeAmount": payload.get("涨跌额"),
+                    "volume": payload.get("成交量(手)"),
+                    "turnover": payload.get("成交额(元)"),
+                    "turnoverRate": payload.get("换手率(%)"),
+                    "amplitude": payload.get("振幅(%)"),
+                    "status": "ok",
+                }
+            )
+        except Exception as exc:
+            logger.warning("批量行情接口查询失败，symbol=%s, error=%s", symbol, exc)
+            result.append(
+                {
+                    "symbol": symbol,
+                    "status": "error",
+                    "message": "行情查询失败",
+                }
+            )
+
+    return {"code": 200, "data": {"quotes": result}, "message": "成功"}
 
 
 def _normalize_title(raw_title: str) -> str:

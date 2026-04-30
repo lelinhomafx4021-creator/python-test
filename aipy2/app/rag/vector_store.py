@@ -40,6 +40,7 @@ from typing import Optional
 # psycopg2: PostgreSQL 的 Python 驱动（同步版）
 # -binary 后缀表示预编译版本，不需要本地编译 C 代码
 import psycopg2
+from psycopg2.extras import execute_values
 
 # pgvector 的 psycopg2 集成
 # register_vector() 让 psycopg2 认识 VECTOR 类型
@@ -81,6 +82,7 @@ class VectorStore:
         self.collection_name = collection_name
         self.api_key = api_key
         self.embedding_model = embedding_model
+        self.http_timeout = 30
         
         # 阿里云官方提供的兼容 OpenAI 格式的接口地址
         self.api_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
@@ -97,55 +99,38 @@ class VectorStore:
         register_vector(self.conn)
 
     def create_collection(self):
-        """
-        【创建向量表：就像在电脑里分出一个专门存照片的文件夹】
+        """校验 RAG 相关表是否已经由 Alembic 初始化完成。
+
+        注意：
+        - 这个方法现在不再负责“建表”
+        - 它只负责“检查表是否存在”
+        - 如果表不存在，会明确提示先执行 `alembic upgrade head`
         """
         cur = self.conn.cursor()
-        # 1. 激活 pgvector 插件
+        # 保险起见，先确认 pgvector 扩展已经启用。
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
-
-        # 2. 建表语句 (SQL)
-        # embedding 列的类型是 vector(1024)，这就是存放“文字指纹”的地方
-        cur.execute(f"""
-            CREATE TABLE IF NOT EXISTS {self.collection_name} (
-                id          TEXT PRIMARY KEY,
-                content     TEXT NOT NULL,
-                source      VARCHAR(255),
-                page        INTEGER,
-                chunk_index INTEGER DEFAULT 0,
-                file_type   VARCHAR(50),
-                embedding   vector({self.vector_size})
-            )
-        """)
-
-        # 3. 创建 HNSW 索引（这是检索起飞的关键！）
-        # 面试建议：一定要提到 HNSW。它是目前向量检索中最快的算法。
-        # 它像是在知识库里建立了一个“高速公路网”，AI 找资料不用挨个查，顺着路标找就行。
-        cur.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_{self.collection_name}_embedding
-            ON {self.collection_name}
-            USING hnsw (embedding vector_cosine_ops)
-            WITH (m = 16, ef_construction = 200)
-        """)
-
-        # 【教学修改】文档入库登记表。
-        # 这张表不存正文，只存“这个文件上次入库时的指纹(hash)”。
-        # 以后重复跑脚本时，先看 hash 有没有变化，没变化就直接跳过，
-        # 这样就不会重复花 embedding 的钱。
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS ai_ingest_registry (
-                source      VARCHAR(255) PRIMARY KEY,
-                file_hash   TEXT NOT NULL,
-                updated_at  TIMESTAMP DEFAULT NOW()
-            )
-        """)
+        # 检查文档切片表是否存在。
+        cur.execute("SELECT to_regclass(%s)", (self.collection_name,))
+        collection_exists = cur.fetchone()[0]
+        # 检查文档入库登记表是否存在。
+        cur.execute("SELECT to_regclass('ai_ingest_registry')")
+        registry_exists = cur.fetchone()[0]
         cur.close()
+
+        # 只要缺任意一张关键表，就直接报错，提醒先跑 Alembic。
+        if not collection_exists or not registry_exists:
+            raise RuntimeError(
+                "Missing RAG tables. Run `alembic upgrade head` before using the vector store."
+            )
 
     def _get_embeddings(self, texts: list[str]) -> list[list[float]]:
         """
         【中转站：把文字变成数字】
         调用阿里 API，把一句话变成一个 1024 维的坐标点。
         """
+        if not texts:
+            return []
+
         all_embeddings = []
         # 【教学修改】这里按当前阿里接口的真实限制来。
         # 我们刚才实测报错里已经明确说了：单次不能超过 10 条。
@@ -162,14 +147,24 @@ class VectorStore:
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }
-            resp = requests.post(self.api_url, json=payload, headers=headers)
+            resp = requests.post(
+                self.api_url,
+                json=payload,
+                headers=headers,
+                timeout=self.http_timeout,
+            )
             if resp.status_code != 200:
-                raise Exception(f"API 失败: {resp.text}")
+                raise RuntimeError(f"Embedding API 失败（HTTP {resp.status_code}）：{resp.text}")
             
             data = resp.json()
+            batch_vectors = data.get("data", [])
+            if len(batch_vectors) != len(batch):
+                raise RuntimeError(
+                    f"Embedding API 返回数量异常：输入 {len(batch)} 条，返回 {len(batch_vectors)} 条"
+                )
             # 这里按 API 返回顺序追加向量，保持与输入 texts 的顺序对齐。
             # 后面 add_documents 会用 zip(chunks, embeddings) 一一对应入库。
-            for item in data["data"]:
+            for item in batch_vectors:
                 all_embeddings.append(item["embedding"])
 
         return all_embeddings
@@ -185,19 +180,22 @@ class VectorStore:
         embeddings = self._get_embeddings(texts)
         # 关键假设：embeddings 的长度和 chunks 一致，且顺序一致。
         # 若三方接口行为变化，这里会导致文本和向量错位，检索结果会变差。
+        if len(embeddings) != len(chunks):
+            raise RuntimeError(
+                f"向量数量与文档数量不一致：chunks={len(chunks)} embeddings={len(embeddings)}"
+            )
 
         cur = self.conn.cursor()
-        # 批量插入：减少网络连接次数，速度更快
+        # 批量插入：使用 execute_values 在大量数据时比 executemany 更快。
         insert_sql = f"""
             INSERT INTO {self.collection_name}
                 (id, content, source, page, chunk_index, file_type, embedding)
-            VALUES
-                (%s, %s, %s, %s, %s, %s, %s)
+            VALUES %s
             ON CONFLICT (id) DO NOTHING
         """
-        params = []
+        values = []
         for chunk, vec in zip(chunks, embeddings):
-            params.append((
+            values.append((
                 str(uuid.uuid4()),
                 chunk.text,
                 chunk.metadata.get("source", ""),
@@ -207,7 +205,7 @@ class VectorStore:
                 vec,
             ))
 
-        cur.executemany(insert_sql, params)
+        execute_values(cur, insert_sql, values)
         cur.close()
 
     def delete_by_sources(self, sources: list[str]):
@@ -226,9 +224,8 @@ class VectorStore:
             return
 
         cur = self.conn.cursor()
-        delete_sql = f"DELETE FROM {self.collection_name} WHERE source = %s"
-        for source in cleaned_sources:
-            cur.execute(delete_sql, (source,))
+        delete_sql = f"DELETE FROM {self.collection_name} WHERE source = ANY(%s)"
+        cur.execute(delete_sql, (cleaned_sources,))
         cur.close()
 
     def get_source_hash(self, source: str) -> Optional[str]:
@@ -264,6 +261,13 @@ class VectorStore:
         这是最神奇的地方：哪怕你搜“盈利”，数据库也能找到“净利润”，
         因为它算的是两个坐标点之间的【角度】（余弦距离）。
         """
+        query = (query or "").strip()
+        if not query:
+            return []
+
+        # 保护查询规模：最多返回 20 条，避免误传大值拖慢 SQL。
+        top_k = max(1, min(int(top_k), 20))
+
         # 1. 先把搜索词也变成向量
         query_vec = self._get_embeddings([query])[0]
         # 格式化成 PG 认识的字符串格式 [0.1, 0.2...]

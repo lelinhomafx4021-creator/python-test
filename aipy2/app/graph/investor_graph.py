@@ -1,10 +1,65 @@
 ﻿"""
-终极进化版：带有“自我反思”机制的 AI 投研助手 (LangGraph Self-RAG)
+================================================================================
+AI 投研助手 - LangGraph Self-RAG 工作流引擎
+================================================================================
 
-特点：
-1. 闭环控制：Answer -> Critic -> (Pass or Retry)
-2. 异步高性能：全部采用 astream / ainvoke
-3. 质量保险：检测到幻觉自动打回重搜
+这是整个 AI-Investor 项目最核心的文件，定义了 AI 推理的完整流程图。
+
+架构全景（类比：这就像是一个"聪明的 AI 生产线"）：
+
+  用户提问
+     │
+     ▼
+  ┌─────────┐    use_kb    ┌─────────┐    ┌─────────┐    ┌─────────┐
+  │ intent  │──────────────│ rewrite  │───▶│ search  │───▶│ answer  │
+  │(意图识别)│              │(问题改写) │    │(知识检索)│    │(生成回答)│
+  └─────────┘              └─────────┘    └─────────┘    └─────────┘
+     │ no_kb                                                    │
+     ▼                                                          ▼
+  ┌──────────────┐                                       ┌─────────┐
+  │direct_answer │                                       │ critic  │
+  │  (直接回答)   │                                       │(质量评审)│
+  └──────────────┘                                       └─────────┘
+       │                                                  │       │
+       │                                             fail │       │ pass
+       │                                     (打回重写)   │       │
+       │                                                  ▼       ▼
+       │                                              ┌──────────────┐
+       └──────────────────────────────────────────────│     END      │
+                                                      │  (输出结果)   │
+                                                      └──────────────┘
+
+核心设计理念（Self-RAG = Self-Reflective RAG）：
+
+1. 意图路由 (Intent Routing)
+   - 判断用户是在闲聊还是需要投研分析
+   - 闲聊→直接回答（不浪费检索资源）
+   - 投研→进入检索增强流程
+
+2. 闭环质量管控 (Closed-Loop Quality Control)
+   - Answer → Critic → Pass? YES → 输出
+   - Answer → Critic → Pass? NO → 带着反馈意见回到 Rewrite → 重新检索 → 重新回答
+   - 最多重试 3 次，防止死循环（安全兜底）
+
+3. 流式输出 (Streaming)
+   - 使用 LangGraph 的 astream 接口
+   - 同时订阅 updates（节点状态）和 messages（token 增量）
+   - 前端实时看到"正在思考..."→"正在检索..."→逐字输出→评审→完成
+
+技术要点（面试加分）：
+  - AgentState：LangGraph 的核心，像公文包一样在节点间传递
+  - add_messages：消息追加而非覆盖，保持完整对话历史
+  - Checkpointer：持久化对话状态，同一 threadId 可续接上下文
+  - 条件边 (Conditional Edges)：根据状态动态选择下一步（路由/评审判断）
+  - Pydantic Output Parser：将 LLM 的非结构化输出转为严格类型
+
+节点职责速查：
+  intent        - 意图识别：需要查资料吗？
+  direct_answer - 闲聊回答：礼貌回复，不查资料
+  rewrite       - 问题改写：把用户大白话转成精确搜索词
+  search        - 知识检索：本地向量库 + 联网搜索 + 实时行情
+  answer        - 生成回答：基于检索资料撰写投研报告
+  critic        - 质量评审：检测幻觉，决定通过或打回重写
 """
 import re
 from typing import Annotated, TypedDict, Literal
@@ -62,6 +117,11 @@ class AgentState(TypedDict):
     
     # 存储股票行情等结构化数据的上下文
     skill_context: str
+
+    # 人工兜底信号：当 AI 判断当前问题应该转人工时，这几个字段会被设置
+    handoff_to_human: bool
+    handoff_reason: str
+    handoff_summary: str
 
 
 def _latest_user_query(state: AgentState) -> str:
@@ -149,12 +209,54 @@ def _wants_detailed_answer(query: str) -> bool:
     ]
     return any(re.search(pattern, query) for pattern in patterns)
 
+
+def _wants_human_handoff(query: str) -> bool:
+    """判断用户是否明确要求转人工。"""
+    keywords = [
+        "人工",
+        "人工客服",
+        "转人工",
+        "客服",
+        "投诉",
+        "专员",
+    ]
+    return any(keyword in query for keyword in keywords)
+
+
+def _build_handoff_summary(state: AgentState, reason: str) -> str:
+    """生成一段给人工客服看的交接摘要。"""
+    query = _latest_user_query(state)
+    retry_count = state.get("retry_count", 0)
+    review_status = state.get("review_status", "")
+    critic_feedback = state.get("critic_feedback", "")
+
+    parts = [
+        f"用户问题：{query}",
+        f"转人工原因：{reason}",
+    ]
+    if retry_count:
+        parts.append(f"当前重试次数：{retry_count}")
+    if review_status:
+        parts.append(f"当前评审状态：{review_status}")
+    if critic_feedback:
+        parts.append(f"评审反馈：{critic_feedback}")
+    return "\n".join(parts)
+
 # --- 2. 节点逻辑 (Nodes) ---
 # 每个节点就是一个 Python 函数，它执行完后返回更新后的状态（往公文包里塞东西）
 
 async def route_intent_node(state: AgentState):
     """【意图识别】判断用户是在闲聊还是在问正经的投研问题"""
     user_msg = _latest_user_query(state)
+
+    if _wants_human_handoff(user_msg):
+        return {
+            "handoff_to_human": True,
+            "handoff_reason": "user_requested_human",
+            "handoff_summary": _build_handoff_summary(state, "user_requested_human"),
+            "step": "🤝 用户明确要求人工客服，正在准备转接..."
+        }
+
     llm = llm_core.get_llm(temperature=0) # temperature=0 让 AI 的判断更稳定，不乱猜
 
     # ainvoke 是“异步调用”，程序发出请求后可以去处理别的任务，等 AI 返回了再回来继续
@@ -341,11 +443,20 @@ async def critic_node(state: AgentState):
     
     # 如果不通过，重试次数加 1
     new_retry = state.get("retry_count", 0) + (1 if status == "fail" else 0)
-    
-    # 重要：兜底机制。重试 3 次后无论如何都通关，防止大模型陷入逻辑死循环浪费 Token。
-    if new_retry >= 3:
-        status = "pass"
-        step = "⚠️ 经过多次修正，已产出当前最优分析"
+
+    # 重试 3 次仍然失败，就不要再硬答了，直接转人工。
+    if status == "fail" and new_retry >= 3:
+        handoff_reason = "critic_failed_after_retries"
+        return {
+            "review_status": "handoff",
+            "critic_feedback": reason,
+            "retry_count": new_retry,
+            "handoff_to_human": True,
+            "handoff_reason": handoff_reason,
+            "handoff_summary": _build_handoff_summary(state, handoff_reason),
+            "total_tokens": _state_total_tokens(state, res),
+            "step": "🤝 多次修正后仍不稳定，正在转人工客服..."
+        }
     else:
         step = "✅ 评审通过，内容可信" if status == "pass" else f"❌ 发现缺陷：{reason}，已打回重写..."
 
@@ -357,16 +468,40 @@ async def critic_node(state: AgentState):
         "step": step
     }
 
+
+async def handoff_node(state: AgentState):
+    """【人工兜底节点】当 AI 不适合继续处理时，输出转人工提示。"""
+    reason = state.get("handoff_reason", "unknown")
+    summary = state.get("handoff_summary", "")
+
+    message = (
+        "当前问题我已经为你转交人工客服继续处理。\n"
+        "人工客服将基于当前对话上下文继续跟进，你不需要从头重复描述。\n"
+        f"转接原因：{reason}"
+    )
+    if summary:
+        message += "\n\n交接摘要：\n" + summary
+
+    return {
+        "messages": [AIMessage(content=message)],
+        "review_status": "handoff",
+        "step": "🤝 已生成人工交接信息"
+    }
+
 # --- 3. 路由逻辑 (Edges) ---
 # 定义了在不同节点之间跳转的“规则”
 
-def route_intent(state: AgentState) -> Literal["use_kb", "no_kb"]:
+def route_intent(state: AgentState) -> Literal["use_kb", "no_kb", "handoff"]:
     """第一段路由：根据 intent 节点的输出，决定走 rewrite 还是 direct_answer"""
+    if state.get("handoff_to_human"):
+        return "handoff"
     return "use_kb" if state.get("use_kb", True) else "no_kb"
 
 
-def route_judge(state: AgentState) -> Literal["retry", "end"]:
+def route_judge(state: AgentState) -> Literal["retry", "handoff", "end"]:
     """第二段路由：根据评审结论，决定是回退重试还是直接结束"""
+    if state.get("handoff_to_human") or state.get("review_status") == "handoff":
+        return "handoff"
     if state.get("review_status") == "fail":
         return "retry"
     return "end"
@@ -387,6 +522,7 @@ def build_self_rag_graph():
     workflow.add_node("search", search_node)
     workflow.add_node("answer", answer_node)
     workflow.add_node("critic", critic_node)
+    workflow.add_node("handoff", handoff_node)
 
     # 2. 连线
     workflow.add_edge(START, "intent") # 从 START 开始，第一步到 intent
@@ -397,12 +533,14 @@ def build_self_rag_graph():
         route_intent, # 调用上面定义的函数来决定走哪条路
         {
             "use_kb": "rewrite",
-            "no_kb": "direct_answer"
+            "no_kb": "direct_answer",
+            "handoff": "handoff",
         }
     )
 
     # 普通连线：一步接一步
     workflow.add_edge("direct_answer", END) # 直接回答完就结束 (END)
+    workflow.add_edge("handoff", END)
     workflow.add_edge("rewrite", "search")
     workflow.add_edge("search", "answer")
     workflow.add_edge("answer", "critic")
@@ -413,6 +551,7 @@ def build_self_rag_graph():
         route_judge,
         {
             "retry": "rewrite", # 如果失败，跳回 rewrite 节点重新开始
+            "handoff": "handoff",
             "end": END
         }
     )
@@ -437,7 +576,11 @@ class MultiGraphInvestorAgent:
             self._graph = build_self_rag_graph()
         return self._graph
 
-    async def ask_stream_events(self, query: str, thread_id: str, callbacks: list = None):
+    async def ask_stream_events(
+        self,
+        query: str,
+        thread_id: str,
+    ):
         """
         【流式接口】像水流一样一点点把 AI 的结果吐回给前端。
         """
@@ -453,7 +596,6 @@ class MultiGraphInvestorAgent:
         # - 不同 thread_id：视为新会话
         config = {
             "configurable": {"thread_id": thread_id}, # 线程 ID，用来区分不同的对话窗口
-            "callbacks": callbacks
         }
 
         # 告诉前端：我收到请求了 (accepted)
@@ -466,6 +608,9 @@ class MultiGraphInvestorAgent:
         retry_count = 0
         review_status = ""
         critic_feedback = ""
+        handoff_to_human = False
+        handoff_reason = ""
+        handoff_summary = ""
 
         # astream 是 LangGraph 的流式执行接口。
         # 我们同时订阅两类流：
@@ -508,6 +653,12 @@ class MultiGraphInvestorAgent:
                         review_status = updates.get("review_status", review_status)
                     if "critic_feedback" in updates:
                         critic_feedback = updates.get("critic_feedback", critic_feedback)
+                    if "handoff_to_human" in updates:
+                        handoff_to_human = updates.get("handoff_to_human", handoff_to_human)
+                    if "handoff_reason" in updates:
+                        handoff_reason = updates.get("handoff_reason", handoff_reason)
+                    if "handoff_summary" in updates:
+                        handoff_summary = updates.get("handoff_summary", handoff_summary)
 
             elif mode == "messages":
                 # messages 模式拿到的是 (message_chunk, metadata)
@@ -527,6 +678,16 @@ class MultiGraphInvestorAgent:
         if streamed_answer_parts:
             final_msg = "".join(streamed_answer_parts).strip() or final_msg
 
+        if handoff_to_human:
+            yield {
+                "stage": "handoff",
+                "data": {
+                    "step": "🤝 当前问题已触发人工兜底",
+                    "reason": handoff_reason,
+                    "summary": handoff_summary,
+                }
+            }
+
         # 整个图跑完了，把最终答案发出去
         yield {
             "stage": "final_answer",
@@ -538,6 +699,9 @@ class MultiGraphInvestorAgent:
                 "retry_count": retry_count,
                 "review_status": review_status,
                 "critic_feedback": critic_feedback,
+                "handoff_to_human": handoff_to_human,
+                "handoff_reason": handoff_reason,
+                "handoff_summary": handoff_summary,
             }
         }
         # 完结撒花
