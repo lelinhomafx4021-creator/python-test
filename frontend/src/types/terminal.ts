@@ -1,10 +1,36 @@
-export type NavKey = 'overview' | 'chat' | 'watchlist' | 'paper' | 'handoff'
+export type NavKey =
+  | 'overview'
+  | 'chat'
+  | 'watchlist'
+  | 'paper'
+  | 'news'
+  | 'handoff'
+  | 'profile'
+  | 'admin'
+  | 'admin-tickets'
 
 export type AuthUser = {
   id: number
   username: string
   nickname?: string
+  avatarUrl?: string
+  phone?: string
   role?: string
+}
+
+export type UserProfile = {
+  id: number
+  username: string
+  nickname?: string
+  avatarUrl?: string
+  phone?: string
+  role?: string
+  status?: number
+  lastLoginAt?: string
+  riskLevel?: string
+  investmentYears?: number
+  interestedSectors?: string
+  bio?: string
 }
 
 export type MembershipInfo = {
@@ -51,6 +77,10 @@ export type HandoffTicket = {
   handoffReason?: string
   handoffSummary?: string
   status?: string
+  processNote?: string
+  responseMessage?: string
+  handledBy?: string
+  handledAt?: string
   createdAt?: string
 }
 
@@ -68,6 +98,33 @@ export type MarketQuote = {
   turnoverRate?: number
   amplitude?: number
   quoteTime?: string
+}
+
+export type MarketStock = {
+  symbol: string
+  name: string
+  lastPrice?: number
+  changePercent?: number
+  changeAmount?: number
+  volume?: number
+  turnover?: number
+  turnoverRate?: number
+  highPrice?: number
+  lowPrice?: number
+  openPrice?: number
+  totalMarketValue?: number
+  circulatingMarketValue?: number
+  sixtyDayChangePercent?: number
+  yearToDateChangePercent?: number
+}
+
+export type HotNewsItem = {
+  title: string
+  summary?: string
+  tag?: string
+  source?: string
+  url?: string
+  publishedAt?: string
 }
 
 export type Sector = {
@@ -115,6 +172,16 @@ export type PaperPosition = {
   avgCost: number
   marketValue: number
   floatingPnl: number
+  latestPrice?: number
+  changePercent?: number
+  changeAmount?: number
+  quoteTime?: string
+}
+
+export type PaperPortfolioSnapshot = {
+  account: PaperAccount
+  positions: PaperPosition[]
+  refreshedAt?: string
 }
 
 export type PaperOrder = {
@@ -129,8 +196,87 @@ export type PaperOrder = {
   createdAt?: string
 }
 
+export type PaperCashTransfer = {
+  id: number
+  direction: string
+  channelCode: string
+  channelName: string
+  outTradeNo: string
+  channelTradeNo?: string
+  amount: number
+  status: string
+  remark?: string
+  createdAt?: string
+  paidAt?: string
+}
+
+export type UserNotification = {
+  id: number
+  category: string
+  title: string
+  content: string
+  status: string
+  createdAt?: string
+  readAt?: string
+}
+
 export type NavItem = {
   key: NavKey
   label: string
   count?: number
+}
+
+export type AdminDashboard = {
+  totalUsers: number
+  totalVipUsers: number
+  totalAdminUsers: number
+  totalAiSessions: number
+  totalHandoffTickets: number
+  openHandoffTickets: number
+  totalWatchlists: number
+  totalPaperAccounts: number
+}
+
+export type AdminUser = {
+  id: number
+  username: string
+  nickname?: string
+  phone?: string
+  role?: string
+  status?: number
+  avatarUrl?: string
+  planCode?: string
+  membershipStatus?: string
+  aiChatLimit?: number
+  aiChatUsed?: number
+  watchlistCount?: number
+  lastLoginAt?: string
+  createdAt?: string
+}
+
+export type AdminTicket = {
+  traceId: string
+  userId?: string
+  username?: string
+  nickname?: string
+  sessionId?: string
+  query: string
+  handoffReason?: string
+  handoffSummary?: string
+  status?: string
+  processNote?: string
+  responseMessage?: string
+  handledBy?: string
+  handledAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type AdminUserPortfolio = {
+  userId: number
+  username: string
+  nickname?: string
+  account?: PaperAccount
+  positions: PaperPosition[]
+  orders: PaperOrder[]
 }

@@ -111,6 +111,43 @@ public class MembershipService {
                 });
     }
 
+    /**
+     * 管理员直接切换用户会员方案。
+     */
+    @Transactional
+    public void assignMembershipPlan(Long userId, String role, String planCode) {
+        MembershipPlanDO targetPlan = getPlanByCode(planCode);
+
+        List<UserMembershipDO> memberships = userMembershipMapper.selectList(
+                new LambdaQueryWrapper<UserMembershipDO>()
+                        .eq(UserMembershipDO::getUserId, userId)
+                        .eq(UserMembershipDO::getStatus, "active")
+        );
+        for (UserMembershipDO membership : memberships) {
+            membership.setStatus("expired");
+            membership.setEndAt(LocalDateTime.now());
+            userMembershipMapper.updateById(membership);
+        }
+
+        UserMembershipDO created = new UserMembershipDO();
+        created.setUserId(userId);
+        created.setPlanCode(targetPlan.getPlanCode());
+        created.setStatus("active");
+        created.setAutoRenew(Boolean.FALSE);
+        created.setSource("admin_console");
+        created.setStartAt(LocalDateTime.now());
+        userMembershipMapper.insert(created);
+
+        userFeatureQuotaMapper.delete(
+                new LambdaQueryWrapper<UserFeatureQuotaDO>()
+                        .eq(UserFeatureQuotaDO::getUserId, userId)
+        );
+        List<UserFeatureQuotaDO> createdQuotas = buildQuotaRows(userId, targetPlan);
+        for (UserFeatureQuotaDO quota : createdQuotas) {
+            userFeatureQuotaMapper.insert(quota);
+        }
+    }
+
     private void refreshExpiredQuotas(List<UserFeatureQuotaDO> quotas) {
         LocalDateTime now = LocalDateTime.now();
         for (UserFeatureQuotaDO quota : quotas) {

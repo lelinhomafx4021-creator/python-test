@@ -3,21 +3,27 @@ package com.aiinvestor.gateway.modules.papertrading.service;
 import com.aiinvestor.gateway.modules.market.service.MarketService;
 import com.aiinvestor.gateway.modules.market.vo.MarketQuoteVO;
 import com.aiinvestor.gateway.modules.papertrading.dao.entity.PaperAccountDO;
+import com.aiinvestor.gateway.modules.papertrading.dao.entity.PaperCashTransferDO;
 import com.aiinvestor.gateway.modules.papertrading.dao.entity.PaperDailyAssetDO;
 import com.aiinvestor.gateway.modules.papertrading.dao.entity.PaperOrderDO;
 import com.aiinvestor.gateway.modules.papertrading.dao.entity.PaperPositionDO;
 import com.aiinvestor.gateway.modules.papertrading.dao.entity.PaperTradeDO;
 import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperAccountMapper;
+import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperCashTransferMapper;
 import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperDailyAssetMapper;
 import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperOrderMapper;
 import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperPositionMapper;
 import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperTradeMapper;
+import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperCashTransferRequest;
 import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperOrderRequest;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperAccountVO;
+import com.aiinvestor.gateway.modules.papertrading.vo.PaperCashTransferVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperOrderVO;
+import com.aiinvestor.gateway.modules.papertrading.vo.PaperPortfolioSnapshotVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperPositionVO;
 import com.aiinvestor.gateway.modules.shared.config.AppCacheProperties;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
+import com.aiinvestor.gateway.service.UserNotificationService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -28,8 +34,12 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 模拟交易服务。
@@ -40,6 +50,7 @@ public class PaperTradingService {
     private static final BigDecimal INITIAL_CASH = new BigDecimal("1000000");
 
     private final PaperAccountMapper paperAccountMapper;
+    private final PaperCashTransferMapper paperCashTransferMapper;
     private final PaperPositionMapper paperPositionMapper;
     private final PaperOrderMapper paperOrderMapper;
     private final PaperTradeMapper paperTradeMapper;
@@ -47,16 +58,20 @@ public class PaperTradingService {
     private final MarketService marketService;
     private final StringRedisTemplate stringRedisTemplate;
     private final AppCacheProperties appCacheProperties;
+    private final UserNotificationService userNotificationService;
 
     public PaperTradingService(PaperAccountMapper paperAccountMapper,
+                               PaperCashTransferMapper paperCashTransferMapper,
                                PaperPositionMapper paperPositionMapper,
                                PaperOrderMapper paperOrderMapper,
                                PaperTradeMapper paperTradeMapper,
                                PaperDailyAssetMapper paperDailyAssetMapper,
                                MarketService marketService,
                                StringRedisTemplate stringRedisTemplate,
-                               AppCacheProperties appCacheProperties) {
+                               AppCacheProperties appCacheProperties,
+                               UserNotificationService userNotificationService) {
         this.paperAccountMapper = paperAccountMapper;
+        this.paperCashTransferMapper = paperCashTransferMapper;
         this.paperPositionMapper = paperPositionMapper;
         this.paperOrderMapper = paperOrderMapper;
         this.paperTradeMapper = paperTradeMapper;
@@ -64,6 +79,7 @@ public class PaperTradingService {
         this.marketService = marketService;
         this.stringRedisTemplate = stringRedisTemplate;
         this.appCacheProperties = appCacheProperties;
+        this.userNotificationService = userNotificationService;
     }
 
     /**
@@ -75,34 +91,31 @@ public class PaperTradingService {
     }
 
     /**
+     * 获取持仓快照。
+     * 可选强制刷新实时行情，并把最新结果回写到 Redis 与账户资产快照。
+     */
+    @Transactional
+    public PaperPortfolioSnapshotVO getPortfolioSnapshot(Long userId, Long accountId, boolean refreshQuote) {
+        PaperAccountDO account = getOwnedAccount(userId, accountId);
+        List<PaperPositionDO> positionEntities = paperPositionMapper.selectList(
+                new LambdaQueryWrapper<PaperPositionDO>()
+                        .eq(PaperPositionDO::getAccountId, account.getId())
+                        .orderByDesc(PaperPositionDO::getMarketValue)
+        );
+        return buildPortfolioSnapshot(account, positionEntities, refreshQuote);
+    }
+
+    /**
      * 获取持仓列表。
      */
     public List<PaperPositionVO> listPositions(Long userId, Long accountId) {
-        PaperAccountDO account = getOwnedAccount(userId, accountId);
-        return paperPositionMapper.selectList(
-                        new LambdaQueryWrapper<PaperPositionDO>()
-                                .eq(PaperPositionDO::getAccountId, account.getId())
-                                .orderByDesc(PaperPositionDO::getMarketValue)
-                ).stream()
-                .map(item -> {
-                    MarketQuoteVO quote = marketService.getLatestQuote(item.getSymbol());
-                    BigDecimal latestPrice = quote.getLastPrice() == null ? item.getAvgCost() : quote.getLastPrice();
-                    BigDecimal latestMarketValue = latestPrice.multiply(BigDecimal.valueOf(item.getPositionQty()));
-                    BigDecimal latestFloatingPnl = latestMarketValue.subtract(
-                            item.getAvgCost().multiply(BigDecimal.valueOf(item.getPositionQty()))
-                    );
-                    return new PaperPositionVO(
-                            item.getId(),
-                            item.getSymbol(),
-                            quote.getName(),
-                            item.getPositionQty(),
-                            item.getAvailableQty(),
-                            item.getAvgCost(),
-                            latestMarketValue,
-                            latestFloatingPnl
-                    );
-                })
-                .toList();
+        return listPositions(userId, accountId, false);
+    }
+
+    /**
+     * 鑾峰彇鎸佷粨鍒楄〃锛屽彲閫夋嫨寮哄埗鍒锋柊瀹炴椂琛屾儏銆?     */
+    public List<PaperPositionVO> listPositions(Long userId, Long accountId, boolean refreshQuote) {
+        return getPortfolioSnapshot(userId, accountId, refreshQuote).getPositions();
     }
 
     /**
@@ -127,6 +140,112 @@ public class PaperTradingService {
                         item.getCreatedAt()
                 ))
                 .toList();
+    }
+
+    /**
+     * 管理员查看指定用户的账户快照。
+     */
+    @Transactional
+    public PaperPortfolioSnapshotVO getPortfolioSnapshotForAdmin(Long targetUserId, boolean refreshQuote) {
+        PaperAccountDO account = ensureAccount(targetUserId);
+        List<PaperPositionDO> positionEntities = paperPositionMapper.selectList(
+                new LambdaQueryWrapper<PaperPositionDO>()
+                        .eq(PaperPositionDO::getAccountId, account.getId())
+                        .orderByDesc(PaperPositionDO::getMarketValue)
+        );
+        return buildPortfolioSnapshot(account, positionEntities, refreshQuote);
+    }
+
+    /**
+     * 管理员查看指定用户最近委托。
+     */
+    public List<PaperOrderVO> listOrdersForAdmin(Long targetUserId) {
+        PaperAccountDO account = ensureAccount(targetUserId);
+        return paperOrderMapper.selectList(
+                        new LambdaQueryWrapper<PaperOrderDO>()
+                                .eq(PaperOrderDO::getAccountId, account.getId())
+                                .orderByDesc(PaperOrderDO::getId)
+                                .last("limit 20")
+                ).stream()
+                .map(this::toOrderVO)
+                .toList();
+    }
+
+    /**
+     * 获取充值转账记录。
+     */
+    public List<PaperCashTransferVO> listCashTransfers(Long userId, Long accountId) {
+        PaperAccountDO account = getOwnedAccount(userId, accountId);
+        return paperCashTransferMapper.selectList(
+                        new LambdaQueryWrapper<PaperCashTransferDO>()
+                                .eq(PaperCashTransferDO::getAccountId, account.getId())
+                                .orderByDesc(PaperCashTransferDO::getId)
+                ).stream()
+                .map(this::toCashTransferVO)
+                .toList();
+    }
+
+    /**
+     * 创建模拟充值并立即到账。
+     */
+    @Transactional
+    public PaperCashTransferVO createCashTransfer(Long userId, CreatePaperCashTransferRequest request) {
+        return createCashTransfer(userId, request, "deposit");
+    }
+
+    /**
+     * 创建模拟提现并立即到账。
+     */
+    @Transactional
+    public PaperCashTransferVO createWithdrawTransfer(Long userId, CreatePaperCashTransferRequest request) {
+        return createCashTransfer(userId, request, "withdraw");
+    }
+
+    /**
+     * 创建模拟资金变动记录。
+     */
+    @Transactional
+    public PaperCashTransferVO createCashTransfer(Long userId, CreatePaperCashTransferRequest request, String direction) {
+        PaperAccountDO account = getOwnedAccount(userId, request.getAccountId());
+        BigDecimal amount = request.getAmount().setScale(2, RoundingMode.HALF_UP);
+
+        if ("withdraw".equalsIgnoreCase(direction) && account.getCashBalance().compareTo(amount) < 0) {
+            throw new BusinessException("可用资金不足，无法完成提现");
+        }
+
+        PaperCashTransferDO transfer = new PaperCashTransferDO();
+        transfer.setAccountId(account.getId());
+        transfer.setUserId(userId);
+        transfer.setDirection(direction);
+        transfer.setChannelCode("mock_gateway");
+        transfer.setChannelName("演示支付通道");
+        transfer.setOutTradeNo(("withdraw".equalsIgnoreCase(direction) ? "WITHDRAW-" : "TOPUP-") + System.currentTimeMillis());
+        transfer.setChannelTradeNo("SUCCESS-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+        transfer.setAmount(amount);
+        transfer.setStatus("success");
+        transfer.setRemark(request.getRemark());
+        transfer.setCreatedAt(LocalDateTime.now());
+        transfer.setPaidAt(LocalDateTime.now());
+        paperCashTransferMapper.insert(transfer);
+
+        if ("withdraw".equalsIgnoreCase(direction)) {
+            account.setCashBalance(account.getCashBalance().subtract(transfer.getAmount()));
+        } else {
+            account.setCashBalance(account.getCashBalance().add(transfer.getAmount()));
+        }
+        paperAccountMapper.updateById(account);
+        refreshAccountSnapshot(account.getId());
+
+        userNotificationService.createNotification(
+                userId,
+                "fund_transfer",
+                "withdraw".equalsIgnoreCase(direction) ? "提现成功" : "充值到账",
+                ("withdraw".equalsIgnoreCase(direction) ? "提现" : "充值")
+                        + transfer.getAmount().setScale(2, RoundingMode.HALF_UP).toPlainString()
+                        + " 元，资金已更新到交易账户。"
+        );
+
+        return toCashTransferVO(transfer);
     }
 
     /**
@@ -296,6 +415,66 @@ public class PaperTradingService {
         paperTradeMapper.insert(trade);
     }
 
+    private PaperPortfolioSnapshotVO buildPortfolioSnapshot(PaperAccountDO account,
+                                                            List<PaperPositionDO> positionEntities,
+                                                            boolean refreshQuote) {
+        if (positionEntities.isEmpty()) {
+            refreshAccountSnapshot(account, BigDecimal.ZERO);
+            return new PaperPortfolioSnapshotVO(toAccountVO(account), List.of(), LocalDateTime.now());
+        }
+
+        List<String> symbols = positionEntities.stream()
+                .map(PaperPositionDO::getSymbol)
+                .distinct()
+                .toList();
+        Map<String, MarketQuoteVO> quoteMap = (refreshQuote
+                ? marketService.refreshQuotes(symbols)
+                : marketService.getQuotes(symbols)).stream()
+                .collect(Collectors.toMap(MarketQuoteVO::getSymbol, Function.identity(), (a, b) -> a));
+
+        List<PaperPositionVO> positions = new ArrayList<>();
+        BigDecimal totalMarketValue = BigDecimal.ZERO;
+
+        for (PaperPositionDO item : positionEntities) {
+            MarketQuoteVO quote = quoteMap.get(item.getSymbol());
+            BigDecimal latestPrice = quote != null && quote.getLastPrice() != null
+                    ? quote.getLastPrice()
+                    : item.getAvgCost();
+            BigDecimal latestMarketValue = latestPrice.multiply(BigDecimal.valueOf(item.getPositionQty()));
+            BigDecimal latestFloatingPnl = latestMarketValue.subtract(
+                    item.getAvgCost().multiply(BigDecimal.valueOf(item.getPositionQty()))
+            );
+            totalMarketValue = totalMarketValue.add(latestMarketValue);
+
+            if (item.getMarketValue() == null
+                    || item.getFloatingPnl() == null
+                    || item.getMarketValue().compareTo(latestMarketValue) != 0
+                    || item.getFloatingPnl().compareTo(latestFloatingPnl) != 0) {
+                item.setMarketValue(latestMarketValue);
+                item.setFloatingPnl(latestFloatingPnl);
+                paperPositionMapper.updateById(item);
+            }
+
+            positions.add(new PaperPositionVO(
+                    item.getId(),
+                    item.getSymbol(),
+                    quote == null || quote.getName() == null || quote.getName().isBlank() ? item.getSymbol() : quote.getName(),
+                    item.getPositionQty(),
+                    item.getAvailableQty(),
+                    item.getAvgCost(),
+                    latestMarketValue,
+                    latestFloatingPnl,
+                    latestPrice,
+                    quote == null ? null : quote.getChangePercent(),
+                    quote == null ? null : quote.getChangeAmount(),
+                    quote == null ? null : quote.getQuoteTime()
+            ));
+        }
+
+        refreshAccountSnapshot(account, totalMarketValue);
+        return new PaperPortfolioSnapshotVO(toAccountVO(account), positions, LocalDateTime.now());
+    }
+
     private void refreshAccountSnapshot(Long accountId) {
         PaperAccountDO account = paperAccountMapper.selectById(accountId);
         List<PaperPositionDO> positions = paperPositionMapper.selectList(
@@ -304,6 +483,10 @@ public class PaperTradingService {
         BigDecimal marketValue = positions.stream()
                 .map(PaperPositionDO::getMarketValue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        refreshAccountSnapshot(account, marketValue);
+    }
+
+    private void refreshAccountSnapshot(PaperAccountDO account, BigDecimal marketValue) {
         BigDecimal totalAsset = account.getCashBalance().add(marketValue);
         BigDecimal totalPnl = totalAsset.subtract(INITIAL_CASH);
 
@@ -313,13 +496,13 @@ public class PaperTradingService {
 
         PaperDailyAssetDO dailyAsset = paperDailyAssetMapper.selectOne(
                 new LambdaQueryWrapper<PaperDailyAssetDO>()
-                        .eq(PaperDailyAssetDO::getAccountId, accountId)
+                        .eq(PaperDailyAssetDO::getAccountId, account.getId())
                         .eq(PaperDailyAssetDO::getTradeDate, LocalDate.now())
                         .last("limit 1")
         );
         if (dailyAsset == null) {
             dailyAsset = new PaperDailyAssetDO();
-            dailyAsset.setAccountId(accountId);
+            dailyAsset.setAccountId(account.getId());
             dailyAsset.setTradeDate(LocalDate.now());
             dailyAsset.setCashBalance(account.getCashBalance());
             dailyAsset.setMarketValue(marketValue);
@@ -391,6 +574,22 @@ public class PaperTradingService {
                 order.getFilledQty(),
                 order.getOrderStatus(),
                 order.getCreatedAt()
+        );
+    }
+
+    private PaperCashTransferVO toCashTransferVO(PaperCashTransferDO transfer) {
+        return new PaperCashTransferVO(
+                transfer.getId(),
+                transfer.getDirection(),
+                transfer.getChannelCode(),
+                transfer.getChannelName(),
+                transfer.getOutTradeNo(),
+                transfer.getChannelTradeNo(),
+                transfer.getAmount(),
+                transfer.getStatus(),
+                transfer.getRemark(),
+                transfer.getCreatedAt(),
+                transfer.getPaidAt()
         );
     }
 }

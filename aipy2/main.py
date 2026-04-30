@@ -130,17 +130,15 @@ async def trace_middleware(request: Request, call_next):
 
 
 if __name__ == "__main__":
-    # Windows 本地开发时，热重载会额外拉起子进程。
-    # 当前项目里同时用了 LangGraph 的 PostgreSQL 记忆层和异步连接池，
-    # 在 Windows + reload 组合下容易出现：
-    # 1. 记忆连接池卡死，回答刚 accepted 就报错
-    # 2. 子进程继承旧环境，导致配置看起来“改了但没生效”
-    # 所以本地 Windows 默认关闭 reload，优先保证链路稳定。
-    enable_reload = settings.is_dev and not sys.platform.startswith("win")
+    # 当前这套 AI 服务在 Windows 下接了 psycopg 异步连接池。
+    # 对于 uvicorn 0.44 来说，开启 reload 会走子进程启动，
+    # 子进程路径会使用 SelectorEventLoop，正好兼容 psycopg_pool。
+    # 所以这里按当前项目的本地开发现实，统一恢复成开发模式开启热重载。
+    enable_reload = settings.is_dev
     if settings.is_dev and sys.platform.startswith("win"):
-        logger.info(">>> Windows 本地开发默认关闭热重载，优先保证 AI 链路稳定")
+        logger.info(">>> Windows 本地开发已启用热重载，用子进程模式兼容 PostgreSQL checkpoint")
 
-    # 非热重载模式下直接传 app 对象，避免 Uvicorn 再次导入 main 模块，
-    # 减少本地开发阶段的额外进程和初始化歧义。
+    # 开启热重载时必须传 import string，让子进程重新导入应用。
+    # 非热重载模式才直接传 app 对象，减少额外导入。
     app_target = "main:app" if enable_reload else app
     uvicorn.run(app_target, host="0.0.0.0", port=8000, reload=enable_reload)

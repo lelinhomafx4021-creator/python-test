@@ -81,6 +81,17 @@ app:
     audit-exchange: ai.chat.audit.exchange
     audit-routing-key: ai.chat.audit.routing
 
+aliyun:
+  oss:
+    enabled: ${ALIYUN_OSS_ENABLED:false}
+    endpoint: ${ALIYUN_OSS_ENDPOINT:oss-cn-beijing.aliyuncs.com}
+    bucket: ${ALIYUN_OSS_BUCKET:}
+    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+    public-base-url: ${ALIYUN_OSS_PUBLIC_BASE_URL:}
+    directory: avatar
+
+
 management:
   endpoints:
     web:
@@ -95,4 +106,3 @@ sa-token:
   is-share: false
   token-style: uuid
   is-log: false
-

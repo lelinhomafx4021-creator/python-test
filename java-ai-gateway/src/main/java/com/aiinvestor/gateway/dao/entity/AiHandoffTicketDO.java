@@ -20,7 +20,12 @@ public class AiHandoffTicketDO {
     private String handoffReason;
     private String handoffSummary;
     private String status;
+    private String processNote;
+    private String responseMessage;
+    private String handledBy;
+    private LocalDateTime handledAt;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public Long getId() {
         return id;
@@ -94,11 +99,51 @@ public class AiHandoffTicketDO {
         this.status = status;
     }
 
+    public String getProcessNote() {
+        return processNote;
+    }
+
+    public void setProcessNote(String processNote) {
+        this.processNote = processNote;
+    }
+
+    public String getResponseMessage() {
+        return responseMessage;
+    }
+
+    public void setResponseMessage(String responseMessage) {
+        this.responseMessage = responseMessage;
+    }
+
+    public String getHandledBy() {
+        return handledBy;
+    }
+
+    public void setHandledBy(String handledBy) {
+        this.handledBy = handledBy;
+    }
+
+    public LocalDateTime getHandledAt() {
+        return handledAt;
+    }
+
+    public void setHandledAt(LocalDateTime handledAt) {
+        this.handledAt = handledAt;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

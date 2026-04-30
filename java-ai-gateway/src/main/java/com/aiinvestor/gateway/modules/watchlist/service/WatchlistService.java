@@ -62,8 +62,6 @@ public class WatchlistService {
                             .orderByAsc(WatchlistDO::getSortOrder, WatchlistDO::getId)
             );
         }
-        membershipService.syncPermanentQuota(userId, role, "watchlist_count", watchlists.size());
-
         List<Long> watchlistIds = watchlists.stream().map(WatchlistDO::getId).toList();
         List<WatchlistItemDO> items = watchlistIds.isEmpty()
                 ? Collections.emptyList()
@@ -180,6 +178,7 @@ public class WatchlistService {
         entity.setIsDefault(Boolean.TRUE);
         entity.setSortOrder(1);
         watchlistMapper.insert(entity);
+        membershipService.syncPermanentQuota(userId, role, "watchlist_count", 1);
     }
 
     private WatchlistDO getOwnedWatchlist(Long userId, Long watchlistId) {

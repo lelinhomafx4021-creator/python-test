@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 模拟持仓视图。
@@ -37,4 +38,16 @@ public class PaperPositionVO {
 
     /** 浮动盈亏。 */
     private BigDecimal floatingPnl;
+
+    /** 鏈€鏂颁环銆?*/
+    private BigDecimal latestPrice;
+
+    /** 娑ㄨ穼骞呫€?*/
+    private BigDecimal changePercent;
+
+    /** 娑ㄨ穼棰濄€?*/
+    private BigDecimal changeAmount;
+
+    /** 琛屾儏鏃堕棿銆?*/
+    private LocalDateTime quoteTime;
 }

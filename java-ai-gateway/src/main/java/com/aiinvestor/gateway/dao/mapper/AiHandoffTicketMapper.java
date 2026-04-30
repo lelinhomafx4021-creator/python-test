@@ -20,7 +20,7 @@ public interface AiHandoffTicketMapper extends BaseMapper<AiHandoffTicketDO> {
     int countByTraceId(@Param("traceId") String traceId);
 
     /** 查询当前用户的人工兜底工单列表，按建单时间倒序。 */
-    @Select("SELECT trace_id, session_id, query, handoff_reason, handoff_summary, status, created_at " +
+    @Select("SELECT trace_id, session_id, query, handoff_reason, handoff_summary, status, process_note, response_message, handled_by, handled_at, created_at " +
             "FROM ai_handoff_tickets " +
             "WHERE user_id = #{userId} " +
             "ORDER BY created_at DESC")

@@ -11,8 +11,9 @@
   body {
     @apply antialiased;
     color: #0f172a;
-    background: linear-gradient(180deg, #eef4fb 0%, #f7f9fc 100%);
-    overflow: hidden;
+    background: #f3f4f6;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 }
 
@@ -25,7 +26,7 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.16);
+  background: rgba(100, 116, 139, 0.18);
   border-radius: 10px;
 }
 
@@ -33,13 +34,13 @@
   @apply text-zinc-800;
 }
 
-.markdown-body p { @apply my-4 leading-8; }
-.markdown-body code { @apply rounded bg-slate-100 px-1.5 py-0.5 text-[0.92em] text-slate-900; }
-.markdown-body pre { @apply my-5 overflow-x-auto rounded-[24px] bg-slate-950 p-4 text-slate-100; }
+.markdown-body p { @apply my-3 leading-7 text-[14px]; }
+.markdown-body code { @apply rounded bg-stone-100 px-1.5 py-0.5 text-[0.92em] text-slate-900; }
+.markdown-body pre { @apply my-4 overflow-x-auto rounded-2xl bg-slate-800 p-4 text-slate-100; }
 .markdown-body pre code { @apply bg-transparent p-0 text-zinc-100; }
-.markdown-body ul { @apply my-4 list-disc space-y-2 pl-6; }
-.markdown-body ol { @apply my-4 list-decimal space-y-2 pl-6; }
-.markdown-body h1 { @apply mb-4 mt-8 text-2xl font-semibold text-slate-950; }
-.markdown-body h2 { @apply mb-3 mt-7 text-xl font-semibold text-slate-950; }
-.markdown-body h3 { @apply mb-2 mt-6 text-lg font-semibold text-slate-900; }
+.markdown-body ul { @apply my-3 list-disc space-y-2 pl-6; }
+.markdown-body ol { @apply my-3 list-decimal space-y-2 pl-6; }
+.markdown-body h1 { @apply mb-3 mt-6 text-xl font-semibold text-slate-900; }
+.markdown-body h2 { @apply mb-3 mt-6 text-lg font-semibold text-slate-900; }
+.markdown-body h3 { @apply mb-2 mt-5 text-base font-semibold text-slate-900; }
 .markdown-body blockquote { @apply my-4 border-l-2 border-slate-300 pl-4 text-slate-500; }

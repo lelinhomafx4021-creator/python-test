@@ -1,14 +1,29 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import { ArrowRight, Headset, Ticket } from 'lucide-vue-next'
+import PaginationBar from '../components/PaginationBar.vue'
 import type { HandoffTicket } from '../types/terminal'
 
-defineProps<{
+const props = defineProps<{
   tickets: HandoffTicket[]
 }>()
 
 const emit = defineEmits<{
   openSession: [sessionId: string]
 }>()
+
+const page = ref(1)
+const pageSize = 6
+
+watch(() => props.tickets, () => {
+  const maxPage = Math.max(1, Math.ceil(props.tickets.length / pageSize))
+  if (page.value > maxPage) page.value = maxPage
+}, { deep: true })
+
+const pagedTickets = computed(() => {
+  const start = (page.value - 1) * pageSize
+  return props.tickets.slice(start, start + pageSize)
+})
 
 const formatTime = (value?: string) => {
   if (!value) return '暂无'
@@ -51,7 +66,7 @@ const statusText = (status?: string) => {
           </div>
           <h3 class="text-3xl font-semibold tracking-wide">人工工单面板</h3>
           <p class="mt-3 text-sm leading-7 text-slate-300">
-            当智能问答判断不适合继续自动回答时，会把问题、原因和会话上下文转入这里，方便人工承接。
+            当前工单也按分页展示，方便查看处理状态、用户回复和原始会话入口。
           </p>
         </div>
 
@@ -62,9 +77,9 @@ const statusText = (status?: string) => {
       </div>
     </section>
 
-    <section v-if="tickets.length" class="grid gap-4 lg:grid-cols-2">
+    <section v-if="pagedTickets.length" class="grid gap-4 lg:grid-cols-2">
       <button
-        v-for="ticket in tickets"
+        v-for="ticket in pagedTickets"
         :key="ticket.traceId"
         class="rounded-[32px] border border-slate-200 bg-white px-6 py-6 text-left shadow-[0_18px_55px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_60px_rgba(15,23,42,0.08)]"
         @click="emit('openSession', ticket.sessionId)"
@@ -90,6 +105,19 @@ const statusText = (status?: string) => {
           {{ ticket.handoffSummary }}
         </div>
 
+        <div v-if="ticket.responseMessage" class="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-800">
+          回复结果：{{ ticket.responseMessage }}
+        </div>
+
+        <div v-if="ticket.processNote" class="mt-4 text-sm leading-7 text-slate-500">
+          处理备注：{{ ticket.processNote }}
+        </div>
+
+        <div v-if="ticket.handledBy || ticket.handledAt" class="mt-4 text-xs text-slate-400">
+          <span v-if="ticket.handledBy">处理人：{{ ticket.handledBy }}</span>
+          <span v-if="ticket.handledAt" class="ml-3">处理时间：{{ formatTime(ticket.handledAt) }}</span>
+        </div>
+
         <div class="mt-5 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
           打开原始会话
           <ArrowRight class="h-4 w-4" />
@@ -106,8 +134,17 @@ const statusText = (status?: string) => {
       </div>
       <h4 class="mt-5 text-2xl font-semibold text-slate-950">当前没有人工工单</h4>
       <p class="mt-3 text-sm leading-7 text-slate-500">
-        可以在智能副驾里输入“转人工”，或者连续触发高风险问题，演示从智能问答进入人工兜底的流程。
+        可以在智能副驾里输入“转人工”，演示从智能问答进入人工兜底的流程。
       </p>
     </section>
+
+    <div class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+      <PaginationBar
+        :page="page"
+        :page-size="pageSize"
+        :total="tickets.length"
+        @update:page="page = $event"
+      />
+    </div>
   </div>
 </template>

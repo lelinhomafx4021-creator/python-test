@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SynchronousSink;
 
 import java.util.List;
 import java.util.UUID;
@@ -91,8 +92,14 @@ public class AiPortalController {
 
         return aiGatewayController.stream(request.getMessage(), sessionId)
                 .map(ServerSentEvent::data)
-                .map(this::extractFinalAnswer)
-                .filter(answer -> answer != null && !answer.isBlank())
+                // 流式事件里既有 accepted / intent，也有 final_answer。
+                // Reactor 的 map 不允许返回 null，所以这里改成先提取、再按需下发。
+                .handle((String raw, SynchronousSink<String> sink) -> {
+                    String answer = extractFinalAnswer(raw);
+                    if (answer != null && !answer.isBlank()) {
+                        sink.next(answer);
+                    }
+                })
                 .next()
                 .switchIfEmpty(Mono.just(""))
                 .map(answer -> ApiResult.ok(new AiChatResponseVO(

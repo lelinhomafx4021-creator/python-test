@@ -5,6 +5,7 @@ import com.aiinvestor.gateway.annotation.LoginRequired;
 import com.aiinvestor.gateway.context.UserContext;
 import com.aiinvestor.gateway.dao.entity.UserDO;
 import com.aiinvestor.gateway.dto.LoginRequest;
+import com.aiinvestor.gateway.dto.RegisterRequest;
 import com.aiinvestor.gateway.model.vo.ApiResult;
 import com.aiinvestor.gateway.model.vo.LoginUserVO;
 import com.aiinvestor.gateway.service.UserService;
@@ -21,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 认证控制器。
- * 继续沿用 Sa-Token 完成登录态管理，同时把用户昵称、角色等主业务信息返回给前端。
+ * 统一承载登录、注册、当前用户与退出登录能力。
  */
 @CrossOrigin
 @Validated
@@ -47,8 +48,18 @@ public class AuthController {
         }
 
         StpUtil.login(user.getId());
-        String token = StpUtil.getTokenValue();
-        return ResponseEntity.ok(ApiResult.ok(buildLoginUser(user, token)));
+        return ResponseEntity.ok(ApiResult.ok(buildLoginUser(user, StpUtil.getTokenValue())));
+    }
+
+    /**
+     * 注册接口。
+     */
+    @PostMapping("/register")
+    public ResponseEntity<ApiResult<LoginUserVO>> register(@Valid @RequestBody RegisterRequest request) {
+        UserDO user = userService.register(request);
+        StpUtil.login(user.getId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResult.ok(buildLoginUser(user, StpUtil.getTokenValue())));
     }
 
     /**
@@ -75,6 +86,7 @@ public class AuthController {
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
+                user.getAvatarUrl(),
                 user.getRole(),
                 token
         );

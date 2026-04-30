@@ -3,10 +3,13 @@ package com.aiinvestor.gateway.modules.papertrading.controller;
 import com.aiinvestor.gateway.annotation.LoginRequired;
 import com.aiinvestor.gateway.context.UserContext;
 import com.aiinvestor.gateway.model.vo.ApiResult;
+import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperCashTransferRequest;
 import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperOrderRequest;
 import com.aiinvestor.gateway.modules.papertrading.service.PaperTradingService;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperAccountVO;
+import com.aiinvestor.gateway.modules.papertrading.vo.PaperCashTransferVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperOrderVO;
+import com.aiinvestor.gateway.modules.papertrading.vo.PaperPortfolioSnapshotVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperPositionVO;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -44,8 +48,15 @@ public class PaperTradingController {
      * 获取持仓列表。
      */
     @GetMapping("/accounts/{id}/positions")
-    public ApiResult<List<PaperPositionVO>> positions(@PathVariable("id") Long accountId) {
-        return ApiResult.ok(paperTradingService.listPositions(UserContext.getUserId(), accountId));
+    public ApiResult<List<PaperPositionVO>> positions(@PathVariable("id") Long accountId,
+                                                      @RequestParam(value = "refresh", defaultValue = "false") boolean refresh) {
+        return ApiResult.ok(paperTradingService.listPositions(UserContext.getUserId(), accountId, refresh));
+    }
+
+    @GetMapping("/accounts/{id}/snapshot")
+    public ApiResult<PaperPortfolioSnapshotVO> snapshot(@PathVariable("id") Long accountId,
+                                                        @RequestParam(value = "refresh", defaultValue = "false") boolean refresh) {
+        return ApiResult.ok(paperTradingService.getPortfolioSnapshot(UserContext.getUserId(), accountId, refresh));
     }
 
     /**
@@ -57,11 +68,35 @@ public class PaperTradingController {
     }
 
     /**
+     * 获取充值转账记录。
+     */
+    @GetMapping("/accounts/{id}/transfers")
+    public ApiResult<List<PaperCashTransferVO>> transfers(@PathVariable("id") Long accountId) {
+        return ApiResult.ok(paperTradingService.listCashTransfers(UserContext.getUserId(), accountId));
+    }
+
+    /**
      * 提交委托。
      */
     @PostMapping("/orders")
     public ApiResult<PaperOrderVO> placeOrder(@Valid @RequestBody CreatePaperOrderRequest request) {
         return ApiResult.ok(paperTradingService.placeOrder(UserContext.getUserId(), request));
+    }
+
+    /**
+     * 创建充值到账记录。
+     */
+    @PostMapping("/transfers/deposit")
+    public ApiResult<PaperCashTransferVO> deposit(@Valid @RequestBody CreatePaperCashTransferRequest request) {
+        return ApiResult.ok(paperTradingService.createCashTransfer(UserContext.getUserId(), request));
+    }
+
+    /**
+     * 创建提现到账记录。
+     */
+    @PostMapping("/transfers/withdraw")
+    public ApiResult<PaperCashTransferVO> withdraw(@Valid @RequestBody CreatePaperCashTransferRequest request) {
+        return ApiResult.ok(paperTradingService.createWithdrawTransfer(UserContext.getUserId(), request));
     }
 
     /**

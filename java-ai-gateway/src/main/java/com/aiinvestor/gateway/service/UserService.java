@@ -2,6 +2,8 @@ package com.aiinvestor.gateway.service;
 
 import com.aiinvestor.gateway.dao.entity.UserDO;
 import com.aiinvestor.gateway.dao.mapper.UserMapper;
+import com.aiinvestor.gateway.dto.RegisterRequest;
+import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -62,6 +64,29 @@ public class UserService {
 
         user.setLastLoginAt(LocalDateTime.now());
         userMapper.updateById(user);
+        return user;
+    }
+
+    /**
+     * 注册新用户。
+     */
+    public UserDO register(RegisterRequest request) {
+        String username = request.getUsername().trim();
+        if (getByUsername(username) != null) {
+            throw new BusinessException("用户名已存在，请更换后重试");
+        }
+
+        UserDO user = new UserDO();
+        user.setUsername(username);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setPassword(user.getPasswordHash());
+        user.setPhone(request.getPhone() == null || request.getPhone().isBlank() ? null : request.getPhone().trim());
+        user.setNickname(request.getNickname() == null || request.getNickname().isBlank() ? username : request.getNickname().trim());
+        user.setRole("normal");
+        user.setStatus(1);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.insert(user);
         return user;
     }
 }

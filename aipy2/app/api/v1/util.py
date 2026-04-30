@@ -16,7 +16,8 @@ from fastapi import APIRouter, Query, Request
 from app.core.llm import llm
 from app.core.logger import logger
 from app.prompts.investor_prompts import GENERATE_TITLE_PROMPT, TITLE_PARSER
-from app.tools.stockdata_tool import get_stock_quote_core
+from app.tools.news_tool import collect_hot_news
+from app.tools.stockdata_tool import get_stock_quote_core, load_market_page, search_market_stocks
 
 router = APIRouter(prefix="/ai/v1/util", tags=["AI通用工具接口"])
 
@@ -80,6 +81,35 @@ async def market_quotes(symbols: str = Query(..., description="多个股票代�
             )
 
     return {"code": 200, "data": {"quotes": result}, "message": "成功"}
+
+
+@router.get("/market/stocks")
+async def market_stocks(
+    page: int = Query(1, ge=1, description="页码，从 1 开始"),
+    page_size: int = Query(40, ge=1, le=200, description="每页数量"),
+    keyword: str = Query("", description="股票代码或名称关键字"),
+):
+    """获取股票列表或搜索结果。"""
+    try:
+        if keyword.strip():
+            data = search_market_stocks(keyword=keyword, page=page, page_size=page_size)
+        else:
+            data = load_market_page(page=page, page_size=page_size)
+        return {"code": 200, "data": data, "message": "成功"}
+    except Exception as exc:
+        logger.error("股票列表接口失败: %s", exc)
+        return {"code": 500, "data": {"page": page, "pageSize": page_size, "total": 0, "items": []}, "message": "失败"}
+
+
+@router.get("/news/hot")
+async def hot_news(limit: int = Query(12, ge=1, le=30, description="新闻条数")):
+    """获取财经热点新闻。"""
+    try:
+        data = collect_hot_news(limit=limit)
+        return {"code": 200, "data": {"items": data}, "message": "成功"}
+    except Exception as exc:
+        logger.error("热点新闻接口失败: %s", exc)
+        return {"code": 500, "data": {"items": []}, "message": "失败"}
 
 
 def _normalize_title(raw_title: str) -> str:

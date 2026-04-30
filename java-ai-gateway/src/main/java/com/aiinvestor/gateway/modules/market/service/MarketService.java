@@ -7,6 +7,9 @@ import com.aiinvestor.gateway.modules.market.dao.mapper.MarketQuoteMapper;
 import com.aiinvestor.gateway.modules.market.dao.mapper.SectorMapper;
 import com.aiinvestor.gateway.modules.market.dao.mapper.StockMapper;
 import com.aiinvestor.gateway.modules.market.vo.MarketQuoteVO;
+import com.aiinvestor.gateway.modules.market.vo.HotNewsItemVO;
+import com.aiinvestor.gateway.modules.market.vo.MarketStockListItemVO;
+import com.aiinvestor.gateway.modules.market.vo.MarketStockPageVO;
 import com.aiinvestor.gateway.modules.market.vo.SectorVO;
 import com.aiinvestor.gateway.modules.shared.cache.RedisJsonCacheService;
 import com.aiinvestor.gateway.modules.shared.config.AppCacheProperties;
@@ -23,7 +26,7 @@ import java.util.Map;
 
 /**
  * 行情域服务。
- * 读取顺序为 Redis -> Python 实时行情 -> MySQL 快照，兼顾实时性和稳定性。
+ * 读取顺序为 Redis -> Python 实时行情 -> MySQL 快照。
  */
 @Service
 public class MarketService {
@@ -55,6 +58,76 @@ public class MarketService {
      * 批量获取行情。
      */
     public List<MarketQuoteVO> getQuotes(List<String> symbols) {
+        return loadQuotes(symbols, false);
+    }
+
+    /**
+     * 强制刷新行情。
+     */
+    public List<MarketQuoteVO> refreshQuotes(List<String> symbols) {
+        return loadQuotes(symbols, true);
+    }
+
+    /**
+     * 获取单只股票最新行情。
+     */
+    public MarketQuoteVO getLatestQuote(String symbol) {
+        return getQuotes(List.of(symbol)).stream()
+                .findFirst()
+                .orElseThrow(() -> new BusinessException("未查询到股票行情：" + symbol));
+    }
+
+    /**
+     * 获取股票列表或搜索结果。
+     */
+    public MarketStockPageVO listStocks(int page, int pageSize, String keyword) {
+        MarketStockPageVO stockPage = pythonMarketClient.fetchStocks(page, pageSize, keyword);
+        for (MarketStockListItemVO item : stockPage.getItems()) {
+            MarketQuoteVO quote = new MarketQuoteVO(
+                    item.getSymbol(),
+                    item.getName(),
+                    item.getLastPrice(),
+                    item.getChangePercent(),
+                    item.getChangeAmount(),
+                    item.getHighPrice(),
+                    item.getLowPrice(),
+                    item.getOpenPrice(),
+                    item.getVolume(),
+                    item.getTurnover(),
+                    item.getTurnoverRate(),
+                    null,
+                    LocalDateTime.now()
+            );
+            cacheAndPersistQuote(quote);
+            ensureStockRecord(quote);
+        }
+        return stockPage;
+    }
+
+    /**
+     * 获取热点新闻。
+     */
+    public List<HotNewsItemVO> listHotNews(int limit) {
+        return pythonMarketClient.fetchHotNews(limit);
+    }
+
+    /**
+     * 获取板块列表。
+     */
+    public List<SectorVO> listSectors() {
+        return sectorMapper.selectList(
+                        new LambdaQueryWrapper<SectorDO>().orderByAsc(SectorDO::getSortOrder, SectorDO::getId)
+                ).stream()
+                .map(item -> new SectorVO(
+                        item.getSectorCode(),
+                        item.getSectorName(),
+                        item.getParentCode(),
+                        item.getSortOrder()
+                ))
+                .toList();
+    }
+
+    private List<MarketQuoteVO> loadQuotes(List<String> symbols, boolean forceRefresh) {
         List<String> normalizedSymbols = symbols.stream()
                 .map(String::trim)
                 .filter(symbol -> !symbol.isBlank())
@@ -68,7 +141,9 @@ public class MarketService {
         List<String> missedSymbols = new ArrayList<>();
 
         for (String symbol : normalizedSymbols) {
-            MarketQuoteVO cached = redisJsonCacheService.get(cacheKey(symbol), MarketQuoteVO.class);
+            MarketQuoteVO cached = forceRefresh
+                    ? null
+                    : redisJsonCacheService.get(cacheKey(symbol), MarketQuoteVO.class);
             if (cached != null) {
                 result.put(symbol, cached);
             } else {
@@ -88,45 +163,13 @@ public class MarketService {
                 if (result.containsKey(symbol)) {
                     continue;
                 }
-                MarketQuoteDO dbQuote = marketQuoteMapper.selectOne(
-                        new LambdaQueryWrapper<MarketQuoteDO>()
-                                .eq(MarketQuoteDO::getSymbol, symbol)
-                                .last("limit 1")
-                );
-                if (dbQuote != null) {
-                    result.put(symbol, toQuoteVO(dbQuote, findStockName(symbol)));
-                }
+                fillFromSnapshot(symbol, result);
             }
         }
 
         return normalizedSymbols.stream()
                 .map(result::get)
                 .filter(item -> item != null)
-                .toList();
-    }
-
-    /**
-     * 获取单只股票最新价。
-     */
-    public MarketQuoteVO getLatestQuote(String symbol) {
-        return getQuotes(List.of(symbol)).stream()
-                .findFirst()
-                .orElseThrow(() -> new BusinessException("未查询到股票行情：" + symbol));
-    }
-
-    /**
-     * 获取板块列表。
-     */
-    public List<SectorVO> listSectors() {
-        return sectorMapper.selectList(
-                        new LambdaQueryWrapper<SectorDO>().orderByAsc(SectorDO::getSortOrder, SectorDO::getId)
-                ).stream()
-                .map(item -> new SectorVO(
-                        item.getSectorCode(),
-                        item.getSectorName(),
-                        item.getParentCode(),
-                        item.getSortOrder()
-                ))
                 .toList();
     }
 
@@ -160,6 +203,10 @@ public class MarketService {
                         .last("limit 1")
         );
         if (stock != null) {
+            if (quote.getName() != null && !quote.getName().isBlank() && !quote.getName().equals(stock.getName())) {
+                stock.setName(quote.getName());
+                stockMapper.updateById(stock);
+            }
             return;
         }
 
@@ -170,6 +217,23 @@ public class MarketService {
         created.setMarket("A");
         created.setStatus("active");
         stockMapper.insert(created);
+    }
+
+    private void fillFromSnapshot(String symbol, Map<String, MarketQuoteVO> result) {
+        MarketQuoteVO cached = redisJsonCacheService.get(cacheKey(symbol), MarketQuoteVO.class);
+        if (cached != null) {
+            result.put(symbol, cached);
+            return;
+        }
+
+        MarketQuoteDO dbQuote = marketQuoteMapper.selectOne(
+                new LambdaQueryWrapper<MarketQuoteDO>()
+                        .eq(MarketQuoteDO::getSymbol, symbol)
+                        .last("limit 1")
+        );
+        if (dbQuote != null) {
+            result.put(symbol, toQuoteVO(dbQuote, findStockName(symbol)));
+        }
     }
 
     private String findStockName(String symbol) {
