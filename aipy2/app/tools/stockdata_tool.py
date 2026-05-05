@@ -1,4 +1,21 @@
-"""股票行情与股票搜索工具。"""
+"""
+股票行情与股票搜索工具
+
+功能：
+1. 获取单只/多只 A 股实时行情（通过腾讯行情接口）
+2. 按关键字搜索股票（支持代码、中文名、拼音缩写）
+3. 获取热门股票列表
+
+数据源：
+- 腾讯行情接口（qt.gtimg.cn）：实时价格、涨跌幅、成交量
+- 新浪联想接口：搜索建议
+- 腾讯联想接口：搜索建议
+
+对外接口：
+- get_stock_quote_core：获取单只股票行情（LangChain Tool）
+- load_market_page：获取热门股票列表
+- search_market_stocks：按关键字搜索股票
+"""
 
 from __future__ import annotations
 
@@ -14,18 +31,48 @@ from langchain_core.tools import tool
 TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={code}"
 TENCENT_SUGGEST_URL = "https://smartbox.gtimg.cn/s3/?q={keyword}&t=all"
 SINA_SUGGEST_URL = "https://suggest3.sinajs.cn/suggest/type=11,12,13,14,15&key={keyword}&name=suggestdata"
+# 热门股票代码列表（涵盖各行业龙头）
 HOT_SYMBOLS = [
-    "600519", "000001", "300750", "601318", "600036", "601688", "002594", "000858",
-    "600900", "601398", "601288", "601166", "600030", "601012", "600809", "002415",
-    "300059", "601899", "000333", "601888", "600276", "688981", "603259", "600887",
+    "600519",  # 贵州茅台
+    "000001",  # 平安银行
+    "300750",  # 宁德时代
+    "601318",  # 中国平安
+    "600036",  # 招商银行
+    "601688",  # 华泰证券
+    "002594",  # 比亚迪
+    "000858",  # 五粮液
+    "600900",  # 长江电力
+    "601398",  # 工商银行
+    "601288",  # 农业银行
+    "601166",  # 兴业银行
+    "600030",  # 中信证券
+    "601012",  # 隆基绿能
+    "600809",  # 山西汾酒
+    "002415",  # 海康威视
+    "300059",  # 东方财富
+    "601899",  # 紫金矿业
+    "000333",  # 美的集团
+    "601888",  # 中国中免
+    "600276",  # 恒瑞医药
+    "688981",  # 中芯国际
+    "603259",  # 药明康德
+    "600887",  # 伊利股份
 ]
 
+# 创建 requests 会话对象，复用 TCP 连接提升性能
 _http = requests.Session()
-_http.trust_env = False
+_http.trust_env = False  # 不使用系统代理，避免开发环境干扰
 
 
 def _build_market_code(symbol: str) -> str:
-    """把 6 位股票代码转换成腾讯接口需要的市场前缀格式。"""
+    """把 6 位股票代码转换成腾讯接口需要的市场前缀格式
+    
+    股票代码规则：
+    - 以 5/6/9 开头：上海市场（sh）
+    - 其他：深圳市场（sz）
+    
+    示例：600519 -> sh600519, 000001 -> sz000001
+    """
     if not re.fullmatch(r"\d{6}", symbol):
         raise ValueError("symbol 必须是 6 位数字，例如 600519")
     return f"sh{symbol}" if symbol.startswith(("5", "6", "9")) else f"sz{symbol}"
@@ -233,7 +280,11 @@ def _build_stock_items(candidates: list[dict[str, str]]) -> list[dict[str, Any]]
 
 
 def load_market_page(page: int = 1, page_size: int = 40) -> dict[str, Any]:
-    """获取默认主流股票池列表。"""
+    """获取默认主流股票池列表
+    
+    参数：page-页码(从1开始), page_size-每页数量(默认40)
+    返回：分页格式的股票列表
+    """
     start = max(page - 1, 0) * page_size
     end = start + page_size
     sliced_symbols = HOT_SYMBOLS[start:end]
@@ -251,7 +302,11 @@ def load_market_page(page: int = 1, page_size: int = 40) -> dict[str, Any]:
 
 
 def search_market_stocks(keyword: str, page: int = 1, page_size: int = 40) -> dict[str, Any]:
-    """按关键字搜索股票。支持代码、中文名和拼音缩写。"""
+    """按关键字搜索股票
+    
+    搜索策略：同时请求新浪+腾讯联想接口，合并去重后补充实时行情
+    参数：keyword-搜索关键字, page-页码, page_size-每页数量
+    """
     normalized_keyword = keyword.strip()
     if not normalized_keyword:
         return load_market_page(page=page, page_size=page_size)
@@ -284,7 +339,11 @@ def search_market_stocks(keyword: str, page: int = 1, page_size: int = 40) -> di
 
 @tool
 def get_stock_quote_core(symbol: str) -> str:
-    """获取单只 A 股实时行情。"""
+    """获取单只 A 股实时行情
+    
+    参数：symbol - 6 位股票代码（如 600519）
+    返回：JSON 格式行情数据（代码、名称、价格、涨跌、成交量等）
+    """
     try:
         payload = _fetch_batch_quotes([symbol]).get(symbol)
         if not payload:

@@ -1,3 +1,5 @@
+<!-- TerminalAdmin - 管理后台页面 -->
+<!-- 展示系统概况卡片、用户列表（支持角色/会员变更）和用户持仓详情 -->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { BriefcaseBusiness, Shield, Users, WalletCards } from 'lucide-vue-next'
@@ -22,8 +24,9 @@ const emit = defineEmits<{
   'update-user-membership': [payload: { userId: number; planCode: string }]
 }>()
 
+// 用户列表分页状态
 const userPage = ref(1)
-const userPageSize = 8
+const userPageSize = 8 // 每页显示用户数
 
 watch(
   () => props.users,
@@ -34,18 +37,22 @@ watch(
   { deep: true },
 )
 
+// 根据当前页码切片用户列表
 const pagedUsers = computed(() => {
   const start = (userPage.value - 1) * userPageSize
   return props.users.slice(start, start + userPageSize)
 })
 
+// 搜索关键词变更，重置到第一页
 const updateKeyword = (event: Event) => {
   userPage.value = 1
   emit('update:keyword', (event.target as HTMLInputElement).value)
 }
 
+// 格式化数字为中文千分位
 const numberText = (value?: number) => new Intl.NumberFormat('zh-CN').format(value || 0)
 
+// 格式化金额为人民币格式
 const moneyText = (value?: number) =>
   new Intl.NumberFormat('zh-CN', {
     style: 'currency',
@@ -53,6 +60,7 @@ const moneyText = (value?: number) =>
     maximumFractionDigits: 2,
   }).format(value || 0)
 
+// 格式化价格，无值时显示 '--'
 const priceText = (value?: number) =>
   typeof value === 'number'
     ? new Intl.NumberFormat('zh-CN', {
@@ -61,6 +69,7 @@ const priceText = (value?: number) =>
       }).format(value)
     : '--'
 
+// 管理后台顶部概况卡片数据
 const cards = computed(() => [
   { key: 'users', title: '用户总数', value: numberText(props.overview?.totalUsers), icon: Users },
   { key: 'vip', title: '会员用户', value: numberText(props.overview?.totalVipUsers), icon: Shield },
@@ -70,6 +79,7 @@ const cards = computed(() => [
   { key: 'accounts', title: '模拟账户', value: numberText(props.overview?.totalPaperAccounts), icon: WalletCards },
 ])
 
+// 修改用户角色（需确认）
 const confirmRoleChange = (user: AdminUser, event: Event) => {
   const select = event.target as HTMLSelectElement
   const nextRole = select.value
@@ -84,6 +94,7 @@ const confirmRoleChange = (user: AdminUser, event: Event) => {
   emit('update-user-role', { userId: user.id, role: nextRole })
 }
 
+// 修改用户会员方案（需确认）
 const confirmMembershipChange = (user: AdminUser, event: Event) => {
   const select = event.target as HTMLSelectElement
   const nextPlan = select.value
@@ -117,7 +128,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
             @keyup.enter="emit('search')"
           />
           <button
-            class="rounded-lg bg-slate-900 px-3 py-2 text-[13px] text-white transition hover:bg-slate-800"
+            class="rounded-lg bg-slate-900 px-3 py-2 text-[13px] text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.97]"
             @click="emit('search')"
           >
             查询
@@ -196,7 +207,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
           <div class="text-slate-600">{{ user.watchlistCount || 0 }}</div>
           <div class="flex justify-end">
             <button
-              class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+              class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-medium text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-white active:scale-[0.97]"
               @click="emit('open-portfolio', user.id)"
             >
               <BriefcaseBusiness class="h-3.5 w-3.5" />
@@ -228,7 +239,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
           </div>
         </div>
         <button
-          class="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600 transition hover:bg-slate-50"
+          class="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600 transition-all duration-150 hover:bg-slate-50 active:scale-[0.97]"
           @click="emit('close-portfolio')"
         >
           收起

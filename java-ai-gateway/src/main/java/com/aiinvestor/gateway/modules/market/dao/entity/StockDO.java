@@ -22,6 +22,9 @@ public class StockDO {
     /** 股票名称。 */
     private String name;
 
+    /** 拼音首字母。 */
+    private String pinyin;
+
     /** 交易所。 */
     private String exchange;
 

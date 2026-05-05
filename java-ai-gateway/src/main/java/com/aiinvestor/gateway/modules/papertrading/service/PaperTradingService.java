@@ -16,6 +16,8 @@ import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperPositionMappe
 import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperTradeMapper;
 import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperCashTransferRequest;
 import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperOrderRequest;
+import com.aiinvestor.gateway.modules.papertrading.mq.TransactionEvent;
+import com.aiinvestor.gateway.modules.papertrading.mq.TransactionEventProducer;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperAccountVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperCashTransferVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperOrderVO;
@@ -23,7 +25,7 @@ import com.aiinvestor.gateway.modules.papertrading.vo.PaperPortfolioSnapshotVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperPositionVO;
 import com.aiinvestor.gateway.modules.shared.config.AppCacheProperties;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
-import com.aiinvestor.gateway.service.UserNotificationService;
+import com.aiinvestor.gateway.modules.shared.service.UserNotificationService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -59,6 +62,7 @@ public class PaperTradingService {
     private final StringRedisTemplate stringRedisTemplate;
     private final AppCacheProperties appCacheProperties;
     private final UserNotificationService userNotificationService;
+    private final TransactionEventProducer transactionEventProducer;
 
     public PaperTradingService(PaperAccountMapper paperAccountMapper,
                                PaperCashTransferMapper paperCashTransferMapper,
@@ -69,7 +73,8 @@ public class PaperTradingService {
                                MarketService marketService,
                                StringRedisTemplate stringRedisTemplate,
                                AppCacheProperties appCacheProperties,
-                               UserNotificationService userNotificationService) {
+                               UserNotificationService userNotificationService,
+                               TransactionEventProducer transactionEventProducer) {
         this.paperAccountMapper = paperAccountMapper;
         this.paperCashTransferMapper = paperCashTransferMapper;
         this.paperPositionMapper = paperPositionMapper;
@@ -80,6 +85,7 @@ public class PaperTradingService {
         this.stringRedisTemplate = stringRedisTemplate;
         this.appCacheProperties = appCacheProperties;
         this.userNotificationService = userNotificationService;
+        this.transactionEventProducer = transactionEventProducer;
     }
 
     /**
@@ -113,7 +119,7 @@ public class PaperTradingService {
     }
 
     /**
-     * 鑾峰彇鎸佷粨鍒楄〃锛屽彲閫夋嫨寮哄埗鍒锋柊瀹炴椂琛屾儏銆?     */
+     * 获取持仓列表，可选择强制刷新实时行情。     */
     public List<PaperPositionVO> listPositions(Long userId, Long accountId, boolean refreshQuote) {
         return getPortfolioSnapshot(userId, accountId, refreshQuote).getPositions();
     }
@@ -245,6 +251,21 @@ public class PaperTradingService {
                         + " 元，资金已更新到交易账户。"
         );
 
+        // 异步发送充值/提现事件（通过 MQ）
+        PaperAccountDO updatedAccount = paperAccountMapper.selectById(account.getId());
+        transactionEventProducer.send(new TransactionEvent(
+                userId,
+                "withdraw".equalsIgnoreCase(direction) ? "WITHDRAW" : "DEPOSIT",
+                null,
+                null,
+                null,
+                null,
+                amount,
+                updatedAccount.getCashBalance(),
+                ("withdraw".equalsIgnoreCase(direction) ? "提现" : "充值") + " " + amount.toPlainString() + " 元",
+                Instant.now()
+        ));
+
         return toCashTransferVO(transfer);
     }
 
@@ -309,6 +330,22 @@ public class PaperTradingService {
 
             createTrade(order, dealPrice, tradeAmount);
             refreshAccountSnapshot(account.getId());
+
+            // 异步发送交易事件（通过 MQ）
+            PaperAccountDO latestAccount = paperAccountMapper.selectById(account.getId());
+            transactionEventProducer.send(new TransactionEvent(
+                    userId,
+                    "ORDER_FILLED",
+                    order.getSymbol(),
+                    side,
+                    order.getOrderQty(),
+                    dealPrice,
+                    tradeAmount,
+                    latestAccount.getCashBalance(),
+                    ("BUY".equals(side) ? "买入" : "卖出") + order.getSymbol() + " " + order.getOrderQty() + "股",
+                    Instant.now()
+            ));
+
             return toOrderVO(order);
         } finally {
             stringRedisTemplate.delete(lockKey);
@@ -331,6 +368,20 @@ public class PaperTradingService {
         }
         order.setOrderStatus("cancelled");
         paperOrderMapper.updateById(order);
+
+        // 异步发送撤单事件（通过 MQ）
+        transactionEventProducer.send(new TransactionEvent(
+                userId,
+                "ORDER_CANCELLED",
+                order.getSymbol(),
+                order.getSide(),
+                order.getOrderQty(),
+                order.getOrderPrice(),
+                null,
+                null,
+                "撤销" + order.getSymbol() + " 委托",
+                Instant.now()
+        ));
     }
 
     private void handleBuy(PaperAccountDO account, PaperOrderDO order, BigDecimal dealPrice, BigDecimal tradeAmount) {

@@ -60,7 +60,7 @@ class StockAnalysisSkill:
     【高级技能：数据管家】 -> 【类比 Java】：这是一个 @Service 类
     """
 
-    _symbol_pattern = re.compile(r"\b\d{6}\b")
+    _symbol_pattern = re.compile(r"(?<!\d)\d{6}(?!\d)")
 
     async def run(self, payload: StockAnalysisSkillInput) -> StockAnalysisSkillOutput:
         """执行技能主流程：查询检索资料、提取股票代码、补充行情与证据。"""

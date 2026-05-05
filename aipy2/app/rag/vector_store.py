@@ -88,7 +88,7 @@ class VectorStore:
         self.api_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
         self.vector_size = 1024
         
-        print(f"[PG] 正在连接数据库...")
+        print("[PG] 正在连接数据库...")
         self.conn = psycopg2.connect(db_url)
         self.conn.autocommit = True
 

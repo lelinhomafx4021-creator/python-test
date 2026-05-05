@@ -1,7 +1,7 @@
 package com.aiinvestor.gateway.config;
 
 import cn.dev33.satoken.exception.NotLoginException;
-import com.aiinvestor.gateway.model.vo.ApiResult;
+import com.aiinvestor.gateway.modules.shared.vo.ApiResult;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

@@ -203,7 +203,7 @@ def parse_file(file_path: str) -> list[DocChunk]:
         # .doc 是旧版 Word 格式（二进制），python-docx 不支持
         # 需要用 LibreOffice 或者 antiword 转换
         raise ValueError(
-            f"不支持 .doc 格式（旧版 Word），请用 Word 另存为 .docx 格式"
+            "不支持 .doc 格式（旧版 Word），请用 Word 另存为 .docx 格式"
         )
 
     else:

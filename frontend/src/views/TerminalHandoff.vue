@@ -1,3 +1,5 @@
+<!-- TerminalHandoff - 人工工单面板页面 -->
+<!-- 展示转人工工单列表，支持分页查看、状态筛选和打开原始会话 -->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ArrowRight, Headset, Ticket } from 'lucide-vue-next'
@@ -12,6 +14,7 @@ const emit = defineEmits<{
   openSession: [sessionId: string]
 }>()
 
+// 当前页码
 const page = ref(1)
 const pageSize = 6
 
@@ -20,11 +23,13 @@ watch(() => props.tickets, () => {
   if (page.value > maxPage) page.value = maxPage
 }, { deep: true })
 
+// 根据当前页码切片工单列表
 const pagedTickets = computed(() => {
   const start = (page.value - 1) * pageSize
   return props.tickets.slice(start, start + pageSize)
 })
 
+// 格式化时间戳为本地日期时间
 const formatTime = (value?: string) => {
   if (!value) return '暂无'
   const date = new Date(value)
@@ -37,6 +42,7 @@ const formatTime = (value?: string) => {
   })
 }
 
+// 将转人工原因代码转换为中文描述
 const reasonText = (reason?: string) => {
   const map: Record<string, string> = {
     user_requested_human: '用户主动要求转人工',
@@ -45,6 +51,7 @@ const reasonText = (reason?: string) => {
   return map[reason || ''] || reason || '待人工确认'
 }
 
+// 将工单状态码转换为中文标签
 const statusText = (status?: string) => {
   const map: Record<string, string> = {
     open: '待处理',
@@ -81,7 +88,7 @@ const statusText = (status?: string) => {
       <button
         v-for="ticket in pagedTickets"
         :key="ticket.traceId"
-        class="rounded-[32px] border border-slate-200 bg-white px-6 py-6 text-left shadow-[0_18px_55px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_60px_rgba(15,23,42,0.08)]"
+        class="rounded-[32px] border border-slate-200 bg-white px-6 py-6 text-left shadow-[0_18px_55px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_22px_60px_rgba(15,23,42,0.08)] active:scale-[0.99]"
         @click="emit('openSession', ticket.sessionId)"
       >
         <div class="flex flex-wrap items-center gap-3">

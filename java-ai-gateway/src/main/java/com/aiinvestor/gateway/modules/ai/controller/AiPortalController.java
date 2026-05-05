@@ -1,14 +1,14 @@
 package com.aiinvestor.gateway.modules.ai.controller;
 
-import com.aiinvestor.gateway.annotation.LoginRequired;
-import com.aiinvestor.gateway.context.UserContext;
-import com.aiinvestor.gateway.controller.AiGatewayController;
-import com.aiinvestor.gateway.model.vo.AiHandoffTicketVO;
-import com.aiinvestor.gateway.model.vo.ApiResult;
+import com.aiinvestor.gateway.modules.shared.annotation.LoginRequired;
+import com.aiinvestor.gateway.modules.shared.context.UserContext;
+import com.aiinvestor.gateway.modules.ai.controller.AiGatewayController;
+import com.aiinvestor.gateway.modules.ai.vo.HandoffTicketVO;
+import com.aiinvestor.gateway.modules.shared.vo.ApiResult;
 import com.aiinvestor.gateway.modules.ai.dto.AiStreamChatRequest;
 import com.aiinvestor.gateway.modules.ai.service.AiSessionService;
 import com.aiinvestor.gateway.modules.ai.vo.AiChatResponseVO;
-import com.aiinvestor.gateway.service.HumanHandoffService;
+import com.aiinvestor.gateway.modules.ai.service.HumanHandoffService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
@@ -22,6 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SynchronousSink;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +36,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/ai")
 @LoginRequired
+@Tag(name = "AI对话(标准API)", description = "AI 标准化对话接口（POST /chat/stream、/chat、/handoff-tickets）")
 public class AiPortalController {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -49,9 +53,8 @@ public class AiPortalController {
         this.aiSessionService = aiSessionService;
     }
 
-    /**
-     * 标准化流式聊天接口。
-     */
+    /** 标准化流式聊天接口。 */
+    @Operation(summary = "标准化流式聊天", description = "发送消息并以 SSE 流式方式接收 AI 回答（标准化 API）")
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> stream(@Valid @RequestBody AiStreamChatRequest request) {
         String sessionId = normalizeSessionId(request.getSessionId());
@@ -74,10 +77,8 @@ public class AiPortalController {
                 ));
     }
 
-    /**
-     * 标准化同步聊天接口。
-     * 当前基于流式接口聚合最终答案，便于后续前后端统一接入。
-     */
+    /** 标准化同步聊天接口，基于流式接口聚合最终答案 */
+    @Operation(summary = "同步AI对话", description = "发送消息并等待 AI 完整回答后返回（同步模式）")
     @PostMapping("/chat")
     public Mono<ApiResult<AiChatResponseVO>> chat(@Valid @RequestBody AiStreamChatRequest request) {
         String sessionId = normalizeSessionId(request.getSessionId());
@@ -110,12 +111,11 @@ public class AiPortalController {
                 )));
     }
 
-    /**
-     * 标准化人工工单查询接口。
-     */
+    /** 标准化人工工单查询接口。 */
+    @Operation(summary = "查询人工工单(标准API)", description = "获取当前用户的人工兜底工单列表（标准化 API）")
     @GetMapping("/handoff-tickets")
-    public ApiResult<List<AiHandoffTicketVO>> handoffTickets() {
-        return ApiResult.ok(humanHandoffService.listTicketsByUserId(String.valueOf(UserContext.getUserId())));
+    public ApiResult<List<HandoffTicketVO>> handoffTickets() {
+        return ApiResult.ok(humanHandoffService.listTicketsByUserId(UserContext.getUserId()));
     }
 
     private String normalizeSessionId(String sessionId) {

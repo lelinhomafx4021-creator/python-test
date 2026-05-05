@@ -81,7 +81,29 @@ public class MarketService {
      * 获取股票列表或搜索结果。
      */
     public MarketStockPageVO listStocks(int page, int pageSize, String keyword) {
-        MarketStockPageVO stockPage = pythonMarketClient.fetchStocks(page, pageSize, keyword);
+        String trimmedKeyword = keyword == null ? "" : keyword.trim();
+        
+        // 先尝试通过 Python 服务获取
+        MarketStockPageVO stockPage = pythonMarketClient.fetchStocks(page, pageSize, trimmedKeyword);
+        
+        // 如果有搜索关键词，同时从数据库搜索拼音匹配的股票
+        if (!trimmedKeyword.isEmpty()) {
+            List<MarketStockListItemVO> dbResults = searchByPinyin(trimmedKeyword, pageSize);
+            // 合并数据库搜索结果（去重）
+            java.util.Set<String> existingSymbols = new java.util.HashSet<>();
+            for (MarketStockListItemVO item : stockPage.getItems()) {
+                existingSymbols.add(item.getSymbol());
+            }
+            for (MarketStockListItemVO item : dbResults) {
+                if (!existingSymbols.contains(item.getSymbol())) {
+                    stockPage.getItems().add(item);
+                    existingSymbols.add(item.getSymbol());
+                }
+            }
+            stockPage.setTotal(stockPage.getItems().size());
+        }
+        
+        // 缓存行情数据
         for (MarketStockListItemVO item : stockPage.getItems()) {
             MarketQuoteVO quote = new MarketQuoteVO(
                     item.getSymbol(),
@@ -101,8 +123,46 @@ public class MarketService {
             cacheAndPersistQuote(quote);
             ensureStockRecord(quote);
         }
+        
         return stockPage;
     }
+    
+    /**
+     * 通过拼音首字母搜索股票。
+     */
+    private List<MarketStockListItemVO> searchByPinyin(String keyword, int limit) {
+        String pinyinKeyword = keyword.toUpperCase();
+        List<MarketStockListItemVO> results = new ArrayList<>();
+        
+        // 从数据库查询拼音匹配的股票
+        List<StockDO> stocks = stockMapper.selectList(
+                new LambdaQueryWrapper<StockDO>()
+                        .and(w -> w
+                                .like(StockDO::getPinyin, pinyinKeyword)
+                                .or()
+                                .like(StockDO::getName, keyword)
+                                .or()
+                                .like(StockDO::getSymbol, keyword)
+                        )
+                        .eq(StockDO::getStatus, "active")
+                        .last("limit " + limit)
+        );
+        
+        for (StockDO stock : stocks) {
+            String pinyin = stock.getPinyin();
+            if (pinyin == null || pinyin.isBlank()) {
+                pinyin = PinyinHelper.toPinyinInitials(stock.getName()).toLowerCase();
+            }
+            
+            MarketStockListItemVO item = new MarketStockListItemVO();
+            item.setSymbol(stock.getSymbol());
+            item.setName(stock.getName());
+            item.setPinyin(pinyin);
+            results.add(item);
+        }
+        
+        return results;
+     }
 
     /**
      * 获取热点新闻。
@@ -205,6 +265,8 @@ public class MarketService {
         if (stock != null) {
             if (quote.getName() != null && !quote.getName().isBlank() && !quote.getName().equals(stock.getName())) {
                 stock.setName(quote.getName());
+                // 名称变更时重新生成拼音
+                stock.setPinyin(PinyinHelper.toPinyinInitials(quote.getName()).toLowerCase());
                 stockMapper.updateById(stock);
             }
             return;
@@ -216,6 +278,10 @@ public class MarketService {
         created.setExchange(resolveExchange(quote.getSymbol()));
         created.setMarket("A");
         created.setStatus("active");
+        // 自动生成拼音首字母
+        if (created.getName() != null && !created.getName().isBlank()) {
+            created.setPinyin(PinyinHelper.toPinyinInitials(created.getName()).toLowerCase());
+        }
         stockMapper.insert(created);
     }
 

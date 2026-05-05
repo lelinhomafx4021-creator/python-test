@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 const props = defineProps<{
   page: number
   pageSize: number
@@ -9,7 +11,7 @@ const emit = defineEmits<{
   'update:page': [value: number]
 }>()
 
-const totalPages = Math.max(1, Math.ceil((props.total || 0) / props.pageSize))
+const totalPages = computed(() => Math.max(1, Math.ceil((props.total || 0) / props.pageSize)))
 
 const goPrev = () => {
   if (props.page <= 1) return
@@ -17,25 +19,25 @@ const goPrev = () => {
 }
 
 const goNext = () => {
-  if (props.page >= totalPages) return
+  if (props.page >= totalPages.value) return
   emit('update:page', props.page + 1)
 }
 </script>
 
 <template>
-  <div class="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-[12px] text-slate-500">
+  <div class="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-[12px] text-slate-500">
     <div>共 {{ total }} 条</div>
     <div class="flex items-center gap-2">
       <button
-        class="rounded-md border border-slate-200 px-2.5 py-1 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-lg border border-slate-200 px-2.5 py-1 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="page <= 1"
         @click="goPrev"
       >
         上一页
       </button>
-      <span>第 {{ page }} / {{ totalPages }} 页</span>
+      <span class="tabular-nums">第 {{ page }} / {{ totalPages }} 页</span>
       <button
-        class="rounded-md border border-slate-200 px-2.5 py-1 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-lg border border-slate-200 px-2.5 py-1 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="page >= totalPages"
         @click="goNext"
       >

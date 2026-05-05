@@ -1,8 +1,12 @@
+<!-- TerminalAuth - 终端登录/注册页面 -->
+<!-- 左侧展示产品介绍和行情示例，右侧为登录/注册表单 -->
 <script setup lang="ts">
 import { LockKeyhole, ShieldCheck, TrendingDown, TrendingUp, UserPlus } from 'lucide-vue-next'
 
+// 认证模式：登录或注册
 type AuthMode = 'login' | 'register'
 
+// 登录页左侧展示的终端功能信号
 type LoginSignal = {
   value: string
   label: string
@@ -29,6 +33,7 @@ const emit = defineEmits<{
   submit: []
 }>()
 
+// 根据字段名分发输入值变更到父组件
 const updateValue = (key: 'username' | 'password' | 'nickname' | 'phone', event: Event) => {
   const value = (event.target as HTMLInputElement).value
   if (key === 'username') emit('update:username', value)
@@ -37,6 +42,7 @@ const updateValue = (key: 'username' | 'password' | 'nickname' | 'phone', event:
   else emit('update:phone', value)
 }
 
+// 登录页展示的模拟行情数据
 const marketRows = [
   { symbol: '600519', name: '贵州茅台', price: '1382.43', change: '-1.34%', positive: false },
   { symbol: '000001', name: '平安银行', price: '11.52', change: '+0.35%', positive: true },
@@ -100,7 +106,7 @@ const marketRows = [
               <div class="text-[13px] font-medium text-slate-700">终端模块</div>
               <div class="mt-4 grid gap-2">
                 <div
-                  v-for="signal in signals.slice(0, 3)"
+                  v-for="signal in signals.slice(0, 4)"
                   :key="signal.value"
                   class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
                 >
@@ -136,14 +142,14 @@ const marketRows = [
 
           <div class="mt-6 flex items-center gap-2 rounded-full bg-slate-100 p-1">
             <button
-              class="flex-1 rounded-full px-3 py-2 text-[13px] font-medium transition"
+              class="flex-1 rounded-full px-3 py-2 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]"
               :class="mode === 'login' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'"
               @click="emit('update:mode', 'login')"
             >
               登录
             </button>
             <button
-              class="flex-1 rounded-full px-3 py-2 text-[13px] font-medium transition"
+              class="flex-1 rounded-full px-3 py-2 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]"
               :class="mode === 'register' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'"
               @click="emit('update:mode', 'register')"
             >
@@ -198,9 +204,7 @@ const marketRows = [
               />
             </label>
 
-            <div v-if="mode === 'login'" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-600">
-              演示账号：<span class="font-medium text-slate-900">admin / 123456</span>
-            </div>
+
 
             <div v-if="error" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] leading-6 text-rose-600">
               {{ error }}
@@ -208,7 +212,7 @@ const marketRows = [
 
             <button
               type="submit"
-              class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-[14px] font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-[14px] font-medium text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="loading"
             >
               <component :is="mode === 'login' ? LockKeyhole : UserPlus" class="h-4 w-4" />

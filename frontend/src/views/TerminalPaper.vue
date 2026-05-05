@@ -193,13 +193,13 @@ const submitWithdraw = () => {
 
           <div class="grid grid-cols-2 gap-2">
             <button
-              class="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-[13px] font-medium text-white transition hover:bg-slate-800"
+              class="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-[13px] font-medium text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.97]"
               @click="submitDeposit"
             >
               充值并到账
             </button>
             <button
-              class="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50"
+              class="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition-all duration-150 hover:bg-slate-50 active:scale-[0.97]"
               @click="submitWithdraw"
             >
               提现并扣款
@@ -235,14 +235,14 @@ const submitWithdraw = () => {
 
           <div class="grid grid-cols-2 gap-2">
             <button
-              class="rounded-xl px-3 py-2 text-[13px] font-medium transition"
+              class="rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]"
               :class="side === 'BUY' ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-200' : 'bg-slate-100 text-slate-600'"
               @click="emit('update:side', 'BUY')"
             >
               买入
             </button>
             <button
-              class="rounded-xl px-3 py-2 text-[13px] font-medium transition"
+              class="rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]"
               :class="side === 'SELL' ? 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-600'"
               @click="emit('update:side', 'SELL')"
             >
@@ -262,7 +262,7 @@ const submitWithdraw = () => {
           </div>
 
           <button
-            class="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-[13px] font-medium text-white transition hover:bg-slate-800"
+            class="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-[13px] font-medium text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.97]"
             @click="emit('submit')"
           >
             提交委托
@@ -377,7 +377,7 @@ const submitWithdraw = () => {
             <div class="text-right">
               <button
                 v-if="order.orderStatus === 'submitted'"
-                class="rounded-lg border border-slate-200 px-2 py-1 text-[12px] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                class="rounded-lg border border-slate-200 px-2 py-1 text-[12px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:text-slate-900 active:scale-[0.97]"
                 @click="emit('cancel', order.id)"
               >
                 撤单

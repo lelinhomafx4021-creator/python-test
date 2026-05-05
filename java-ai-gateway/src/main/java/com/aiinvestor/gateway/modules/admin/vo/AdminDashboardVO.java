@@ -35,4 +35,7 @@ public class AdminDashboardVO {
 
     /** 模拟账户总数。 */
     private Long totalPaperAccounts;
+
+    /** 交易流水总数。 */
+    private Long totalTransactionLogs;
 }

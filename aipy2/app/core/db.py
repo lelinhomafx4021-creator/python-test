@@ -34,9 +34,8 @@ def init_db():
     """本地/测试辅助函数：根据 ORM 模型补齐缺失表。"""
     # 这些 import 的作用不是在这里直接使用变量，
     # 而是把表模型加载进来，让 SQLModel.metadata 能看到它们。
-    import app.models.chat_turn  # noqa: F401
-    import app.models.stock  # noqa: F401
-    import app.models.user_profile  # noqa: F401
+    # 只有 Python 端实际使用的模型才需要在这里注册。
+    import app.models.agent_run_audit  # noqa: F401
 
     # `create_all` 适合本地快速补表，但它不是正式的迁移工具。
     SQLModel.metadata.create_all(engine)

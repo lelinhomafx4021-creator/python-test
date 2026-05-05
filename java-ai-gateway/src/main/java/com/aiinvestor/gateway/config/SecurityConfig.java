@@ -53,7 +53,16 @@ public class SecurityConfig {
                 // CORS：允许前端 (localhost:5173) 跨域访问后端 API
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // 授权：所有请求一律放行，真正的鉴权由 Sa-Token LoginInterceptor 完成
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                // Swagger UI 和 OpenAPI 文档路径也需要放行
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/api-docs/**",
+                                "/v3/api-docs/**",
+                                "/webjars/**"
+                        ).permitAll()
+                        .anyRequest().permitAll())
                 // 关闭 Spring Security 自带的登录页（我们用 /gateway/auth/login）
                 .formLogin(AbstractHttpConfigurer::disable)
                 // 关闭 HTTP Basic 认证

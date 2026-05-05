@@ -47,7 +47,7 @@ public class UserProfileVO {
     /**
      * 状态。
      */
-    private Integer status;
+    private String status;
 
     /**
      * 最后登录时间。

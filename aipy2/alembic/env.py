@@ -30,12 +30,11 @@ sys.path.append(os.getcwd())
 # 导入项目配置对象，后面用它拿真实数据库连接地址。
 from app.core.config import settings
 
-# 下面这几个 import 看起来像“没用到”，其实是必须的。
-# 作用不是在当前文件里调用它们，而是“触发模块加载”。
+# 下面这几个 import 看起来像"没用到"，其实是必须的。
+# 作用不是在当前文件里调用它们，而是"触发模块加载"。
 # 模块一加载，其中的 `SQLModel(table=True)` 类就会把表定义注册到 `SQLModel.metadata`。
+# 只有 Python 端实际使用的模型才需要在这里注册。
 import app.models.agent_run_audit  # noqa: F401
-import app.models.chat_turn  # noqa: F401
-import app.models.user_profile  # noqa: F401
 
 # 取到 Alembic 当前运行时的配置对象。
 config = context.config

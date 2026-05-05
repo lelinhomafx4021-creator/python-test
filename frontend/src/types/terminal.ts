@@ -3,6 +3,7 @@ export type NavKey =
   | 'chat'
   | 'watchlist'
   | 'paper'
+  | 'transactions'
   | 'news'
   | 'handoff'
   | 'profile'
@@ -103,6 +104,7 @@ export type MarketQuote = {
 export type MarketStock = {
   symbol: string
   name: string
+  pinyin?: string
   lastPrice?: number
   changePercent?: number
   changeAmount?: number
@@ -279,4 +281,56 @@ export type AdminUserPortfolio = {
   account?: PaperAccount
   positions: PaperPosition[]
   orders: PaperOrder[]
+}
+
+/* ─── K线 / 图表 / 新闻相关类型 ─── */
+
+/** K线数据点 */
+export type KLineDataPoint = {
+  date: string
+  open: number
+  close: number
+  high: number
+  low: number
+  volume: number
+}
+
+/** 技术指标类型 */
+export type IndicatorType = 'ma' | 'macd' | 'kdj' | 'rsi' | 'boll'
+
+/** 持仓饼图数据项 */
+export type PortfolioPieItem = {
+  name: string
+  value: number
+  color?: string
+}
+
+/** 权益曲线数据点 */
+export type EquityCurvePoint = {
+  date: string
+  equity: number
+  benchmark?: number
+}
+
+/** 雷达评分数据 */
+export type RadarScoreData = {
+  fundamental: number   // 基本面 0-100
+  technical: number     // 技术面 0-100
+  sentiment: number     // 情绪面 0-100
+  capital: number       // 资金面 0-100
+  valuation: number     // 估值面 0-100
+}
+
+/** 新闻 Feed 项目（增强版，含情绪标签） */
+export type NewsFeedItem = {
+  title: string
+  summary?: string
+  tag?: string
+  source?: string
+  url?: string
+  publishedAt?: string
+  /** 情绪标签：利好 / 利空 / 中性 */
+  sentiment?: 'positive' | 'negative' | 'neutral'
+  /** 是否为 VIP 专属内容 */
+  vipOnly?: boolean
 }

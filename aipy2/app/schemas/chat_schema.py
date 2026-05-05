@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     """聊天请求体。"""
-
     # 用户输入问题
     message: str = Field(
         min_length=1,
@@ -31,6 +30,14 @@ class ChatRequest(BaseModel):
         default=None,
         description="链路追踪 ID（可选）；不传则后端自动生成。",
         examples=["trace_abc123"],
+    )
+    # 用户角色：决定使用哪套图流程
+    # 'normal'（普通用户）：精简流程，禁止买卖建议
+    # 'vip'（VIP 用户）：完整流程，深度分析 + 投资建议
+    role: str = Field(
+        default="normal",
+        description="用户角色：'normal' 或 'vip'，决定使用哪套 AI 流程。",
+        examples=["normal"],
     )
 
 

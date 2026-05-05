@@ -25,12 +25,13 @@ async def post_chat(req: ChatRequest):
 
     适用场景：
     - 后台任务、管理端页面。
-    - 不需要实时展示“思考过程”，只关心最终答案。
+    - 不需要实时展示"思考过程"，只关心最终答案。
 
     入参：
     - `req.message`：用户问题。
     - `req.thread_id`：会话线程 ID（用于上下文记忆）。
     - `req.trace_id`：可选链路追踪 ID；不传则后端自动生成。
+    - `req.role`：用户角色（'normal' 或 'vip'），决定使用哪套 AI 流程。
 
     返回：
     - `trace_id`：本次请求唯一追踪号。
@@ -43,13 +44,14 @@ async def post_chat(req: ChatRequest):
     source = []
 
     # 统一走 InvestorService 的事件流。
-    # 这里的 run_investor_flow 不是一次性返回，而是“边算边吐事件”。
+    # 这里的 run_investor_flow 不是一次性返回，而是"边算边吐事件"。
     # `async for` 可以理解成：异步版 for 循环，每来一条事件就处理一条，不会阻塞整个服务。
     # 同步接口做法：把整条事件流读完，只在最终答案事件时提取结果。
     async for evt in investor_service.run_investor_flow(
         query=req.message,
         thread_id=req.thread_id,
         trace_id=trace_id,
+        role=req.role,
     ):
         # event 是一个字典，通常长这样：
         # {"stage": "...", "data": {...}}
@@ -79,12 +81,13 @@ async def post_chat_stream(req: ChatRequest):
     async def event_gen():
         """将内部事件流转换为 SSE 输出。"""
         try:
-            # 关键点：流式接口不会等“最终答案”才返回。
+            # 关键点：流式接口不会等"最终答案"才返回。
             # 而是每收到一个 event 就立刻 yield 给前端，前端就能实时渲染。
             async for evt in investor_service.run_investor_flow(
                 query=req.message,
                 thread_id=req.thread_id,
                 trace_id=trace_id,
+                role=req.role,
             ):
                 # SSE 的 data 建议传 JSON，前端解析稳定。
                 payload = json.dumps(evt, ensure_ascii=False)

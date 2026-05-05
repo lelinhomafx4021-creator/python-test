@@ -15,6 +15,9 @@ import org.springframework.context.annotation.Configuration;
  *   问了什么、走哪个接口）。但这个"记日志"操作不应该阻塞用户的聊天响应。
  *   所以采用消息队列异步处理——主流程只负责发消息，消费者在后台慢慢入库。
  *
+ *   同样，用户的交易流水记录（下单、成交、撤单、充值、提现）也通过
+ *   消息队列异步写入 transaction_logs 表，避免阻塞主流程。
+ *
  * 三个核心概念（面试必考）：
  *   1. Exchange（交换机）: 接收消息并根据路由规则分发给队列
  *   2. Queue（队列）   : 存储消息的缓冲区
@@ -33,8 +36,19 @@ public class RabbitConfig {
     @Value("${app.mq.audit-routing-key}")
     private String auditRoutingKey;
 
+    /** 从配置文件读取交易事件交换机名称 */
+    @Value("${app.mq.transaction-exchange}")
+    private String transactionExchange;
+
+    /** 从配置文件读取交易事件路由键 */
+    @Value("${app.mq.transaction-routing-key}")
+    private String transactionRoutingKey;
+
     /** 审计队列的固定名称（硬编码但合理，因为只有这一个消费者） */
     public static final String AUDIT_QUEUE = "ai.chat.audit.queue";
+
+    /** 交易事件队列的固定名称 */
+    public static final String TRANSACTION_QUEUE = "transaction.event.queue";
 
     /**
      * 定义 Direct Exchange（直接交换机）。
@@ -78,6 +92,38 @@ public class RabbitConfig {
     @Bean
     public Binding auditBinding(Queue auditQueue, DirectExchange auditExchange) {
         return BindingBuilder.bind(auditQueue).to(auditExchange).with(auditRoutingKey);
+    }
+
+    /**
+     * 定义交易事件队列。
+     *
+     * @return Queue 实例
+     */
+    @Bean
+    public Queue transactionQueue() {
+        return new Queue(TRANSACTION_QUEUE);
+    }
+
+    /**
+     * 定义交易事件 Direct Exchange（直接交换机）。
+     *
+     * @return DirectExchange 实例
+     */
+    @Bean
+    public DirectExchange transactionExchange() {
+        return new DirectExchange(transactionExchange);
+    }
+
+    /**
+     * 将交易事件队列绑定到交易事件交换机。
+     *
+     * @param transactionQueue    交易事件队列 Bean
+     * @param transactionExchange 交易事件交换机 Bean
+     * @return Binding 绑定关系
+     */
+    @Bean
+    public Binding transactionBinding(Queue transactionQueue, DirectExchange transactionExchange) {
+        return BindingBuilder.bind(transactionQueue).to(transactionExchange).with(transactionRoutingKey);
     }
 
     /**

@@ -1,3 +1,5 @@
+<!-- TerminalAdminTickets - 管理后台工单处理页面 -->
+<!-- 展示转人工工单列表，支持展开查看详情、修改状态和回复用户 -->
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { ChevronDown, ChevronUp, Ticket } from 'lucide-vue-next'
@@ -12,16 +14,20 @@ const emit = defineEmits<{
   'update-ticket-status': [payload: { traceId: string; status: string; processNote: string; responseMessage: string }]
 }>()
 
+// 每条工单的处理表单状态
 const forms = reactive<Record<string, { status: string; processNote: string; responseMessage: string }>>({})
+// 工单展开/折叠状态
 const expandedMap = reactive<Record<string, boolean>>({})
 const page = ref(1)
 const pageSize = 6
 
+// 根据当前页码切片工单列表
 const pagedTickets = computed(() => {
   const start = (page.value - 1) * pageSize
   return props.tickets.slice(start, start + pageSize)
 })
 
+// 将工单数据同步到表单状态中
 const syncForms = () => {
   for (const [index, ticket] of props.tickets.entries()) {
     forms[ticket.traceId] = {
@@ -39,6 +45,7 @@ const syncForms = () => {
 
 watch(() => props.tickets, syncForms, { immediate: true, deep: true })
 
+// 格式化时间戳为本地日期时间
 const formatTime = (value?: string) => {
   if (!value) return '--'
   const date = new Date(value)
@@ -51,22 +58,26 @@ const formatTime = (value?: string) => {
   })
 }
 
+// 返回工单状态的中文标签
 const statusLabel = (status?: string) => {
   if (status === 'closed') return '已关闭'
   if (status === 'processing') return '处理中'
   return '待处理'
 }
 
+// 返回工单状态对应的样式类名
 const statusClass = (status?: string) => {
   if (status === 'closed') return 'bg-slate-100 text-slate-600'
   if (status === 'processing') return 'bg-amber-50 text-amber-700'
   return 'bg-emerald-50 text-emerald-700'
 }
 
+// 切换工单的展开/折叠
 const toggleExpand = (traceId: string) => {
   expandedMap[traceId] = !expandedMap[traceId]
 }
 
+// 提交工单处理结果
 const submitTicket = (traceId: string) => {
   const form = forms[traceId]
   if (!form) return
@@ -192,7 +203,7 @@ const submitTicket = (traceId: string) => {
                   <span v-if="ticket.handledAt">处理时间：{{ formatTime(ticket.handledAt) }}</span>
                 </div>
                 <button
-                  class="rounded-lg bg-slate-900 px-3 py-2 text-[13px] text-white transition hover:bg-slate-800"
+                  class="rounded-lg bg-slate-900 px-3 py-2 text-[13px] text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.97]"
                   @click="submitTicket(ticket.traceId)"
                 >
                   保存处理结果

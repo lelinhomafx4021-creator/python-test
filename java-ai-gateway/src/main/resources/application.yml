@@ -4,6 +4,8 @@
 spring:
   application:
     name: java-ai-gateway
+  config:
+    import: optional:classpath:application-local.yml
 
   # --- 数据库连接池优化（主业务真相存储） ---
   datasource:
@@ -47,6 +49,17 @@ spring:
     port: 5672
     username: guest
     password: guest
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
   cloud:
     # 本地开发阶段先关闭 Spring Cloud 与 Spring Boot 的版本拦截，
@@ -77,9 +90,13 @@ app:
   cache:
     market-quote-ttl-seconds: 30
     account-lock-seconds: 10
+  email:
+    mock-enabled: ${APP_EMAIL_MOCK_ENABLED:true}
   mq:
     audit-exchange: ai.chat.audit.exchange
     audit-routing-key: ai.chat.audit.routing
+    transaction-exchange: transaction.event.exchange
+    transaction-routing-key: transaction.event
 
 aliyun:
   oss:
@@ -93,10 +110,22 @@ aliyun:
 
 
 management:
+  health:
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
         include: health,info,metrics
+
+# --- SpringDoc OpenAPI (Swagger UI) 配置 ---
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
 
 sa-token:
   token-name: satoken

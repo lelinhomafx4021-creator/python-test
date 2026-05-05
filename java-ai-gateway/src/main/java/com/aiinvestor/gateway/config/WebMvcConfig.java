@@ -1,6 +1,6 @@
 package com.aiinvestor.gateway.config;
 
-import com.aiinvestor.gateway.interceptor.LoginInterceptor;
+import com.aiinvestor.gateway.modules.identity.interceptor.LoginInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -64,6 +64,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 对所有路径（/**）都启用登录拦截器
         // 具体哪些接口需要登录，由 @LoginRequired 注解 + 拦截器内部逻辑决定
-        registry.addInterceptor(loginInterceptor).addPathPatterns("/**");
+        // 排除 Swagger UI / OpenAPI 文档路径，避免被拦截器拒绝访问
+        registry.addInterceptor(loginInterceptor)
+                .addPathPatterns("/**")
+                .excludePathPatterns(
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/api-docs/**",
+                        "/v3/api-docs/**",
+                        "/webjars/**",
+                        "/ws/**"
+                );
     }
 }

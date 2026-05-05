@@ -10,6 +10,7 @@ import akshare as ak
 
 from app.core.logger import logger
 
+# 抓取超时上限（秒），避免网络异常时线程长期阻塞
 _NEWS_FETCH_TIMEOUT_SECONDS = 8
 
 
@@ -58,6 +59,7 @@ def collect_hot_news(limit: int = 12) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     seen: set[str] = set()
 
+    # 优先从财新数据通获取财经新闻
     cx_df = _run_with_timeout("财新数据通", ak.stock_news_main_cx)
     if cx_df is not None:
         for _, row in cx_df.head(limit).iterrows():
@@ -80,6 +82,7 @@ def collect_hot_news(limit: int = 12) -> list[dict[str, Any]]:
             if len(result) >= limit:
                 return result
 
+    # 若财新数据不足，从东方财富补充
     em_df = _run_with_timeout("东方财富资讯", ak.stock_news_em)
     if em_df is not None:
         for _, row in em_df.iterrows():

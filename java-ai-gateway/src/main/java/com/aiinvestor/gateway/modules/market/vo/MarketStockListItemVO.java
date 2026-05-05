@@ -70,6 +70,11 @@ public class MarketStockListItemVO {
     private BigDecimal openPrice;
 
     /**
+     * 拼音首字母。
+     */
+    private String pinyin;
+
+    /**
      * 总市值。
      */
     private BigDecimal totalMarketValue;

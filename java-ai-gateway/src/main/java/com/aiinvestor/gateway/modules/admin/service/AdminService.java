@@ -1,15 +1,15 @@
 package com.aiinvestor.gateway.modules.admin.service;
 
-import com.aiinvestor.gateway.context.UserContext;
-import com.aiinvestor.gateway.dao.entity.AiHandoffTicketDO;
-import com.aiinvestor.gateway.dao.entity.UserDO;
-import com.aiinvestor.gateway.dao.mapper.AiHandoffTicketMapper;
-import com.aiinvestor.gateway.dao.mapper.UserMapper;
+import com.aiinvestor.gateway.modules.shared.context.UserContext;
+import com.aiinvestor.gateway.modules.ai.dao.entity.AiHandoffTicketDO;
+import com.aiinvestor.gateway.modules.identity.dao.entity.UserDO;
+import com.aiinvestor.gateway.modules.ai.dao.mapper.AiHandoffTicketMapper;
+import com.aiinvestor.gateway.modules.identity.dao.mapper.UserMapper;
 import com.aiinvestor.gateway.modules.admin.dto.AdminUpdateMembershipRequest;
 import com.aiinvestor.gateway.modules.admin.dto.AdminUpdateTicketStatusRequest;
 import com.aiinvestor.gateway.modules.admin.dto.AdminUpdateUserRoleRequest;
 import com.aiinvestor.gateway.modules.admin.vo.AdminDashboardVO;
-import com.aiinvestor.gateway.modules.admin.vo.AdminHandoffTicketVO;
+import com.aiinvestor.gateway.modules.ai.vo.HandoffTicketVO;
 import com.aiinvestor.gateway.modules.admin.vo.AdminUserPortfolioVO;
 import com.aiinvestor.gateway.modules.admin.vo.AdminUserVO;
 import com.aiinvestor.gateway.modules.ai.dao.entity.AiSessionDO;
@@ -21,6 +21,8 @@ import com.aiinvestor.gateway.modules.membership.dao.mapper.UserMembershipMapper
 import com.aiinvestor.gateway.modules.membership.service.MembershipService;
 import com.aiinvestor.gateway.modules.papertrading.dao.entity.PaperAccountDO;
 import com.aiinvestor.gateway.modules.papertrading.dao.mapper.PaperAccountMapper;
+import com.aiinvestor.gateway.modules.papertrading.dao.entity.TransactionLogDO;
+import com.aiinvestor.gateway.modules.papertrading.dao.mapper.TransactionLogMapper;
 import com.aiinvestor.gateway.modules.papertrading.service.PaperTradingService;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperPortfolioSnapshotVO;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
@@ -52,6 +54,7 @@ public class AdminService {
     private final AiHandoffTicketMapper aiHandoffTicketMapper;
     private final WatchlistMapper watchlistMapper;
     private final PaperAccountMapper paperAccountMapper;
+    private final TransactionLogMapper transactionLogMapper;
     private final PaperTradingService paperTradingService;
     private final MembershipService membershipService;
 
@@ -62,6 +65,7 @@ public class AdminService {
                         AiHandoffTicketMapper aiHandoffTicketMapper,
                         WatchlistMapper watchlistMapper,
                         PaperAccountMapper paperAccountMapper,
+                        TransactionLogMapper transactionLogMapper,
                         PaperTradingService paperTradingService,
                         MembershipService membershipService) {
         this.userMapper = userMapper;
@@ -71,6 +75,7 @@ public class AdminService {
         this.aiHandoffTicketMapper = aiHandoffTicketMapper;
         this.watchlistMapper = watchlistMapper;
         this.paperAccountMapper = paperAccountMapper;
+        this.transactionLogMapper = transactionLogMapper;
         this.paperTradingService = paperTradingService;
         this.membershipService = membershipService;
     }
@@ -100,6 +105,7 @@ public class AdminService {
         );
         long totalWatchlists = watchlistMapper.selectCount(new LambdaQueryWrapper<WatchlistDO>());
         long totalPaperAccounts = paperAccountMapper.selectCount(new LambdaQueryWrapper<PaperAccountDO>());
+        long totalTransactionLogs = transactionLogMapper.selectCount(new LambdaQueryWrapper<TransactionLogDO>());
 
         return new AdminDashboardVO(
                 totalUsers,
@@ -109,7 +115,8 @@ public class AdminService {
                 totalHandoffTickets,
                 openHandoffTickets,
                 totalWatchlists,
-                totalPaperAccounts
+                totalPaperAccounts,
+                totalTransactionLogs
         );
     }
 
@@ -193,7 +200,7 @@ public class AdminService {
     /**
      * 查询人工工单列表。
      */
-    public List<AdminHandoffTicketVO> listHandoffTickets(String status) {
+    public List<HandoffTicketVO> listHandoffTickets(String status) {
         assertAdmin();
 
         LambdaQueryWrapper<AiHandoffTicketDO> wrapper = new LambdaQueryWrapper<AiHandoffTicketDO>()
@@ -210,7 +217,6 @@ public class AdminService {
 
         Set<Long> userIds = tickets.stream()
                 .map(AiHandoffTicketDO::getUserId)
-                .map(this::safeParseUserId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
@@ -219,12 +225,12 @@ public class AdminService {
                 : userMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(UserDO::getId, Function.identity()));
 
-        List<AdminHandoffTicketVO> result = new ArrayList<>();
+        List<HandoffTicketVO> result = new ArrayList<>();
         for (AiHandoffTicketDO ticket : tickets) {
-            Long userId = safeParseUserId(ticket.getUserId());
+            Long userId = ticket.getUserId();
             UserDO user = userId == null ? null : userMap.get(userId);
 
-            AdminHandoffTicketVO row = new AdminHandoffTicketVO();
+            HandoffTicketVO row = new HandoffTicketVO();
             row.setTraceId(ticket.getTraceId());
             row.setUserId(ticket.getUserId());
             row.setUsername(user != null ? user.getUsername() : null);
@@ -300,7 +306,7 @@ public class AdminService {
     /**
      * 修改工单状态。
      */
-    public AdminHandoffTicketVO updateTicketStatus(String traceId, AdminUpdateTicketStatusRequest request) {
+    public HandoffTicketVO updateTicketStatus(String traceId, AdminUpdateTicketStatusRequest request) {
         assertAdmin();
 
         AiHandoffTicketDO ticket = aiHandoffTicketMapper.selectOne(
@@ -333,20 +339,6 @@ public class AdminService {
     }
 
     /**
-     * 将字符串用户 ID 安全转成 Long。
-     */
-    private Long safeParseUserId(String rawUserId) {
-        if (rawUserId == null || rawUserId.isBlank()) {
-            return null;
-        }
-        try {
-            return Long.parseLong(rawUserId);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    /**
      * 规范角色值。
      */
     private String normalizeRole(String role) {
@@ -375,11 +367,11 @@ public class AdminService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private AdminHandoffTicketVO toAdminTicket(AiHandoffTicketDO ticket) {
-        Long userId = safeParseUserId(ticket.getUserId());
+    private HandoffTicketVO toAdminTicket(AiHandoffTicketDO ticket) {
+        Long userId = ticket.getUserId();
         UserDO user = userId == null ? null : userMapper.selectById(userId);
 
-        AdminHandoffTicketVO row = new AdminHandoffTicketVO();
+        HandoffTicketVO row = new HandoffTicketVO();
         row.setTraceId(ticket.getTraceId());
         row.setUserId(ticket.getUserId());
         row.setUsername(user != null ? user.getUsername() : null);

@@ -1,7 +1,7 @@
 package com.aiinvestor.gateway.modules.identity.service;
 
-import com.aiinvestor.gateway.dao.entity.UserDO;
-import com.aiinvestor.gateway.dao.mapper.UserMapper;
+import com.aiinvestor.gateway.modules.identity.dao.entity.UserDO;
+import com.aiinvestor.gateway.modules.identity.dao.mapper.UserMapper;
 import com.aiinvestor.gateway.modules.identity.dao.entity.UserProfileDO;
 import com.aiinvestor.gateway.modules.identity.dao.mapper.UserProfileMapper;
 import com.aiinvestor.gateway.modules.identity.dto.UpdateUserProfileRequest;

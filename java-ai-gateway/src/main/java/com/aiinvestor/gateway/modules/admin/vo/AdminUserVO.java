@@ -26,7 +26,7 @@ public class AdminUserVO {
     private String role;
 
     /** 状态。 */
-    private Integer status;
+    private String status;
 
     /** 头像地址。 */
     private String avatarUrl;

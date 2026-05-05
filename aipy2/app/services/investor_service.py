@@ -83,6 +83,7 @@ class InvestorService:
         query: str,
         thread_id: str,
         trace_id: str,
+        role: str = "normal",
     ) -> AsyncGenerator:
         """
         运行投研工作流，并持续产出流式事件。
@@ -90,6 +91,7 @@ class InvestorService:
         设计要点：
         - 一边消费 Agent 的流式事件，一边 yield 给调用方
         - 在 finally 中异步落库，确保成功/失败都记录审计
+        - role 参数决定使用哪套图流程（normal/vip）
         """
         # Langfuse v2 兼容方案：
         # - session_id 使用 thread_id，把同一会话归到一起
@@ -150,6 +152,7 @@ class InvestorService:
             async for event in multi_graph_agent.ask_stream_events(
                 query=query,
                 thread_id=thread_id,
+                role=role,
             ):
                 # stage_path 用于还原本次运行经过了哪些阶段。
                 stage = event.get("stage", "")

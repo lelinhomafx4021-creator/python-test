@@ -4,6 +4,9 @@ import com.aiinvestor.gateway.modules.market.vo.MarketQuoteVO;
 import com.aiinvestor.gateway.modules.market.vo.HotNewsItemVO;
 import com.aiinvestor.gateway.modules.market.vo.MarketStockListItemVO;
 import com.aiinvestor.gateway.modules.market.vo.MarketStockPageVO;
+import com.aiinvestor.gateway.modules.market.dao.entity.StockDO;
+import com.aiinvestor.gateway.modules.market.dao.mapper.StockMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -11,7 +14,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Python 行情客户端。
@@ -21,9 +26,11 @@ import java.util.List;
 public class PythonMarketClient {
 
     private final WebClient pythonAiWebClient;
+    private final StockMapper stockMapper;
 
-    public PythonMarketClient(WebClient pythonAiWebClient) {
+    public PythonMarketClient(WebClient pythonAiWebClient, StockMapper stockMapper) {
         this.pythonAiWebClient = pythonAiWebClient;
+        this.stockMapper = stockMapper;
     }
 
     /**
@@ -90,26 +97,38 @@ public class PythonMarketClient {
             return new MarketStockPageVO(page, pageSize, 0, List.of());
         }
 
+        // 从数据库查询拼音信息
+        Map<String, String> pinyinMap = loadPinyinMap();
+
         JsonNode data = response.path("data");
         List<MarketStockListItemVO> items = new ArrayList<>();
         for (JsonNode item : data.path("items")) {
-            items.add(new MarketStockListItemVO(
-                    item.path("symbol").asText(),
-                    item.path("name").asText(),
-                    decimalOf(item.path("lastPrice")),
-                    decimalOf(item.path("changePercent")),
-                    decimalOf(item.path("changeAmount")),
-                    decimalOf(item.path("volume")),
-                    decimalOf(item.path("turnover")),
-                    decimalOf(item.path("turnoverRate")),
-                    decimalOf(item.path("highPrice")),
-                    decimalOf(item.path("lowPrice")),
-                    decimalOf(item.path("openPrice")),
-                    decimalOf(item.path("totalMarketValue")),
-                    decimalOf(item.path("circulatingMarketValue")),
-                    decimalOf(item.path("sixtyDayChangePercent")),
-                    decimalOf(item.path("yearToDateChangePercent"))
-            ));
+            String symbol = item.path("symbol").asText();
+            String name = item.path("name").asText();
+            String pinyin = pinyinMap.get(symbol);
+            if (pinyin == null || pinyin.isBlank()) {
+                // 动态计算拼音首字母
+                pinyin = PinyinHelper.toPinyinInitials(name).toLowerCase();
+            }
+
+            MarketStockListItemVO stockItem = new MarketStockListItemVO();
+            stockItem.setSymbol(symbol);
+            stockItem.setName(name);
+            stockItem.setPinyin(pinyin);
+            stockItem.setLastPrice(decimalOf(item.path("lastPrice")));
+            stockItem.setChangePercent(decimalOf(item.path("changePercent")));
+            stockItem.setChangeAmount(decimalOf(item.path("changeAmount")));
+            stockItem.setVolume(decimalOf(item.path("volume")));
+            stockItem.setTurnover(decimalOf(item.path("turnover")));
+            stockItem.setTurnoverRate(decimalOf(item.path("turnoverRate")));
+            stockItem.setHighPrice(decimalOf(item.path("highPrice")));
+            stockItem.setLowPrice(decimalOf(item.path("lowPrice")));
+            stockItem.setOpenPrice(decimalOf(item.path("openPrice")));
+            stockItem.setTotalMarketValue(decimalOf(item.path("totalMarketValue")));
+            stockItem.setCirculatingMarketValue(decimalOf(item.path("circulatingMarketValue")));
+            stockItem.setSixtyDayChangePercent(decimalOf(item.path("sixtyDayChangePercent")));
+            stockItem.setYearToDateChangePercent(decimalOf(item.path("yearToDateChangePercent")));
+            items.add(stockItem);
         }
 
         return new MarketStockPageVO(
@@ -151,6 +170,23 @@ public class PythonMarketClient {
             ));
         }
         return items;
+    }
+
+    /**
+     * 从数据库加载拼音映射表。
+     */
+    private Map<String, String> loadPinyinMap() {
+        Map<String, String> pinyinMap = new HashMap<>();
+        List<StockDO> stocks = stockMapper.selectList(
+                new LambdaQueryWrapper<StockDO>()
+                        .isNotNull(StockDO::getPinyin)
+                        .ne(StockDO::getPinyin, "")
+                        .last("limit 5000")
+        );
+        for (StockDO stock : stocks) {
+            pinyinMap.put(stock.getSymbol(), stock.getPinyin());
+        }
+        return pinyinMap;
     }
 
     private BigDecimal decimalOf(JsonNode node) {
