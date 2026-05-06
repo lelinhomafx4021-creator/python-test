@@ -22,7 +22,6 @@ from app.api.v1.chat import router as chat_router
 from app.api.v1.kline import router as kline_router
 from app.api.v1.news import router as news_router
 from app.api.v1.util import router as util_router
-from app.api.v1.vip import router as vip_router
 from app.core import llm as llm_core
 from app.core.config import settings
 from app.core.logger import logger
@@ -105,7 +104,6 @@ app.include_router(kline_router)
 # 注册新闻聚合路由。
 app.include_router(news_router)
 # 注册 VIP 申请审核路由。
-app.include_router(vip_router)
 
 
 @app.middleware("http")

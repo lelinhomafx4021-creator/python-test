@@ -14,9 +14,6 @@ import java.io.InputStream;
 import java.util.Locale;
 import java.util.UUID;
 
-/**
- * 阿里云 OSS 上传服务。
- */
 @Service
 public class AliyunOssService {
 
@@ -28,18 +25,23 @@ public class AliyunOssService {
         this.properties = properties;
     }
 
-    /**
-     * 上传用户头像并返回可访问地址。
-     */
     public String uploadAvatar(MultipartFile file, Long userId) {
+        return uploadImage(file, "请选择头像图片", "avatars", userId == null ? "anonymous" : String.valueOf(userId));
+    }
+
+    public String uploadPaymentProof(MultipartFile file, Long userId) {
+        return uploadImage(file, "请选择付款凭证图片", "vip-payment-proof", userId == null ? "anonymous" : String.valueOf(userId));
+    }
+
+    private String uploadImage(MultipartFile file, String emptyMessage, String subDirectory, String ownerKey) {
         if (!properties.isEnabled()) {
             throw new BusinessException("当前环境未启用阿里云 OSS 上传");
         }
         if (file == null || file.isEmpty()) {
-            throw new BusinessException("请选择头像图片");
+            throw new BusinessException(emptyMessage);
         }
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new BusinessException("头像图片不能超过 5MB");
+            throw new BusinessException("图片不能超过 5MB");
         }
 
         String contentType = file.getContentType();
@@ -53,7 +55,13 @@ public class AliyunOssService {
         String accessKeySecret = requireText(properties.getAccessKeySecret(), "请先配置阿里云 OSS AccessKeySecret");
 
         String extension = resolveExtension(file.getOriginalFilename(), contentType);
-        String key = normalizeDirectory(properties.getDirectory()) + userId + "/" + System.currentTimeMillis() + "-" + UUID.randomUUID() + extension;
+        String key = normalizeDirectory(subDirectory)
+                + ownerKey
+                + "/"
+                + System.currentTimeMillis()
+                + "-"
+                + UUID.randomUUID()
+                + extension;
 
         OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
         try (InputStream inputStream = file.getInputStream()) {
@@ -63,7 +71,7 @@ public class AliyunOssService {
             PutObjectRequest request = new PutObjectRequest(bucket, key, inputStream, metadata);
             ossClient.putObject(request);
         } catch (IOException ex) {
-            throw new BusinessException("头像上传失败，请稍后重试");
+            throw new BusinessException("图片上传失败，请稍后重试");
         } finally {
             ossClient.shutdown();
         }
@@ -86,7 +94,7 @@ public class AliyunOssService {
     }
 
     private String normalizeDirectory(String directory) {
-        String value = directory == null || directory.isBlank() ? "avatars" : directory.trim();
+        String value = directory == null || directory.isBlank() ? "uploads" : directory.trim();
         value = value.replace("\\", "/");
         if (!value.endsWith("/")) {
             value = value + "/";

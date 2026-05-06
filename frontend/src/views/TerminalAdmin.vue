@@ -1,10 +1,8 @@
-<!-- TerminalAdmin - 管理后台页面 -->
-<!-- 展示系统概况卡片、用户列表（支持角色/会员变更）和用户持仓详情 -->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { BriefcaseBusiness, Shield, Users, WalletCards } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
-import type { AdminDashboard, AdminTicket, AdminUser, AdminUserPortfolio } from '../types/terminal'
+import type { AdminDashboard, AdminTicket, AdminUser, AdminUserPortfolio, VipApplication } from '../types/terminal'
 
 const props = defineProps<{
   overview: AdminDashboard | null
@@ -13,6 +11,7 @@ const props = defineProps<{
   keyword: string
   portfolio: AdminUserPortfolio | null
   loadingPortfolio: boolean
+  vipApplications: VipApplication[]
 }>()
 
 const emit = defineEmits<{
@@ -22,54 +21,50 @@ const emit = defineEmits<{
   'close-portfolio': []
   'update-user-role': [payload: { userId: number; role: string }]
   'update-user-membership': [payload: { userId: number; planCode: string }]
+  'review-vip': [payload: { appId: number; action: 'approve' | 'reject'; rejectReason: string }]
 }>()
 
-// 用户列表分页状态
 const userPage = ref(1)
-const userPageSize = 8 // 每页显示用户数
+const userPageSize = 8
+const rejectReasons = ref<Record<number, string>>({})
+
+const usersList = computed<AdminUser[]>(() => {
+  if (Array.isArray(props.users)) return props.users
+  return []
+})
+
+const vipList = computed<VipApplication[]>(() => {
+  if (Array.isArray(props.vipApplications)) return props.vipApplications
+  return []
+})
 
 watch(
-  () => props.users,
+  usersList,
   () => {
-    const maxPage = Math.max(1, Math.ceil(props.users.length / userPageSize))
+    const maxPage = Math.max(1, Math.ceil(usersList.value.length / userPageSize))
     if (userPage.value > maxPage) userPage.value = maxPage
   },
   { deep: true },
 )
 
-// 根据当前页码切片用户列表
 const pagedUsers = computed(() => {
   const start = (userPage.value - 1) * userPageSize
-  return props.users.slice(start, start + userPageSize)
+  return usersList.value.slice(start, start + userPageSize)
 })
 
-// 搜索关键词变更，重置到第一页
 const updateKeyword = (event: Event) => {
   userPage.value = 1
   emit('update:keyword', (event.target as HTMLInputElement).value)
 }
 
-// 格式化数字为中文千分位
 const numberText = (value?: number) => new Intl.NumberFormat('zh-CN').format(value || 0)
-
-// 格式化金额为人民币格式
 const moneyText = (value?: number) =>
-  new Intl.NumberFormat('zh-CN', {
-    style: 'currency',
-    currency: 'CNY',
-    maximumFractionDigits: 2,
-  }).format(value || 0)
-
-// 格式化价格，无值时显示 '--'
+  new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value || 0)
 const priceText = (value?: number) =>
   typeof value === 'number'
-    ? new Intl.NumberFormat('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(value)
+    ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
     : '--'
 
-// 管理后台顶部概况卡片数据
 const cards = computed(() => [
   { key: 'users', title: '用户总数', value: numberText(props.overview?.totalUsers), icon: Users },
   { key: 'vip', title: '会员用户', value: numberText(props.overview?.totalVipUsers), icon: Shield },
@@ -79,14 +74,13 @@ const cards = computed(() => [
   { key: 'accounts', title: '模拟账户', value: numberText(props.overview?.totalPaperAccounts), icon: WalletCards },
 ])
 
-// 修改用户角色（需确认）
 const confirmRoleChange = (user: AdminUser, event: Event) => {
   const select = event.target as HTMLSelectElement
   const nextRole = select.value
   const currentRole = user.role || 'normal'
   if (nextRole === currentRole) return
 
-  const ok = window.confirm(`确定要把用户“${user.username}”的角色从“${currentRole}”改成“${nextRole}”吗？`)
+  const ok = window.confirm(`确定把用户 ${user.username} 的角色从 ${currentRole} 改成 ${nextRole} 吗？`)
   if (!ok) {
     select.value = currentRole
     return
@@ -94,19 +88,26 @@ const confirmRoleChange = (user: AdminUser, event: Event) => {
   emit('update-user-role', { userId: user.id, role: nextRole })
 }
 
-// 修改用户会员方案（需确认）
 const confirmMembershipChange = (user: AdminUser, event: Event) => {
   const select = event.target as HTMLSelectElement
   const nextPlan = select.value
   const currentPlan = user.planCode || 'free'
   if (nextPlan === currentPlan) return
 
-  const ok = window.confirm(`确定要把用户“${user.username}”的会员方案从“${currentPlan}”改成“${nextPlan}”吗？`)
+  const ok = window.confirm(`确定把用户 ${user.username} 的会员方案从 ${currentPlan} 改成 ${nextPlan} 吗？`)
   if (!ok) {
     select.value = currentPlan
     return
   }
   emit('update-user-membership', { userId: user.id, planCode: nextPlan })
+}
+
+const reviewVip = (app: VipApplication, action: 'approve' | 'reject') => {
+  emit('review-vip', {
+    appId: app.id,
+    action,
+    rejectReason: rejectReasons.value[app.id] || '',
+  })
 }
 </script>
 
@@ -116,7 +117,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div class="text-[18px] font-semibold text-slate-950">管理后台</div>
-          <div class="mt-1 text-[12px] text-slate-500">集中管理用户、会员方案和账户查看，列表统一分页展示。</div>
+          <div class="mt-1 text-[12px] text-slate-500">集中处理用户、会员、VIP 审核和持仓查看。</div>
         </div>
         <div class="flex items-center gap-2">
           <input
@@ -127,10 +128,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
             @input="updateKeyword"
             @keyup.enter="emit('search')"
           />
-          <button
-            class="rounded-lg bg-slate-900 px-3 py-2 text-[13px] text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.97]"
-            @click="emit('search')"
-          >
+          <button class="rounded-lg bg-slate-900 px-3 py-2 text-[13px] text-white transition hover:bg-slate-800" @click="emit('search')">
             查询
           </button>
         </div>
@@ -138,11 +136,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
     </div>
 
     <div class="grid gap-3 xl:grid-cols-3">
-      <div
-        v-for="card in cards"
-        :key="card.key"
-        class="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
-      >
+      <div v-for="card in cards" :key="card.key" class="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex items-center justify-between gap-3">
           <div>
             <div class="text-[11px] text-slate-500">{{ card.title }}</div>
@@ -157,8 +151,57 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
 
     <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div class="border-b border-slate-200 px-4 py-3">
+        <div class="text-[15px] font-semibold text-slate-950">VIP 审核</div>
+        <div class="mt-1 text-[12px] text-slate-500">查看用户付款截图、备注信息，并决定是否通过审核。</div>
+      </div>
+
+      <div v-if="vipList.length" class="space-y-4 px-4 py-4">
+        <div v-for="app in vipList" :key="app.id" class="rounded-xl border border-slate-200 p-4">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="space-y-1 text-[13px] text-slate-600">
+              <div class="text-[16px] font-semibold text-slate-950">{{ app.username }}</div>
+              <div>申请编号：{{ app.id }}</div>
+              <div>金额：{{ moneyText(app.paymentAmount) }}</div>
+              <div>状态：{{ app.status }}</div>
+              <div>备注：{{ app.paymentNote || '无' }}</div>
+              <div>提交时间：{{ app.createdAt || '--' }}</div>
+              <div v-if="app.rejectReason">驳回原因：{{ app.rejectReason }}</div>
+            </div>
+
+            <div class="w-full max-w-[220px] space-y-3">
+              <a v-if="app.paymentProofUrl" :href="app.paymentProofUrl" target="_blank" class="block overflow-hidden rounded-lg border border-slate-200">
+                <img :src="app.paymentProofUrl" alt="付款凭证" class="w-full object-cover" />
+              </a>
+              <div v-else class="rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-[12px] text-slate-400">
+                未上传付款截图
+              </div>
+
+              <textarea
+                v-model="rejectReasons[app.id]"
+                rows="2"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-[12px] outline-none focus:border-slate-400"
+                placeholder="驳回时填写原因"
+              />
+
+              <div class="flex gap-2">
+                <button class="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-[12px] text-white transition hover:bg-emerald-500" @click="reviewVip(app, 'approve')">
+                  通过
+                </button>
+                <button class="flex-1 rounded-lg bg-rose-600 px-3 py-2 text-[12px] text-white transition hover:bg-rose-500" @click="reviewVip(app, 'reject')">
+                  驳回
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="px-4 py-6 text-[12px] text-slate-500">当前没有 VIP 审核申请。</div>
+    </div>
+
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-4 py-3">
         <div class="text-[15px] font-semibold text-slate-950">用户列表</div>
-        <div class="mt-1 text-[12px] text-slate-500">支持直接修改角色、会员方案，并查看用户持仓与委托。</div>
+        <div class="mt-1 text-[12px] text-slate-500">支持修改角色、会员方案，并查看用户持仓与委托。</div>
       </div>
 
       <div class="grid grid-cols-[56px_120px_90px_170px_150px_84px_64px_90px] bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
@@ -167,7 +210,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
         <div>昵称</div>
         <div>角色</div>
         <div>会员方案</div>
-        <div>AI 额度</div>
+        <div>AI 配额</div>
         <div>自选</div>
         <div class="text-right">持仓</div>
       </div>
@@ -207,7 +250,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
           <div class="text-slate-600">{{ user.watchlistCount || 0 }}</div>
           <div class="flex justify-end">
             <button
-              class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-medium text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-white active:scale-[0.97]"
+              class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
               @click="emit('open-portfolio', user.id)"
             >
               <BriefcaseBusiness class="h-3.5 w-3.5" />
@@ -216,21 +259,12 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
           </div>
         </div>
       </div>
-
       <div v-else class="px-4 py-6 text-[12px] text-slate-500">当前没有可展示的用户数据。</div>
 
-      <PaginationBar
-        :page="userPage"
-        :page-size="userPageSize"
-        :total="users.length"
-        @update:page="userPage = $event"
-      />
+      <PaginationBar :page="userPage" :page-size="userPageSize" :total="usersList.length" @update:page="userPage = $event" />
     </div>
 
-    <div
-      v-if="loadingPortfolio || portfolio"
-      class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-    >
+    <div v-if="loadingPortfolio || portfolio" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <div>
           <div class="text-[15px] font-semibold text-slate-950">用户持仓与委托</div>
@@ -238,45 +272,32 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
             {{ portfolio ? `${portfolio.username} / ${portfolio.nickname || '未设置昵称'}` : '正在加载用户账户信息...' }}
           </div>
         </div>
-        <button
-          class="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600 transition-all duration-150 hover:bg-slate-50 active:scale-[0.97]"
-          @click="emit('close-portfolio')"
-        >
+        <button class="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600 transition hover:bg-slate-50" @click="emit('close-portfolio')">
           收起
         </button>
       </div>
 
-      <div v-if="loadingPortfolio" class="px-4 py-8 text-[13px] text-slate-500">
-        正在读取该用户的持仓与委托记录...
-      </div>
+      <div v-if="loadingPortfolio" class="px-4 py-8 text-[13px] text-slate-500">正在读取该用户的持仓与委托记录...</div>
 
       <div v-else-if="portfolio" class="space-y-4 px-4 py-4">
         <div class="grid gap-3 md:grid-cols-3">
           <div class="rounded-lg bg-slate-50 px-4 py-3">
             <div class="text-[12px] text-slate-500">总资产</div>
-            <div class="mt-1 text-[20px] font-semibold text-slate-950">
-              {{ moneyText(portfolio.account?.totalAsset) }}
-            </div>
+            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ moneyText(portfolio.account?.totalAsset) }}</div>
           </div>
           <div class="rounded-lg bg-slate-50 px-4 py-3">
             <div class="text-[12px] text-slate-500">可用资金</div>
-            <div class="mt-1 text-[20px] font-semibold text-slate-950">
-              {{ moneyText(portfolio.account?.cashBalance) }}
-            </div>
+            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ moneyText(portfolio.account?.cashBalance) }}</div>
           </div>
           <div class="rounded-lg bg-slate-50 px-4 py-3">
             <div class="text-[12px] text-slate-500">累计盈亏</div>
-            <div class="mt-1 text-[20px] font-semibold text-slate-950">
-              {{ moneyText(portfolio.account?.totalPnl) }}
-            </div>
+            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ moneyText(portfolio.account?.totalPnl) }}</div>
           </div>
         </div>
 
         <div class="grid gap-4 xl:grid-cols-2">
           <div class="overflow-hidden rounded-lg border border-slate-200">
-            <div class="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-medium text-slate-700">
-              当前持仓
-            </div>
+            <div class="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-medium text-slate-700">当前持仓</div>
             <div class="grid grid-cols-[90px_1fr_90px_90px_120px] bg-white px-4 py-2 text-[11px] text-slate-500">
               <div>代码</div>
               <div>名称</div>
@@ -294,10 +315,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
                 <div class="truncate text-slate-600">{{ position.name || '--' }}</div>
                 <div class="text-right text-slate-900">{{ position.positionQty }}</div>
                 <div class="text-right text-slate-900">{{ priceText(position.latestPrice) }}</div>
-                <div
-                  class="text-right"
-                  :class="(position.floatingPnl || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'"
-                >
+                <div class="text-right" :class="(position.floatingPnl || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
                   {{ moneyText(position.floatingPnl) }}
                 </div>
               </div>
@@ -306,9 +324,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
           </div>
 
           <div class="overflow-hidden rounded-lg border border-slate-200">
-            <div class="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-medium text-slate-700">
-              最近委托
-            </div>
+            <div class="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-medium text-slate-700">最近委托</div>
             <div class="grid grid-cols-[90px_70px_90px_100px_1fr] bg-white px-4 py-2 text-[11px] text-slate-500">
               <div>代码</div>
               <div>方向</div>
@@ -323,9 +339,7 @@ const confirmMembershipChange = (user: AdminUser, event: Event) => {
                 class="grid grid-cols-[90px_70px_90px_100px_1fr] items-center border-t border-slate-100 px-4 py-2 text-[12px]"
               >
                 <div class="font-medium text-slate-900">{{ order.symbol }}</div>
-                <div :class="order.side === 'BUY' ? 'text-rose-600' : 'text-emerald-600'">
-                  {{ order.side === 'BUY' ? '买入' : '卖出' }}
-                </div>
+                <div :class="order.side === 'BUY' ? 'text-rose-600' : 'text-emerald-600'">{{ order.side === 'BUY' ? '买入' : '卖出' }}</div>
                 <div class="text-right text-slate-900">{{ order.orderQty }}</div>
                 <div class="text-right text-slate-900">{{ priceText(order.orderPrice) }}</div>
                 <div class="text-right text-slate-500">{{ order.orderStatus || '--' }}</div>

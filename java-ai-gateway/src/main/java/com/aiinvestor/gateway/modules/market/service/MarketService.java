@@ -174,6 +174,10 @@ public class MarketService {
     /**
      * 获取板块列表。
      */
+    public List<Map<String, Object>> getKline(String symbol, String period, int days) {
+        return pythonMarketClient.fetchKline(symbol, period, days);
+    }
+
     public List<SectorVO> listSectors() {
         return sectorMapper.selectList(
                         new LambdaQueryWrapper<SectorDO>().orderByAsc(SectorDO::getSortOrder, SectorDO::getId)

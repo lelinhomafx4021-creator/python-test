@@ -200,7 +200,7 @@ watch(
         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
           <PieChart class="h-4 w-4 text-blue-500" />
         </div>
-        <div class="text-[15px] font-semibold text-slate-950">{{ title || '持仓分布' }}</div>
+        <div class="text-[15px] font-semibold text-slate-950">{{ title || '资产分布雷达' }}</div>
       </div>
     </div>
 

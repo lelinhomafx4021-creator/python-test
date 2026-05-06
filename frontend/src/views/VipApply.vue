@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { store, applyVip } from '../api'
-import { ArrowLeft, Check, QrCode, Send } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { ArrowLeft, Check, QrCode, Send, Upload } from 'lucide-vue-next'
+import { applyVipWithProof, store, uploadVipPaymentProof } from '../api'
 
 const step = ref<'info' | 'pay' | 'submit' | 'done'>('info')
 const paymentNote = ref('')
+const paymentProofUrl = ref('')
+const uploading = ref(false)
 const submitting = ref(false)
 const errorMsg = ref('')
 
@@ -14,13 +16,33 @@ function goToPay() {
   step.value = 'pay'
 }
 
+async function onSelectFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  uploading.value = true
+  errorMsg.value = ''
+  try {
+    paymentProofUrl.value = await uploadVipPaymentProof(file)
+  } catch (e: any) {
+    errorMsg.value = e?.response?.data?.message || e?.message || '付款凭证上传失败，请重试'
+  } finally {
+    uploading.value = false
+  }
+}
 
 async function submitApplication() {
-  if (!userInfo.value) { errorMsg.value = '请先登录'; return }
+  if (!userInfo.value) {
+    errorMsg.value = '请先登录'
+    return
+  }
+  if (!paymentProofUrl.value) {
+    errorMsg.value = '请先上传付款凭证截图'
+    return
+  }
   submitting.value = true
   errorMsg.value = ''
   try {
-    await applyVip(paymentNote.value)
+    await applyVipWithProof(paymentNote.value, paymentProofUrl.value)
     step.value = 'done'
   } catch (e: any) {
     errorMsg.value = e?.response?.data?.message || e?.message || '提交失败，请重试'
@@ -31,48 +53,38 @@ async function submitApplication() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0a0f1c] text-white">
-    <!-- Header -->
-    <header class="border-b border-white/[0.06]">
-      <div class="mx-auto flex max-w-[640px] items-center gap-4 px-6 py-4">
-        <button class="rounded-lg p-2 transition hover:bg-white/[0.06]" @click="$router.back()">
-          <ArrowLeft class="h-5 w-5 text-slate-400" />
+  <div class="min-h-screen bg-[#fafbfc]">
+    <header class="border-b border-slate-100 bg-white">
+      <div class="mx-auto flex max-w-[560px] items-center gap-3 px-6 py-4">
+        <button class="rounded-lg p-1.5 transition hover:bg-slate-100" @click="$router.back()">
+          <ArrowLeft class="h-5 w-5 text-slate-500" />
         </button>
-        <div class="text-[16px] font-semibold">升级专业版</div>
+        <div class="text-[15px] font-semibold text-slate-900">升级专业版</div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-[640px] px-6 py-8">
-      <!-- Step 1: 说明 -->
+    <main class="mx-auto max-w-[560px] px-6 py-8">
       <div v-if="step === 'info'">
-        <div class="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-          <div class="text-[24px] font-bold text-white">专业版权益</div>
-          <div class="mt-1 text-[14px] text-slate-400">¥199/月 · 解锁完整 AI 投研能力</div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <div class="text-[22px] font-bold text-slate-950">专业版权益</div>
+          <div class="mt-1 text-[14px] text-slate-400">¥199 / 月，解锁完整投研能力</div>
 
           <div class="mt-6 space-y-3">
-            <div v-for="item in [
-              '无限 AI 研究问答',
-              '深度财务数据分析（PE/营收/利润/负债率）',
-              '并行数据引擎（行情+财务+公告+新闻同时获取）',
-              '优先工单响应',
-              '完整管理后台',
-            ]" :key="item" class="flex items-center gap-3 text-[14px] text-slate-300">
-              <div class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
-                <Check class="h-3 w-3 text-emerald-400" />
+            <div
+              v-for="item in ['无限研究问答', '深度财务数据分析', '并行数据引擎', '优先工单响应', '完整管理后台']"
+              :key="item"
+              class="flex items-center gap-3 text-[14px] text-slate-600"
+            >
+              <div class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50">
+                <Check class="h-3 w-3 text-emerald-600" />
               </div>
               <div>{{ item }}</div>
-            </div>
-          </div>
-
-          <div class="mt-6 rounded-xl border border-blue-500/20 bg-blue-500/[0.06] p-4">
-            <div class="text-[13px] text-blue-300">
-              💡 你现在是 <span class="font-semibold text-white">普通用户</span>，AI 回答会限制数据范围且不给投资建议。升级后解锁完整分析。
             </div>
           </div>
         </div>
 
         <button
-          class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-4 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:brightness-110"
+          class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-[14px] font-medium text-white transition hover:bg-slate-800"
           @click="goToPay"
         >
           <QrCode class="h-4 w-4" />
@@ -80,87 +92,72 @@ async function submitApplication() {
         </button>
       </div>
 
-      <!-- Step 2: 扫码付款 -->
       <div v-if="step === 'pay'">
-        <div class="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-          <div class="text-[20px] font-bold text-white">扫码付款</div>
-          <div class="mt-1 text-[14px] text-slate-400">使用微信或支付宝扫码支付 ¥199</div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <div class="text-[18px] font-bold text-slate-950">扫码付款</div>
+          <div class="mt-1 text-[13px] text-slate-400">使用微信或支付宝扫码支付 ¥199</div>
 
-          <!-- 二维码占位 -->
           <div class="mt-6 flex justify-center">
-            <div class="flex h-[240px] w-[240px] items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
-              <div class="text-center">
-                <QrCode class="mx-auto h-16 w-16 text-slate-600" />
-                <div class="mt-3 text-[13px] text-slate-500">收款二维码</div>
-                <div class="mt-1 text-[11px] text-slate-600">（请替换为实际收款码图片）</div>
-              </div>
-            </div>
+            <img src="/e88fd0ca9465fe0d54f9748d4e69fc51.jpg" class="h-[320px] rounded-2xl border border-slate-200" alt="收款码" />
           </div>
 
-          <!-- 替换说明 -->
-          <div class="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-            <div class="text-[12px] leading-6 text-amber-300/80">
-              ⚠️ 替换方法：把你的收款码图片放到 <code class="rounded bg-white/[0.06] px-1.5 py-0.5">frontend/public/payment-qr.png</code>，然后取消下面代码的注释。
-            </div>
-          </div>
-
-          <!--
-            取消注释后显示真实二维码：
-            <img src="/payment-qr.png" class="h-[240px] rounded-2xl" alt="收款码" />
-          -->
-
-          <div class="mt-6 text-center text-[13px] text-slate-400">
-            付款后请在下一步填写备注（如微信号），方便管理员核实
+          <div class="mt-4 rounded-xl bg-amber-50 p-3 text-[12px] text-amber-700">
+            付款完成后请继续上传付款截图，管理员会据此审核开通 VIP。
           </div>
         </div>
 
         <div class="mt-4 flex gap-3">
-          <button
-            class="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-5 py-3.5 text-[14px] font-medium text-slate-300 transition hover:bg-white/[0.06]"
-            @click="step = 'info'"
-          >
+          <button class="flex-1 rounded-xl border border-slate-200 bg-white px-5 py-3 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50" @click="step = 'info'">
             返回
           </button>
-          <button
-            class="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-3.5 text-[14px] font-semibold text-white transition hover:brightness-110"
-            @click="step = 'submit'"
-          >
+          <button class="flex-1 rounded-xl bg-slate-900 px-5 py-3 text-[13px] font-medium text-white transition hover:bg-slate-800" @click="step = 'submit'">
             我已付款，下一步
           </button>
         </div>
       </div>
 
-      <!-- Step 3: 填写信息 -->
       <div v-if="step === 'submit'">
-        <div class="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-          <div class="text-[20px] font-bold text-white">确认付款信息</div>
-          <div class="mt-1 text-[14px] text-slate-400">填写备注方便管理员核实你的付款</div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <div class="text-[18px] font-bold text-slate-950">确认付款信息</div>
+          <div class="mt-1 text-[13px] text-slate-400">上传付款截图并填写备注，方便管理员核实</div>
 
-          <div class="mt-6">
-            <label class="text-[13px] text-slate-400">付款留言（选填）</label>
-            <input
-              v-model="paymentNote"
-              type="text"
-              placeholder="如：微信名/手机号/付款截图说明"
-              class="mt-2 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder-slate-600 outline-none transition focus:border-blue-500/40"
-            />
+          <div class="mt-5 space-y-4">
+            <label class="block">
+              <div class="mb-1.5 text-[12px] text-slate-500">付款留言（选填）</div>
+              <input
+                v-model="paymentNote"
+                type="text"
+                placeholder="例如：微信号 / 手机号 / 付款说明"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+              />
+            </label>
+
+            <div>
+              <div class="mb-1.5 text-[12px] text-slate-500">付款凭证截图</div>
+              <label class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-[13px] text-slate-600 transition hover:border-slate-400 hover:bg-white">
+                <Upload class="h-4 w-4" />
+                {{ uploading ? '上传中...' : paymentProofUrl ? '重新上传截图' : '选择截图上传' }}
+                <input type="file" accept="image/*" class="hidden" @change="onSelectFile" />
+              </label>
+
+              <div v-if="paymentProofUrl" class="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                <img :src="paymentProofUrl" alt="付款凭证预览" class="w-full object-cover" />
+              </div>
+            </div>
           </div>
 
-          <div v-if="errorMsg" class="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] p-3 text-[13px] text-red-300">
+          <div v-if="errorMsg" class="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-[12px] text-rose-500">
             {{ errorMsg }}
           </div>
         </div>
 
         <div class="mt-4 flex gap-3">
-          <button
-            class="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-5 py-3.5 text-[14px] font-medium text-slate-300 transition hover:bg-white/[0.06]"
-            @click="step = 'pay'"
-          >
+          <button class="flex-1 rounded-xl border border-slate-200 bg-white px-5 py-3 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50" @click="step = 'pay'">
             返回
           </button>
           <button
-            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-3.5 text-[14px] font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
-            :disabled="submitting"
+            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-[13px] font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+            :disabled="submitting || uploading"
             @click="submitApplication"
           >
             <Send v-if="!submitting" class="h-4 w-4" />
@@ -169,25 +166,18 @@ async function submitApplication() {
         </div>
       </div>
 
-      <!-- Step 4: 完成 -->
       <div v-if="step === 'done'">
-        <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-6 text-center">
-          <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20">
-            <Check class="h-8 w-8 text-emerald-400" />
+        <div class="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+            <Check class="h-7 w-7 text-emerald-600" />
           </div>
-          <div class="mt-5 text-[22px] font-bold text-white">申请已提交</div>
-          <div class="mt-2 text-[14px] text-slate-400">
-            管理员会在 24 小时内审核，审核通过后你的角色会自动升级为专业版。
-          </div>
-          <div class="mt-3 text-[13px] text-slate-500">
-            你也可以在"个人中心"查看审核状态。
+          <div class="mt-5 text-[20px] font-bold text-slate-950">申请已提交</div>
+          <div class="mt-2 text-[14px] text-slate-500">
+            管理员会尽快审核，审核通过后你的角色会自动升级为 VIP。
           </div>
         </div>
 
-        <button
-          class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] px-6 py-4 text-[14px] font-medium text-slate-300 transition hover:bg-white/[0.06]"
-          @click="$router.push('/overview')"
-        >
+        <button class="mt-5 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-[14px] font-medium text-slate-700 transition hover:bg-slate-50" @click="$router.push('/overview')">
           返回终端
         </button>
       </div>

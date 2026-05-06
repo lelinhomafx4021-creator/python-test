@@ -1,8 +1,6 @@
-<!-- TerminalHandoff - 人工工单面板页面 -->
-<!-- 展示转人工工单列表，支持分页查看、状态筛选和打开原始会话 -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { ArrowRight, Headset, Ticket } from 'lucide-vue-next'
+import { computed, reactive, ref, watch } from 'vue'
+import { ChevronDown, ChevronUp, Clock3, Headset, Sparkles } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { HandoffTicket } from '../types/terminal'
 
@@ -10,26 +8,33 @@ const props = defineProps<{
   tickets: HandoffTicket[]
 }>()
 
-const emit = defineEmits<{
-  openSession: [sessionId: string]
-}>()
-
-// 当前页码
 const page = ref(1)
-const pageSize = 6
+const pageSize = 5
+const expandedMap = reactive<Record<string, boolean>>({})
 
-watch(() => props.tickets, () => {
-  const maxPage = Math.max(1, Math.ceil(props.tickets.length / pageSize))
-  if (page.value > maxPage) page.value = maxPage
-}, { deep: true })
+watch(
+  () => props.tickets,
+  () => {
+    const maxPage = Math.max(1, Math.ceil(props.tickets.length / pageSize))
+    if (page.value > maxPage) page.value = maxPage
+    for (const ticket of props.tickets) {
+      if (expandedMap[ticket.traceId] === undefined) {
+        expandedMap[ticket.traceId] = false
+      }
+    }
+  },
+  { deep: true, immediate: true },
+)
 
-// 根据当前页码切片工单列表
 const pagedTickets = computed(() => {
   const start = (page.value - 1) * pageSize
   return props.tickets.slice(start, start + pageSize)
 })
 
-// 格式化时间戳为本地日期时间
+const openCount = computed(() => props.tickets.filter((ticket) => (ticket.status || 'open') === 'open').length)
+const processingCount = computed(() => props.tickets.filter((ticket) => ticket.status === 'processing').length)
+const closedCount = computed(() => props.tickets.filter((ticket) => ticket.status === 'closed').length)
+
 const formatTime = (value?: string) => {
   if (!value) return '暂无'
   const date = new Date(value)
@@ -42,110 +47,151 @@ const formatTime = (value?: string) => {
   })
 }
 
-// 将转人工原因代码转换为中文描述
 const reasonText = (reason?: string) => {
   const map: Record<string, string> = {
-    user_requested_human: '用户主动要求转人工',
-    critic_failed_after_retries: '多轮修正后仍不稳定',
+    user_requested_human: '你主动要求人工协助',
+    critic_failed_after_retries: '系统判断需要人工继续处理',
   }
-  return map[reason || ''] || reason || '待人工确认'
+  return map[reason || ''] || '已进入人工处理'
 }
 
-// 将工单状态码转换为中文标签
 const statusText = (status?: string) => {
   const map: Record<string, string> = {
     open: '待处理',
     processing: '处理中',
-    closed: '已关闭',
+    closed: '已完成',
   }
-  return map[status || ''] || status || '待处理'
+  return map[status || ''] || '待处理'
+}
+
+const statusClass = (status?: string) => {
+  if (status === 'closed') return 'bg-slate-100 text-slate-600'
+  if (status === 'processing') return 'bg-amber-50 text-amber-700'
+  return 'bg-emerald-50 text-emerald-700'
+}
+
+const summaryText = (ticket: HandoffTicket) => {
+  if (ticket.handoffSummary) return ticket.handoffSummary
+  if (ticket.responseMessage) return ticket.responseMessage
+  return reasonText(ticket.handoffReason)
+}
+
+const toggleExpand = (traceId: string) => {
+  expandedMap[traceId] = !expandedMap[traceId]
 }
 </script>
 
 <template>
-  <div class="space-y-5">
-    <section class="rounded-[32px] bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_48%,#334155_100%)] px-7 py-7 text-white shadow-[0_28px_80px_rgba(8,19,34,0.28)]">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div class="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs text-slate-200">
+  <div class="space-y-4">
+    <section class="rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="max-w-2xl">
+          <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[12px] text-slate-600">
             <Headset class="h-3.5 w-3.5" />
-            智能兜底闭环
+            人工支持
           </div>
-          <h3 class="text-3xl font-semibold tracking-wide">人工工单面板</h3>
-          <p class="mt-3 text-sm leading-7 text-slate-300">
-            当前工单也按分页展示，方便查看处理状态、用户回复和原始会话入口。
+          <h3 class="mt-4 text-[24px] font-semibold text-slate-950">我的工单</h3>
+          <p class="mt-2 text-[13px] leading-6 text-slate-500">
+            这里展示的是 AI 已经整理好的人工工单。你看到的是问题摘要、处理进度和客服回复，而不是后台处理界面。
           </p>
         </div>
 
-        <div class="rounded-[28px] bg-white/8 px-5 py-4 text-center">
-          <div class="text-xs text-slate-300">当前工单数</div>
-          <div class="mt-2 text-3xl font-semibold">{{ tickets.length }}</div>
+        <div class="grid min-w-[260px] flex-1 gap-3 sm:grid-cols-3">
+          <div class="rounded-2xl bg-slate-50 px-4 py-4">
+            <div class="text-[11px] text-slate-500">待处理</div>
+            <div class="mt-2 text-[24px] font-semibold text-slate-950">{{ openCount }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 px-4 py-4">
+            <div class="text-[11px] text-slate-500">处理中</div>
+            <div class="mt-2 text-[24px] font-semibold text-slate-950">{{ processingCount }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 px-4 py-4">
+            <div class="text-[11px] text-slate-500">已完成</div>
+            <div class="mt-2 text-[24px] font-semibold text-slate-950">{{ closedCount }}</div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section v-if="pagedTickets.length" class="grid gap-4 lg:grid-cols-2">
-      <button
+    <section v-if="pagedTickets.length" class="space-y-3">
+      <article
         v-for="ticket in pagedTickets"
         :key="ticket.traceId"
-        class="rounded-[32px] border border-slate-200 bg-white px-6 py-6 text-left shadow-[0_18px_55px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_22px_60px_rgba(15,23,42,0.08)] active:scale-[0.99]"
-        @click="emit('openSession', ticket.sessionId)"
+        class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
       >
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-3 py-1 text-xs text-white">
-            <Ticket class="h-3.5 w-3.5" />
-            {{ statusText(ticket.status) }}
+        <button
+          class="flex w-full items-start justify-between gap-3 px-5 py-4 text-left transition hover:bg-slate-50"
+          @click="toggleExpand(ticket.traceId)"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium" :class="statusClass(ticket.status)">
+                {{ statusText(ticket.status) }}
+              </span>
+              <span class="inline-flex items-center gap-1 text-[12px] text-slate-400">
+                <Clock3 class="h-3.5 w-3.5" />
+                {{ formatTime(ticket.createdAt) }}
+              </span>
+            </div>
+
+            <div class="mt-3 flex items-start gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-[13px] leading-6 text-slate-700">
+              <Sparkles class="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+              <div class="line-clamp-2">{{ summaryText(ticket) }}</div>
+            </div>
           </div>
-          <div class="text-xs text-slate-400">{{ formatTime(ticket.createdAt) }}</div>
-          <div class="text-xs text-slate-400">会话：{{ ticket.sessionId }}</div>
-        </div>
 
-        <div class="mt-5 text-lg font-semibold leading-8 text-slate-950">
-          {{ ticket.query }}
-        </div>
+          <div class="flex items-center gap-2 text-slate-400">
+            <ChevronUp v-if="expandedMap[ticket.traceId]" class="h-4 w-4" />
+            <ChevronDown v-else class="h-4 w-4" />
+          </div>
+        </button>
 
-        <div class="mt-4 rounded-3xl bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
-          转接原因：{{ reasonText(ticket.handoffReason) }}
-        </div>
+        <div v-if="expandedMap[ticket.traceId]" class="border-t border-slate-100 px-5 py-4">
+          <div class="space-y-3">
+            <div>
+              <div class="text-[12px] text-slate-500">AI 整理摘要</div>
+              <div class="mt-1 rounded-2xl bg-slate-50 px-4 py-3 text-[13px] leading-6 text-slate-800">
+                {{ ticket.handoffSummary || '暂无摘要，系统已将你的问题转交人工处理。' }}
+              </div>
+            </div>
 
-        <div v-if="ticket.handoffSummary" class="mt-4 text-sm leading-7 text-slate-500">
-          {{ ticket.handoffSummary }}
-        </div>
+            <div>
+              <div class="text-[12px] text-slate-500">原始问题</div>
+              <div class="mt-1 rounded-2xl bg-white px-4 py-3 text-[13px] leading-6 text-slate-700 border border-slate-200">
+                {{ ticket.query }}
+              </div>
+            </div>
 
-        <div v-if="ticket.responseMessage" class="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-800">
-          回复结果：{{ ticket.responseMessage }}
-        </div>
+            <div class="text-[12px] leading-6 text-slate-500">
+              转人工原因：{{ reasonText(ticket.handoffReason) }}
+            </div>
 
-        <div v-if="ticket.processNote" class="mt-4 text-sm leading-7 text-slate-500">
-          处理备注：{{ ticket.processNote }}
-        </div>
+            <div v-if="ticket.responseMessage" class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-[13px] leading-6 text-emerald-800">
+              客服回复：{{ ticket.responseMessage }}
+            </div>
 
-        <div v-if="ticket.handledBy || ticket.handledAt" class="mt-4 text-xs text-slate-400">
-          <span v-if="ticket.handledBy">处理人：{{ ticket.handledBy }}</span>
-          <span v-if="ticket.handledAt" class="ml-3">处理时间：{{ formatTime(ticket.handledAt) }}</span>
+            <div v-if="ticket.processNote" class="text-[12px] leading-6 text-slate-500">
+              处理备注：{{ ticket.processNote }}
+            </div>
+          </div>
         </div>
-
-        <div class="mt-5 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-          打开原始会话
-          <ArrowRight class="h-4 w-4" />
-        </div>
-      </button>
+      </article>
     </section>
 
     <section
       v-else
-      class="rounded-[32px] border border-slate-200 bg-white px-6 py-14 text-center shadow-[0_18px_55px_rgba(15,23,42,0.05)]"
+      class="rounded-3xl border border-slate-200 bg-white px-6 py-14 text-center shadow-sm"
     >
-      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-100 text-slate-700">
+      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-700">
         <Headset class="h-7 w-7" />
       </div>
-      <h4 class="mt-5 text-2xl font-semibold text-slate-950">当前没有人工工单</h4>
-      <p class="mt-3 text-sm leading-7 text-slate-500">
-        可以在智能副驾里输入“转人工”，演示从智能问答进入人工兜底的流程。
+      <h4 class="mt-5 text-[22px] font-semibold text-slate-950">当前没有人工工单</h4>
+      <p class="mt-3 text-[13px] leading-6 text-slate-500">
+        当 AI 需要把问题转交人工时，这里会出现整理后的工单摘要和处理进度。
       </p>
     </section>
 
-    <div class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+    <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <PaginationBar
         :page="page"
         :page-size="pageSize"

@@ -67,6 +67,7 @@ async def market_quotes(symbols: str = Query(..., description="多个股票代�
                     "turnover": payload.get("成交额(元)"),
                     "turnoverRate": payload.get("换手率(%)"),
                     "amplitude": payload.get("振幅(%)"),
+                    "quoteTime": payload.get("quoteTime", ""),
                     "status": "ok",
                 }
             )

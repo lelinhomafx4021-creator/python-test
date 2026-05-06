@@ -21,6 +21,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 行情域控制器。
@@ -68,5 +69,17 @@ public class MarketController {
     @GetMapping("/sectors")
     public ApiResult<List<SectorVO>> sectors() {
         return ApiResult.ok(marketService.listSectors());
+    }
+
+    @Operation(summary = "获取 K 线/分时数据", description = "支持日K、1日分时、5日分时图数据查询")
+    @GetMapping("/kline")
+    public ApiResult<List<Map<String, Object>>> kline(
+            @Parameter(description = "6位股票代码", example = "600519")
+            @RequestParam("symbol") @NotBlank String symbol,
+            @Parameter(description = "周期：daily / intraday_1d / intraday_5d", example = "daily")
+            @RequestParam(value = "period", defaultValue = "daily") String period,
+            @Parameter(description = "天数或数据量窗口，默认120", example = "120")
+            @RequestParam(value = "days", defaultValue = "120") @Min(1) @Max(500) Integer days) {
+        return ApiResult.ok(marketService.getKline(symbol, period, days));
     }
 }

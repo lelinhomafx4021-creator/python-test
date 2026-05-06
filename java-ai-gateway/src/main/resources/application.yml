@@ -1,54 +1,37 @@
-﻿server:
-  port: 8080
-
 spring:
   application:
     name: java-ai-gateway
   config:
-    import: optional:classpath:application-local.yml
-
-  # --- 数据库连接池优化（主业务真相存储） ---
+    import:
+      - optional:classpath:application-dev.yml
+      - optional:classpath:application-local.yml
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/ai_investor?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
-    username: root
-    password: "123456"
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 10          # 最大连接数，开发环境 10 够用
-      minimum-idle: 5                # 最小空闲连接
-      connection-timeout: 30000      # 等待连接池分配连接的最大时长（30秒）
-      max-lifetime: 1800000          # 一个连接在池里的最长存活时间
-      idle-timeout: 600000           # 连接退出的闲置时长
-
-  # --- Redis：登录态、热点行情、配额计数、分布式锁 ---
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      idle-timeout: 600000
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
-      password:
       timeout: 5s
       lettuce:
         pool:
           max-active: 8
           max-idle: 8
           min-idle: 1
-
-  # --- Flyway 自动化建表配置 ---
   flyway:
     baseline-on-migrate: true
     enabled: true
-
-  # --- 统一 JSON 返回格式 ---
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
-  
-  # --- RabbitMQ 配置 ---
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:}
+    password: ${RABBITMQ_PASSWORD:}
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}
@@ -60,31 +43,26 @@ spring:
           auth: true
           starttls:
             enable: true
-
   cloud:
-    # 本地开发阶段先关闭 Spring Cloud 与 Spring Boot 的版本拦截，
-    # 避免 Sentinel 接入时因为版本校验阻塞整套项目启动。
     compatibility-verifier:
       enabled: false
     sentinel:
       transport:
-        dashboard: 127.0.0.1:8858
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
       eager: true
       filter:
         enabled: true
+
 mybatis-plus:
   configuration:
     map-underline-to-camel-case: true
-    # 【开发利器】开启控制台 SQL 日志输出，方便调试
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     db-config:
       id-type: auto
 
-# --- Python 侧服务配置 ---
 python:
   ai:
-    base-url: http://localhost:8000
+    base-url: ${PYTHON_AI_BASE_URL:http://localhost:8000}
 
 app:
   cache:
@@ -108,7 +86,6 @@ aliyun:
     public-base-url: ${ALIYUN_OSS_PUBLIC_BASE_URL:}
     directory: avatar
 
-
 management:
   health:
     mail:
@@ -118,7 +95,6 @@ management:
       exposure:
         include: health,info,metrics
 
-# --- SpringDoc OpenAPI (Swagger UI) 配置 ---
 springdoc:
   api-docs:
     path: /api-docs
@@ -135,3 +111,6 @@ sa-token:
   is-share: false
   token-style: uuid
   is-log: false
+
+server:
+  port: ${SERVER_PORT:8080}

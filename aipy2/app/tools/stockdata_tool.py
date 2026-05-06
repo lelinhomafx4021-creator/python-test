@@ -111,6 +111,18 @@ def _parse_tencent_quote_payload(payload: str, fallback_symbol: str) -> dict[str
     fields = payload.split("~")
     if len(fields) < 45:
         return {"symbol": fallback_symbol, "name": fallback_symbol}
+    
+    # 解析时间：fields[30] 是日期（YYYYMMDD），fields[31] 是时间（HHMMSS）
+    quote_time = ""
+    if len(fields) > 31 and fields[30] and fields[31]:
+        try:
+            date_str = fields[30].strip()
+            time_str = fields[31].strip()
+            if len(date_str) == 8 and len(time_str) == 6:
+                quote_time = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]} {time_str[:2]}:{time_str[2:4]}:{time_str[4:6]}"
+        except Exception:
+            pass
+    
     return {
         "symbol": fields[2] or fallback_symbol,
         "name": fields[1] or fallback_symbol,
@@ -124,6 +136,7 @@ def _parse_tencent_quote_payload(payload: str, fallback_symbol: str) -> dict[str
         "turnover": _safe_turnover(fields[37]),
         "turnoverRate": _safe_float(fields[38]),
         "amplitude": _safe_float(fields[43]),
+        "quoteTime": quote_time,
     }
 
 

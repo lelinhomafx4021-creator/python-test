@@ -116,6 +116,11 @@ public class MembershipService {
      */
     @Transactional
     public void assignMembershipPlan(Long userId, String role, String planCode) {
+        assignMembershipPlan(userId, planCode, "admin_console");
+    }
+
+    @Transactional
+    public void assignMembershipPlan(Long userId, String planCode, String source) {
         MembershipPlanDO targetPlan = getPlanByCode(planCode);
 
         List<UserMembershipDO> memberships = userMembershipMapper.selectList(
@@ -134,7 +139,7 @@ public class MembershipService {
         created.setPlanCode(targetPlan.getPlanCode());
         created.setStatus("active");
         created.setAutoRenew(Boolean.FALSE);
-        created.setSource("admin_console");
+        created.setSource(source == null || source.isBlank() ? "system" : source.trim());
         created.setStartAt(LocalDateTime.now());
         userMembershipMapper.insert(created);
 

@@ -697,7 +697,7 @@ const indicatorButtons: { key: IndicatorType; label: string; color: string }[] =
     <div class="border-b border-slate-100 px-5 py-4">
       <div class="flex items-center justify-between">
         <div>
-          <div class="text-[16px] font-semibold text-slate-950">K线走势</div>
+          <div class="text-[16px] font-semibold text-slate-950">趋势 K 线</div>
           <div v-if="symbol" class="mt-0.5 text-[12px] text-slate-400">{{ symbol }}</div>
         </div>
         <div v-if="latestData" class="text-right">

@@ -1,9 +1,33 @@
 <!-- TerminalHeader - 终端顶部导航栏 -->
-<!-- 显示当前页面标题、会员标识、刷新/深色模式切换和用户菜单 -->
+<!-- 显示当前页面标题、会员标识、刷新、实时时钟和用户菜单 -->
 <script setup lang="ts">
-import { BellRing, ChevronDown, Menu, Moon, RefreshCw, Sparkles, Sun } from 'lucide-vue-next'
+import { BellRing, ChevronDown, Menu, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { ref, onMounted, onUnmounted } from 'vue'
 import type { AuthUser, MembershipInfo, NavKey } from '../types/terminal'
-import { store, toggleDarkMode } from '../api/index'
+
+// 实时时钟
+const currentTime = ref('')
+let clockTimer: ReturnType<typeof setInterval> | null = null
+
+const updateClock = () => {
+  const now = new Date()
+  currentTime.value = now.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+onMounted(() => {
+  updateClock()
+  clockTimer = setInterval(updateClock, 1000)
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
+})
 
 defineProps<{
   activeView: NavKey
@@ -56,50 +80,47 @@ const membershipText = (membership?: MembershipInfo | null) => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 overflow-visible border-b border-slate-200 bg-[#f7f7f5]/95 backdrop-blur dark:border-slate-800 dark:bg-[#0f172a]/95 transition-colors duration-300">
+  <header class="sticky top-0 z-40 overflow-visible border-b border-slate-200 bg-[#f7f7f5]/95 backdrop-blur transition-colors duration-300">
     <div class="relative flex flex-wrap items-center justify-between gap-3 overflow-visible px-4 py-3 lg:px-6">
       <div class="flex items-center gap-3">
-        <button class="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition-all duration-150 hover:bg-slate-50 active:scale-[0.95] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700" @click="emit('toggle')">
+        <button class="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition-all duration-150 hover:bg-slate-50 active:scale-[0.95]" @click="emit('toggle')">
           <Menu class="h-4 w-4" />
         </button>
 
         <div>
-          <div class="mb-1 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-colors duration-300">
+          <div class="mb-1 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-500 transition-colors duration-300">
             <Sparkles class="h-3.5 w-3.5" />
             {{ membershipText(membership) }}
           </div>
-          <h2 class="text-[28px] font-semibold tracking-tight text-slate-950 dark:text-slate-50 transition-colors duration-300">{{ titleMap[activeView] }}</h2>
-          <p class="text-[13px] text-slate-500 dark:text-slate-400 transition-colors duration-300">{{ subtitleMap[activeView] }}</p>
+          <h2 class="text-[28px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">{{ titleMap[activeView] }}</h2>
+          <p class="text-[13px] text-slate-500 transition-colors duration-300">{{ subtitleMap[activeView] }}</p>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
+        <!-- 实时时钟 -->
+        <div class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-mono text-slate-700">
+          <Clock class="h-3.5 w-3.5 text-slate-400" />
+          {{ currentTime }}
+        </div>
+
         <button
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.98]"
           @click="emit('refresh')"
         >
           <RefreshCw class="h-3.5 w-3.5" />
           刷新
         </button>
 
-        <!-- 深色模式切换按钮 -->
-        <button
-          class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition-all duration-300 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.95] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-100"
-          :title="store.darkMode ? '切换到亮色模式' : '切换到深色模式'"
-          @click="toggleDarkMode"
-        >
-          <Sun v-if="store.darkMode" class="h-4 w-4 text-amber-400" />
-          <Moon v-else class="h-4 w-4" />
-        </button>
 
-        <div class="hidden items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-600 md:flex dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors duration-300">
+        <div class="hidden items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-600 md:flex transition-colors duration-300">
           <BellRing class="h-3.5 w-3.5 text-slate-400" />
           跟踪自选与委托变化
         </div>
 
         <div class="relative" @click.stop>
           <button
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.97] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.97]"
             @click="emit('toggleUserMenu')"
           >
             {{ authUser.nickname || authUser.username }}
@@ -108,16 +129,16 @@ const membershipText = (membership?: MembershipInfo | null) => {
 
           <div
             v-if="userMenuOpen"
-            class="absolute right-0 top-[calc(100%+8px)] z-[80] w-40 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-800 dark:shadow-[0_18px_40px_rgba(0,0,0,0.4)] transition-colors duration-300"
+            class="absolute right-0 top-[calc(100%+8px)] z-[80] w-40 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.16)] transition-colors duration-300"
           >
             <button
-              class="flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] text-slate-700 transition-all duration-150 hover:bg-slate-50 active:scale-[0.98] dark:text-slate-300 dark:hover:bg-slate-700"
+              class="flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] text-slate-700 transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
               @click="emit('openProfile')"
             >
               个人中心
             </button>
             <button
-              class="mt-1 flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] text-rose-600 transition-all duration-150 hover:bg-rose-50 active:scale-[0.98] dark:text-rose-400 dark:hover:bg-rose-900/30"
+              class="mt-1 flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] text-rose-600 transition-all duration-150 hover:bg-rose-50 active:scale-[0.98]"
               @click="emit('logout')"
             >
               退出登录

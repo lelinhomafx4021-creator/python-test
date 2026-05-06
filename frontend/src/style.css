@@ -15,6 +15,23 @@
     overflow-x: hidden;
     overflow-y: auto;
   }
+
+  /* 全局按钮点击反馈 */
+  button {
+    @apply transition-all duration-150 ease-out cursor-pointer;
+  }
+  button:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  /* 提交类按钮更强的反馈 */
+  button[type="submit"]:active:not(:disabled) {
+    transform: scale(0.96);
+    filter: brightness(0.95);
+  }
+  /* 链接点击反馈 */
+  a:active {
+    opacity: 0.7;
+  }
 }
 
 .custom-scrollbar::-webkit-scrollbar {

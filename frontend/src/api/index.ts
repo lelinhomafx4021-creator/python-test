@@ -6,13 +6,17 @@ import type {
   AuthUser,
   NavKey,
   PaperPortfolioSnapshot,
+  VipApplication,
 } from '../types/terminal'
 
-const GW = 'http://127.0.0.1:8080'
+const GW = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080'
 const AUTH = `${GW}/gateway/auth`
 const AI = `${GW}/gateway/ai`
 const API = `${GW}/api/v1`
 const TOKEN_KEY = 'ai-investor-token'
+
+export const normalizeRole = (role?: string | null) => (role || '').trim().toLowerCase()
+export const isAdminRole = (role?: string | null) => normalizeRole(role) === 'admin'
 
 export const store = reactive({
   token: localStorage.getItem(TOKEN_KEY) || '',
@@ -21,7 +25,7 @@ export const store = reactive({
   submitting: false,
   error: '',
   mode: 'login' as 'login' | 'register',
-  loginForm: { username: 'admin', password: '123456' },
+  loginForm: { username: '', password: '' },
   registerForm: { username: '', password: '', nickname: '', phone: '', email: '', emailCode: '' },
   emailCodeSending: false,
   emailCodeCooldown: 0,
@@ -30,8 +34,6 @@ export const store = reactive({
   sidebarOpen: false,
   sidebarCollapsed: false,
   userMenuOpen: false,
-
-  darkMode: localStorage.getItem('darkMode') === 'true',
 
   membership: null as any,
   profile: null as any,
@@ -81,34 +83,30 @@ export const store = reactive({
   adminPortfolio: null as any,
   adminPortfolioLoading: false,
   adminKeyword: '',
+  vipApplications: [] as VipApplication[],
 })
 
-export const toggleDarkMode = () => {
-  store.darkMode = !store.darkMode
-  localStorage.setItem('darkMode', String(store.darkMode))
-  applyDarkMode()
-}
-
-export const applyDarkMode = () => {
-  if (store.darkMode) {
-    document.documentElement.classList.add('dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-  }
-}
-
 const headers = () => store.token ? { satoken: store.token } : {}
+
+const asArray = <T = any>(value: any): T[] => {
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.items)) return value.items
+  if (Array.isArray(value?.records)) return value.records
+  return []
+}
 
 const get = async (url: string, key: string, fallback: any = []) => {
   const res = await axios.get(url, { headers: headers() })
   ;(store as any)[key] = res.data.data ?? fallback
 }
 
+const isUnauthorized = (e: unknown) => (e as AxiosError).response?.status === 401
+
 const safe = async (fn: () => Promise<void>) => {
   try {
     await fn()
   } catch (e) {
-    if ((e as AxiosError).response?.status === 401) logout()
+    if (isUnauthorized(e)) logout()
     else throw e
   }
 }
@@ -116,6 +114,19 @@ const safe = async (fn: () => Promise<void>) => {
 const err = (e: unknown, msg: string) => {
   const data = (e as AxiosError<{ message?: string; msg?: string; error?: string }>)?.response?.data
   return data?.message || data?.msg || data?.error || (e as Error)?.message || msg
+}
+
+const reportOptionalError = (label: string, e: unknown) => {
+  console.warn(`[api] ${label} failed: ${err(e, label)}`)
+}
+
+const optionalTask = async (label: string, task: () => Promise<void>) => {
+  try {
+    await task()
+  } catch (e) {
+    if (isUnauthorized(e)) throw e
+    reportOptionalError(label, e)
+  }
 }
 
 let _emailCodeTimer: number | null = null
@@ -149,6 +160,7 @@ const reset = () => {
     transactions: [], transactionTotal: 0, transactionPage: 1,
     sessions: [], messages: [], sessionId: null, draft: '', streaming: false,
     tickets: [], adminOverview: null, adminUsers: [], adminTickets: [], adminPortfolio: null,
+    vipApplications: [],
     marketKeyword: '', marketPage: 1, adminKeyword: '', watchlistName: '', watchlistSymbol: '', watchlistNote: '',
     orderSymbol: '', orderSide: 'BUY', orderQty: 100, view: 'overview',
     registerForm: { username: '', password: '', nickname: '', phone: '', email: '', emailCode: '' },
@@ -178,7 +190,6 @@ export const login = async () => {
     const { data: { data } } = await axios.post(`${AUTH}/login`, store.loginForm)
     saveToken(data.token)
     store.user = { id: data.id, username: data.username, nickname: data.nickname, avatarUrl: data.avatarUrl, role: data.role }
-    await refreshAll()
   } catch (e) {
     store.error = err(e, '登录失败')
   } finally {
@@ -207,7 +218,6 @@ export const register = async () => {
     store.registerForm = { username: '', password: '', nickname: '', phone: '', email: '', emailCode: '' }
     store.emailCodeCooldown = 0
     stopEmailCodeCooldown()
-    await refreshAll()
   } catch (e) {
     store.error = err(e, '注册失败')
   } finally {
@@ -386,9 +396,16 @@ export const fetchTransfers = async () => {
 }
 
 export const fetchTransactions = async () => {
-  const res = await axios.get(`${API}/paper/transactions?page=${store.transactionPage}&pageSize=20`, { headers: headers() })
-  store.transactions = res.data.data?.items || []
-  store.transactionTotal = res.data.data?.total || 0
+  try {
+    const res = await axios.get(`${API}/paper/transactions?page=${store.transactionPage}&pageSize=20`, { headers: headers() })
+    store.transactions = res.data.data?.items || []
+    store.transactionTotal = res.data.data?.total || 0
+  } catch (e) {
+    if (isUnauthorized(e)) throw e
+    store.transactions = []
+    store.transactionTotal = 0
+    reportOptionalError('paper transactions', e)
+  }
 }
 
 export const submitOrder = async () => {
@@ -557,12 +574,17 @@ export const newChat = () => {
 }
 
 export const fetchAdmin = async () => {
-  if (store.user?.role !== 'admin') return
-  await Promise.all([
-    get(`${API}/admin/overview`, 'adminOverview'),
-    get(`${API}/admin/users${store.adminKeyword.trim() ? '?keyword=' + encodeURIComponent(store.adminKeyword.trim()) : ''}`, 'adminUsers'),
-    get(`${API}/admin/tickets`, 'adminTickets'),
+  if (!isAdminRole(store.user?.role)) return
+  const [overviewRes, usersRes, ticketsRes, vipItems] = await Promise.all([
+    axios.get(`${API}/admin/overview`, { headers: headers() }),
+    axios.get(`${API}/admin/users${store.adminKeyword.trim() ? '?keyword=' + encodeURIComponent(store.adminKeyword.trim()) : ''}`, { headers: headers() }),
+    axios.get(`${API}/admin/tickets`, { headers: headers() }),
+    fetchVipApplications(),
   ])
+  store.adminOverview = overviewRes.data?.data ?? null
+  store.adminUsers = asArray(usersRes.data?.data)
+  store.adminTickets = asArray(ticketsRes.data?.data)
+  store.vipApplications = asArray(vipItems)
 }
 
 export const fetchAdminPortfolio = async (userId: number) => {
@@ -615,31 +637,85 @@ export const refreshAll = async () => {
   if (!store.user) return
   await safe(async () => {
     await Promise.all([
-      fetchProfile(),
-      get(`${API}/memberships/me`, 'membership'),
-      get(`${API}/quotas/me`, 'quotas'),
-      fetchQuotes(),
-      fetchMarketStocks(),
-      fetchHotNews(),
-      fetchSectors(),
-      fetchWatchlists(),
-      fetchPaper(),
-      fetchSessions(),
-      fetchTickets(),
-      fetchTransactions(),
-      get(`${API}/notifications`, 'notifications'),
-      fetchAdmin(),
+      optionalTask('profile', fetchProfile),
+      optionalTask('membership', () => get(`${API}/memberships/me`, 'membership')),
+      optionalTask('quotas', () => get(`${API}/quotas/me`, 'quotas')),
+      optionalTask('quotes', fetchQuotes),
+      optionalTask('market stocks', fetchMarketStocks),
+      optionalTask('hot news', fetchHotNews),
+      optionalTask('sectors', fetchSectors),
+      optionalTask('watchlists', fetchWatchlists),
+      optionalTask('paper account', fetchPaper),
+      optionalTask('chat sessions', fetchSessions),
+      optionalTask('handoff tickets', fetchTickets),
+      optionalTask('paper transactions', fetchTransactions),
+      optionalTask('notifications', () => get(`${API}/notifications`, 'notifications')),
+      optionalTask('admin workspace', fetchAdmin),
     ])
-    await Promise.all([fetchSnapshot(), fetchOrders(), fetchTransfers()])
+    await Promise.all([
+      optionalTask('paper snapshot', () => fetchSnapshot()),
+      optionalTask('paper orders', fetchOrders),
+      optionalTask('paper transfers', fetchTransfers),
+    ])
+  })
+}
+
+export const refreshTerminal = async () => {
+  if (!store.user) return
+  await safe(async () => {
+    await Promise.all([
+      optionalTask('profile', fetchProfile),
+      optionalTask('membership', () => get(`${API}/memberships/me`, 'membership')),
+      optionalTask('quotas', () => get(`${API}/quotas/me`, 'quotas')),
+      optionalTask('quotes', fetchQuotes),
+      optionalTask('market stocks', fetchMarketStocks),
+      optionalTask('hot news', fetchHotNews),
+      optionalTask('sectors', fetchSectors),
+      optionalTask('watchlists', fetchWatchlists),
+      optionalTask('paper account', fetchPaper),
+      optionalTask('chat sessions', fetchSessions),
+      optionalTask('handoff tickets', fetchTickets),
+      optionalTask('paper transactions', fetchTransactions),
+      optionalTask('notifications', () => get(`${API}/notifications`, 'notifications')),
+    ])
+    await Promise.all([
+      optionalTask('paper snapshot', () => fetchSnapshot()),
+      optionalTask('paper orders', fetchOrders),
+      optionalTask('paper transfers', fetchTransfers),
+    ])
+  })
+}
+
+export const refreshAdminWorkspace = async () => {
+  if (!store.user) return
+  await safe(async () => {
+    await Promise.all([
+      optionalTask('auth me', fetchMe),
+      optionalTask('admin workspace', fetchAdmin),
+      optionalTask('handoff tickets', fetchTickets),
+    ])
   })
 }
 
 /* ─── VIP 申请 ─── */
 
 export const applyVip = async (note: string = '') => {
+  return applyVipWithProof(note, '')
+}
+
+export const uploadVipPaymentProof = async (file: File) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await axios.post(`${GW}/gateway/vip/payment-proof`, fd, {
+    headers: { ...headers(), 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data?.data?.proofUrl || ''
+}
+
+export const applyVipWithProof = async (note: string = '', paymentProofUrl: string = '') => {
   const res = await axios.post(`${GW}/gateway/vip/apply`, null, {
     headers: headers(),
-    params: { paymentAmount: 199, paymentNote: note },
+    params: { paymentAmount: 199, paymentNote: note, paymentProofUrl },
   })
   return res.data
 }
@@ -648,14 +724,21 @@ export const fetchVipApplications = async (status?: string) => {
   const url = status
     ? `${GW}/gateway/vip/applications?status=${status}`
     : `${GW}/gateway/vip/applications`
-  const res = await axios.get(url, { headers: headers() })
-  return res.data?.data || []
+  try {
+    const res = await axios.get(url, { headers: headers() })
+    return asArray(res.data?.data)
+  } catch (e) {
+    if (isUnauthorized(e)) throw e
+    reportOptionalError('vip applications', e)
+    return []
+  }
 }
 
 export const reviewVipApplication = async (appId: number, action: 'approve' | 'reject', rejectReason: string = '') => {
   const res = await axios.put(`${GW}/gateway/vip/applications/${appId}/review`, {
     action,
-    reject_reason: rejectReason,
+    rejectReason,
   }, { headers: headers() })
+  store.vipApplications = await fetchVipApplications()
   return res.data
 }

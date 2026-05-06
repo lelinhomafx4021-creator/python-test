@@ -14,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,6 +174,45 @@ public class PythonMarketClient {
     }
 
     /**
+     * 获取 K 线/分时数据。
+     */
+    public List<Map<String, Object>> fetchKline(String symbol, String period, int days) {
+        JsonNode response = pythonAiWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/kline")
+                        .queryParam("symbol", symbol)
+                        .queryParam("period", period)
+                        .queryParam("days", days)
+                        .build())
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .block();
+
+        if (response == null || !response.has("data")) {
+            return List.of();
+        }
+
+        JsonNode dataNode = response.path("data");
+        JsonNode itemsNode = dataNode.path("items");
+        if (!itemsNode.isArray()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (JsonNode item : itemsNode) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("date", textOf(item, "date", "day", "时间", "tradeDate"));
+            row.put("open", decimalOrNull(item, "open", "开盘", "openPrice"));
+            row.put("close", decimalOrNull(item, "close", "收盘", "closePrice"));
+            row.put("high", decimalOrNull(item, "high", "最高", "highPrice"));
+            row.put("low", decimalOrNull(item, "low", "最低", "lowPrice"));
+            row.put("volume", decimalOrNull(item, "volume", "成交量", "vol"));
+            items.add(row);
+        }
+        return items;
+    }
+
+    /**
      * 从数据库加载拼音映射表。
      */
     private Map<String, String> loadPinyinMap() {
@@ -198,5 +238,26 @@ public class PythonMarketClient {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private BigDecimal decimalOrNull(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            JsonNode child = node.path(fieldName);
+            BigDecimal value = decimalOf(child);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String textOf(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            JsonNode child = node.path(fieldName);
+            if (!child.isMissingNode() && !child.isNull() && !child.asText().isBlank()) {
+                return child.asText();
+            }
+        }
+        return "";
     }
 }

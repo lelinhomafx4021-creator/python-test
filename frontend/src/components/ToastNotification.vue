@@ -14,20 +14,20 @@ const iconMap = {
   warning: AlertTriangle,
 }
 
-// 每种 toast 类型对应的边框和背景色（含深色模式）
+// 每种 toast 类型对应的边框和背景色
 const colorMap = {
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
-  error: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200',
-  info: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200',
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  error: 'border-rose-200 bg-rose-50 text-rose-800',
+  info: 'border-blue-200 bg-blue-50 text-blue-800',
+  warning: 'border-amber-200 bg-amber-50 text-amber-800',
 }
 
 // 每种 toast 类型对应的图标颜色
 const iconColorMap = {
-  success: 'text-emerald-500 dark:text-emerald-400',
-  error: 'text-rose-500 dark:text-rose-400',
-  info: 'text-blue-500 dark:text-blue-400',
-  warning: 'text-amber-500 dark:text-amber-400',
+  success: 'text-emerald-500',
+  error: 'text-rose-500',
+  info: 'text-blue-500',
+  warning: 'text-amber-500',
 }
 </script>
 
@@ -58,7 +58,7 @@ const iconColorMap = {
           <div class="flex-1 text-[13px] leading-5">{{ toast.message }}</div>
           <!-- 关闭按钮 -->
           <button
-            class="shrink-0 rounded-lg p-0.5 transition hover:bg-black/5 dark:hover:bg-white/10"
+            class="shrink-0 rounded-lg p-0.5 transition hover:bg-black/5"
             @click="remove(toast.id)"
           >
             <X class="h-3.5 w-3.5 opacity-60" />

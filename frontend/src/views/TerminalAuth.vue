@@ -1,12 +1,10 @@
-<!-- TerminalAuth - 终端登录/注册页面 -->
-<!-- 左侧展示产品介绍和行情示例，右侧为登录/注册表单 -->
+<!-- TerminalAuth - 登录/注册 · 居中卡片 -->
 <script setup lang="ts">
-import { LockKeyhole, ShieldCheck, TrendingDown, TrendingUp, UserPlus } from 'lucide-vue-next'
+import { LockKeyhole, Mail, ShieldCheck } from 'lucide-vue-next'
+import { ref, onMounted } from 'vue'
 
-// 认证模式：登录或注册
 type AuthMode = 'login' | 'register'
 
-// 登录页左侧展示的终端功能信号
 type LoginSignal = {
   value: string
   label: string
@@ -18,10 +16,13 @@ defineProps<{
   password: string
   nickname: string
   phone: string
+  email: string
+  emailCode: string
   loading: boolean
+  codeSending: boolean
+  codeCooldown: number
   error: string
   signals: LoginSignal[]
-  highlights: string[]
 }>()
 
 const emit = defineEmits<{
@@ -30,197 +31,195 @@ const emit = defineEmits<{
   'update:password': [string]
   'update:nickname': [string]
   'update:phone': [string]
+  'update:email': [string]
+  'update:email-code': [string]
+  'send-email-code': []
   submit: []
 }>()
 
-// 根据字段名分发输入值变更到父组件
-const updateValue = (key: 'username' | 'password' | 'nickname' | 'phone', event: Event) => {
+const updateValue = (key: 'username' | 'password' | 'nickname' | 'phone' | 'email' | 'emailCode', event: Event) => {
   const value = (event.target as HTMLInputElement).value
   if (key === 'username') emit('update:username', value)
   else if (key === 'password') emit('update:password', value)
   else if (key === 'nickname') emit('update:nickname', value)
-  else emit('update:phone', value)
+  else if (key === 'phone') emit('update:phone', value)
+  else if (key === 'email') emit('update:email', value)
+  else emit('update:email-code', value)
 }
 
-// 登录页展示的模拟行情数据
-const marketRows = [
-  { symbol: '600519', name: '贵州茅台', price: '1382.43', change: '-1.34%', positive: false },
-  { symbol: '000001', name: '平安银行', price: '11.52', change: '+0.35%', positive: true },
-  { symbol: '300750', name: '宁德时代', price: '211.68', change: '+1.08%', positive: true },
-]
+const show = ref(false)
+onMounted(() => { setTimeout(() => show.value = true, 30) })
 </script>
 
 <template>
-  <div class="min-h-screen bg-[linear-gradient(180deg,#eef3f7_0%,#e8eef4_100%)] text-slate-900">
-    <div class="mx-auto grid min-h-screen max-w-[1600px] grid-cols-1 gap-10 px-8 py-10 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
-      <section class="flex min-h-[680px] flex-col justify-between">
-        <div>
-          <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] text-slate-500 shadow-sm">
-            <ShieldCheck class="h-3.5 w-3.5 text-slate-500" />
-            量化金融终端
-          </div>
+  <div class="flex min-h-screen items-center justify-center bg-[#fafbfc] px-4">
+    <!-- 微妙背景装饰 -->
+    <div class="pointer-events-none fixed inset-0">
+      <div class="absolute right-[-10%] top-[-15%] h-[400px] w-[400px] rounded-full bg-slate-100 blur-[80px]" />
+      <div class="absolute bottom-[-10%] left-[-5%] h-[300px] w-[300px] rounded-full bg-slate-50 blur-[60px]" />
+    </div>
 
-          <div class="mt-12 max-w-3xl">
-            <div class="text-[46px] font-semibold tracking-tight text-slate-950">智投终端</div>
-            <div class="mt-4 max-w-2xl text-[16px] leading-8 text-slate-600">
-              用一个界面处理行情、自选、交易、热点和人工工单。
-            </div>
-          </div>
+    <div
+      class="relative w-full max-w-[380px]"
+      :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'"
+      style="transition: all 0.5s cubic-bezier(0.16,1,0.3,1)"
+    >
+      <!-- Logo -->
+      <div class="mb-8 text-center">
+        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 shadow-lg shadow-slate-900/10">
+          <ShieldCheck class="h-6 w-6 text-white" />
+        </div>
+        <h1 class="text-[22px] font-semibold text-slate-900">智投终端</h1>
+        <p class="mt-1 text-[13px] text-slate-400">
+          {{ mode === 'login' ? '登录你的账户' : '创建新账户' }}
+        </p>
+      </div>
+
+      <!-- 卡片 -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <!-- 切换 -->
+        <div class="mb-6 flex border-b border-slate-100">
+          <button
+            class="relative flex-1 pb-3 text-center text-[13px] font-medium transition-colors"
+            :class="mode === 'login' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'"
+            @click="emit('update:mode', 'login')"
+          >
+            登录
+            <span
+              v-if="mode === 'login'"
+              class="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full bg-slate-900"
+            />
+          </button>
+          <button
+            class="relative flex-1 pb-3 text-center text-[13px] font-medium transition-colors"
+            :class="mode === 'register' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'"
+            @click="emit('update:mode', 'register')"
+          >
+            注册
+            <span
+              v-if="mode === 'register'"
+              class="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full bg-slate-900"
+            />
+          </button>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div class="flex items-center justify-between">
+        <!-- 表单 -->
+        <form class="space-y-4" @submit.prevent="emit('submit')">
+          <template v-if="mode === 'register'">
+            <div class="grid grid-cols-2 gap-3">
               <div>
-                <div class="text-[12px] text-slate-400">市场摘要</div>
-                <div class="mt-1 text-[24px] font-semibold text-slate-950">盘中观察</div>
-              </div>
-              <div class="rounded-full bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700">实时联动</div>
-            </div>
-
-            <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-              <div class="grid grid-cols-[90px_1fr_90px_84px] bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
-                <div>代码</div>
-                <div>名称</div>
-                <div class="text-right">现价</div>
-                <div class="text-right">涨跌幅</div>
-              </div>
-              <div
-                v-for="row in marketRows"
-                :key="row.symbol"
-                class="grid grid-cols-[90px_1fr_90px_84px] items-center border-t border-slate-100 px-4 py-2.5 text-[12px]"
-              >
-                <div class="font-medium text-slate-900">{{ row.symbol }}</div>
-                <div class="truncate text-slate-600">{{ row.name }}</div>
-                <div class="text-right text-slate-900">{{ row.price }}</div>
-                <div class="flex items-center justify-end gap-1" :class="row.positive ? 'text-emerald-600' : 'text-rose-600'">
-                  <component :is="row.positive ? TrendingUp : TrendingDown" class="h-3.5 w-3.5" />
-                  {{ row.change }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            <div class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="text-[13px] font-medium text-slate-700">终端模块</div>
-              <div class="mt-4 grid gap-2">
-                <div
-                  v-for="signal in signals.slice(0, 4)"
-                  :key="signal.value"
-                  class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                >
-                  <div class="text-[12px] font-semibold text-slate-900">{{ signal.value }}</div>
-                  <div class="mt-1 text-[11px] leading-5 text-slate-500">{{ signal.label }}</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="text-[13px] font-medium text-slate-700">使用方式</div>
-              <div class="mt-3 space-y-2 text-[12px] leading-6 text-slate-500">
-                <div>盘前看热点与重点股票。</div>
-                <div>盘中跟踪自选、持仓与委托变化。</div>
-                <div>需要判断时使用智能副驾，不确定时转人工。</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="flex items-center justify-center xl:justify-end">
-        <div class="w-full max-w-[420px] rounded-[32px] border border-slate-200 bg-white p-7 shadow-[0_20px_48px_rgba(15,23,42,0.08)]">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="text-[12px] text-slate-400">终端入口</div>
-              <div class="mt-1 text-[30px] font-semibold tracking-tight text-slate-950">
-                {{ mode === 'login' ? '进入工作台' : '创建账户' }}
-              </div>
-            </div>
-            <div class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-500">A 股终端</div>
-          </div>
-
-          <div class="mt-6 flex items-center gap-2 rounded-full bg-slate-100 p-1">
-            <button
-              class="flex-1 rounded-full px-3 py-2 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]"
-              :class="mode === 'login' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'"
-              @click="emit('update:mode', 'login')"
-            >
-              登录
-            </button>
-            <button
-              class="flex-1 rounded-full px-3 py-2 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]"
-              :class="mode === 'register' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'"
-              @click="emit('update:mode', 'register')"
-            >
-              注册
-            </button>
-          </div>
-
-          <form class="mt-6 space-y-4" @submit.prevent="emit('submit')">
-            <div v-if="mode === 'register'" class="grid gap-4 sm:grid-cols-2">
-              <label class="block">
-                <div class="mb-1.5 text-[12px] font-medium text-slate-700">昵称</div>
+                <label class="mb-1.5 block text-[12px] text-slate-500">昵称</label>
                 <input
                   :value="nickname"
                   type="text"
-                  class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-[14px] outline-none transition focus:border-slate-400"
-                  placeholder="例如：价值研究员"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                  placeholder="你的昵称"
                   @input="updateValue('nickname', $event)"
                 />
-              </label>
-
-              <label class="block">
-                <div class="mb-1.5 text-[12px] font-medium text-slate-700">手机号</div>
+              </div>
+              <div>
+                <label class="mb-1.5 block text-[12px] text-slate-500">手机号</label>
                 <input
                   :value="phone"
                   type="text"
-                  class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-[14px] outline-none transition focus:border-slate-400"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   placeholder="选填"
                   @input="updateValue('phone', $event)"
                 />
-              </label>
+              </div>
             </div>
 
-            <label class="block">
-              <div class="mb-1.5 text-[12px] font-medium text-slate-700">用户名</div>
-              <input
-                :value="username"
-                type="text"
-                class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-[14px] outline-none transition focus:border-slate-400"
-                placeholder="4-32 位字母、数字或下划线"
-                @input="updateValue('username', $event)"
-              />
-            </label>
-
-            <label class="block">
-              <div class="mb-1.5 text-[12px] font-medium text-slate-700">密码</div>
-              <input
-                :value="password"
-                type="password"
-                class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-[14px] outline-none transition focus:border-slate-400"
-                placeholder="至少 6 位"
-                @input="updateValue('password', $event)"
-              />
-            </label>
-
-
-
-            <div v-if="error" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] leading-6 text-rose-600">
-              {{ error }}
+            <div>
+              <label class="mb-1.5 block text-[12px] text-slate-500">邮箱</label>
+              <div class="relative">
+                <Mail class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
+                <input
+                  :value="email"
+                  type="email"
+                  class="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                  placeholder="接收验证码"
+                  @input="updateValue('email', $event)"
+                />
+              </div>
             </div>
 
-            <button
-              type="submit"
-              class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-[14px] font-medium text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="loading"
-            >
-              <component :is="mode === 'login' ? LockKeyhole : UserPlus" class="h-4 w-4" />
-              {{ loading ? '提交中...' : mode === 'login' ? '登录终端' : '注册并进入' }}
-            </button>
-          </form>
+            <div>
+              <label class="mb-1.5 block text-[12px] text-slate-500">验证码</label>
+              <div class="flex gap-2">
+                <input
+                  :value="emailCode"
+                  type="text"
+                  maxlength="6"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                  placeholder="请输入验证码"
+                  @input="updateValue('emailCode', $event)"
+                />
+                <button
+                  type="button"
+                  class="shrink-0 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="codeSending || codeCooldown > 0"
+                  @click="emit('send-email-code')"
+                >
+                  {{ codeCooldown > 0 ? `${codeCooldown}s` : codeSending ? '...' : '获取' }}
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <div>
+            <label class="mb-1.5 block text-[12px] text-slate-500">用户名</label>
+            <input
+              :value="username"
+              type="text"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+              placeholder="请输入用户名"
+              @input="updateValue('username', $event)"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1.5 block text-[12px] text-slate-500">密码</label>
+            <input
+              :value="password"
+              type="password"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+              placeholder="请输入密码"
+              @input="updateValue('password', $event)"
+            />
+          </div>
+
+          <div
+            v-if="error"
+            class="rounded-lg bg-rose-50 px-3 py-2 text-[12px] text-rose-500"
+          >
+            {{ error }}
+          </div>
+
+          <button
+            type="submit"
+            class="w-full rounded-lg bg-slate-900 py-2.5 text-[14px] font-medium text-white transition-all hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="loading"
+          >
+            {{ loading ? '提交中...' : mode === 'login' ? '登录' : '注册' }}
+          </button>
+        </form>
+
+        <!-- 底部 -->
+        <div class="mt-5 text-center text-[12px] text-slate-400">
+          <button
+            class="transition hover:text-slate-600"
+            @click="emit('update:mode', mode === 'login' ? 'register' : 'login')"
+          >
+            {{ mode === 'login' ? '没有账户？立即注册' : '已有账户？去登录' }}
+          </button>
         </div>
-      </section>
+      </div>
+
+      <!-- 安全提示 -->
+      <div class="mt-4 text-center text-[11px] text-slate-300">
+        <LockKeyhole class="mr-1 inline h-3 w-3 align-[-2px]" />
+        加密传输 · 安全登录
+      </div>
     </div>
   </div>
 </template>

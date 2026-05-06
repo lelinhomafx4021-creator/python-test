@@ -118,6 +118,7 @@ export type MarketStock = {
   circulatingMarketValue?: number
   sixtyDayChangePercent?: number
   yearToDateChangePercent?: number
+  quoteTime?: string
 }
 
 export type HotNewsItem = {
@@ -283,6 +284,24 @@ export type AdminUserPortfolio = {
   orders: PaperOrder[]
 }
 
+export type VipApplication = {
+  id: number
+  userId?: number
+  username?: string
+  nickname?: string
+  planCode?: string
+  note?: string
+  paymentAmount?: number
+  paymentNote?: string
+  status?: string
+  rejectReason?: string
+  paymentProofUrl?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
 /* ─── K线 / 图表 / 新闻相关类型 ─── */
 
 /** K线数据点 */
@@ -310,15 +329,6 @@ export type EquityCurvePoint = {
   date: string
   equity: number
   benchmark?: number
-}
-
-/** 雷达评分数据 */
-export type RadarScoreData = {
-  fundamental: number   // 基本面 0-100
-  technical: number     // 技术面 0-100
-  sentiment: number     // 情绪面 0-100
-  capital: number       // 资金面 0-100
-  valuation: number     // 估值面 0-100
 }
 
 /** 新闻 Feed 项目（增强版，含情绪标签） */

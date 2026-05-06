@@ -1,99 +1,92 @@
 package com.aiinvestor.gateway.modules.membership.controller;
 
+import com.aiinvestor.gateway.modules.identity.service.AliyunOssService;
+import com.aiinvestor.gateway.modules.membership.dto.VipApplicationReviewRequest;
+import com.aiinvestor.gateway.modules.membership.service.VipApplicationService;
+import com.aiinvestor.gateway.modules.membership.vo.VipApplicationSubmitVO;
+import com.aiinvestor.gateway.modules.membership.vo.VipApplicationVO;
 import com.aiinvestor.gateway.modules.shared.annotation.LoginRequired;
 import com.aiinvestor.gateway.modules.shared.context.UserContext;
 import com.aiinvestor.gateway.modules.shared.vo.ApiResult;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
-/**
- * VIP 申请审核接口 - 透传到 Python 后端。
- */
 @Slf4j
 @CrossOrigin
 @RestController
 @RequestMapping("/gateway/vip")
-@Tag(name = "VIP申请", description = "用户VIP申请和管理员审核")
+@Tag(name = "VIP申请", description = "用户 VIP 申请与管理员审核")
 public class VipController {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private final WebClient pythonWebClient;
+    private final AliyunOssService aliyunOssService;
+    private final VipApplicationService vipApplicationService;
 
-    public VipController(WebClient pythonAiWebClient) {
-        this.pythonWebClient = pythonAiWebClient;
+    public VipController(AliyunOssService aliyunOssService,
+                         VipApplicationService vipApplicationService) {
+        this.aliyunOssService = aliyunOssService;
+        this.vipApplicationService = vipApplicationService;
     }
 
-    /**
-     * 用户提交 VIP 申请。
-     * 自动填充当前登录用户的 user_id 和 username。
-     */
-    @Operation(summary = "提交VIP申请")
+    @Operation(summary = "上传 VIP 付款凭证")
+    @PostMapping(value = "/payment-proof", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @LoginRequired
+    public ApiResult<Map<String, String>> uploadPaymentProof(
+            @Parameter(description = "付款凭证图片", required = true)
+            @RequestPart("file") MultipartFile file) {
+        String proofUrl = aliyunOssService.uploadPaymentProof(file, UserContext.getUserId());
+        return ApiResult.ok(Map.of("proofUrl", proofUrl));
+    }
+
+    @Operation(summary = "提交 VIP 申请")
     @PostMapping("/apply")
     @LoginRequired
-    public Mono<JsonNode> apply(
+    public ApiResult<VipApplicationSubmitVO> apply(
             @RequestParam(defaultValue = "199.0") double paymentAmount,
-            @RequestParam(defaultValue = "") String paymentNote) {
+            @RequestParam(defaultValue = "") String paymentNote,
+            @RequestParam(defaultValue = "") String paymentProofUrl) {
         Long userId = UserContext.getUserId();
-        String username = UserContext.get() != null
-                ? UserContext.get().getUsername() : "unknown";
-
-        Map<String, Object> body = Map.of(
-                "user_id", userId,
-                "username", username,
-                "payment_amount", paymentAmount,
-                "payment_note", paymentNote
-        );
-
-        return pythonWebClient.post()
-                .uri("/api/v1/vip/apply")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(JsonNode.class);
+        String username = UserContext.get() != null ? UserContext.get().getUsername() : "unknown";
+        return ApiResult.ok(vipApplicationService.submit(
+                userId,
+                username,
+                paymentAmount,
+                paymentNote,
+                paymentProofUrl
+        ));
     }
 
-    /**
-     * 管理员查看所有申请。
-     */
-    @Operation(summary = "查看VIP申请列表")
+    @Operation(summary = "查看 VIP 申请列表")
     @GetMapping("/applications")
     @LoginRequired
-    public Mono<JsonNode> listApplications(
+    public ApiResult<List<VipApplicationVO>> listApplications(
             @RequestParam(required = false) String status) {
-        String uri = "/api/v1/vip/applications";
-        if (status != null && !status.isEmpty()) {
-            uri += "?status=" + status;
-        }
-
-        return pythonWebClient.get()
-                .uri(uri)
-                .retrieve()
-                .bodyToMono(JsonNode.class);
+        return ApiResult.ok(vipApplicationService.listApplications(status));
     }
 
-    /**
-     * 管理员审核申请。
-     */
-    @Operation(summary = "审核VIP申请")
+    @Operation(summary = "审核 VIP 申请")
     @PutMapping("/applications/{appId}/review")
     @LoginRequired
-    public Mono<JsonNode> review(
-            @PathVariable int appId,
-            @RequestBody Map<String, String> body) {
-        return pythonWebClient.put()
-                .uri("/api/v1/vip/applications/" + appId + "/review")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(JsonNode.class);
+    public ApiResult<VipApplicationVO> review(
+            @PathVariable Long appId,
+            @Valid @RequestBody VipApplicationReviewRequest request) {
+        return ApiResult.ok(vipApplicationService.review(appId, request));
     }
 }

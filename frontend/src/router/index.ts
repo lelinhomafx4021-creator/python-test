@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes: import('vue-router').RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/landing',
+    redirect: '/overview',
   },
   {
     path: '/landing',
@@ -16,7 +16,11 @@ const routes: import('vue-router').RouteRecordRaw[] = [
     component: () => import('../views/VipApply.vue'),
   },
   {
-    // Catch-all: all other routes go to the terminal app
+    path: '/admin',
+    name: 'AdminApp',
+    component: () => import('../AppAdmin.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'Terminal',
     component: () => import('../AppTerminal.vue'),
