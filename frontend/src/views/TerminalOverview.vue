@@ -27,7 +27,9 @@ import PortfolioPieChart from '../components/PortfolioPieChart.vue'
 import EquityCurve from '../components/EquityCurve.vue'
 
 /* ─── API 基础地址 ─── */
-const API_BASE = 'http://127.0.0.1:8080/api/v1'
+const isTunnel = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
+const GW = import.meta.env.VITE_API_BASE_URL ?? (isTunnel ? '' : 'http://127.0.0.1:8080')
+const API_BASE = `${GW}/api/v1`
 
 const router = useRouter()
 
@@ -81,8 +83,8 @@ const formatTime = (value?: string) => {
 }
 
 const infraCards = [
-  { key: 'sentinel', title: 'Sentinel', meta: '8858', icon: Radar, url: 'http://127.0.0.1:8858' },
-  { key: 'langfuse', title: 'Langfuse', meta: '3000', icon: Bot, url: 'http://127.0.0.1:3000' },
+  { key: 'sentinel', title: 'Sentinel', meta: '8858', icon: Radar, url: import.meta.env.VITE_SENTINEL_URL || 'http://127.0.0.1:8858' },
+  { key: 'langfuse', title: 'Langfuse', meta: '3000', icon: Bot, url: import.meta.env.VITE_LANGFUSE_URL || 'http://127.0.0.1:3000' },
   { key: 'watchlist', title: '自选分组', meta: `${props.watchlists.length} 组`, icon: Star, url: '' },
   { key: 'handoff', title: '人工工单', meta: `${props.handoffCount} 条`, icon: Ticket, url: '' },
 ]

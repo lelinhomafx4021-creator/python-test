@@ -48,16 +48,27 @@
 }
 
 .markdown-body {
-  @apply text-zinc-800;
+  @apply text-slate-700;
 }
 
-.markdown-body p { @apply my-3 leading-7 text-[14px]; }
-.markdown-body code { @apply rounded bg-stone-100 px-1.5 py-0.5 text-[0.92em] text-slate-900; }
-.markdown-body pre { @apply my-4 overflow-x-auto rounded-2xl bg-slate-800 p-4 text-slate-100; }
+.markdown-body p { @apply my-2 leading-7 text-[13px]; }
+.markdown-body p:first-child { @apply mt-0; }
+.markdown-body p:last-child { @apply mb-0; }
+.markdown-body code { @apply rounded-md bg-indigo-50 px-1.5 py-0.5 text-[0.9em] text-indigo-700; }
+.markdown-body pre { @apply my-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-slate-100; }
 .markdown-body pre code { @apply bg-transparent p-0 text-zinc-100; }
-.markdown-body ul { @apply my-3 list-disc space-y-2 pl-6; }
-.markdown-body ol { @apply my-3 list-decimal space-y-2 pl-6; }
-.markdown-body h1 { @apply mb-3 mt-6 text-xl font-semibold text-slate-900; }
-.markdown-body h2 { @apply mb-3 mt-6 text-lg font-semibold text-slate-900; }
-.markdown-body h3 { @apply mb-2 mt-5 text-base font-semibold text-slate-900; }
-.markdown-body blockquote { @apply my-4 border-l-2 border-slate-300 pl-4 text-slate-500; }
+.markdown-body ul { @apply my-2 list-disc space-y-1.5 pl-5; }
+.markdown-body ol { @apply my-2 list-decimal space-y-1.5 pl-5; }
+.markdown-body li { @apply text-[13px] leading-6; }
+.markdown-body h1 { @apply mb-2 mt-5 text-lg font-semibold text-slate-800; }
+.markdown-body h2 { @apply mb-2 mt-4 text-base font-semibold text-slate-800; }
+.markdown-body h3 { @apply mb-1.5 mt-3 text-sm font-semibold text-slate-800; }
+.markdown-body blockquote { @apply my-3 rounded-lg border-l-3 border-indigo-200 bg-indigo-50/50 pl-4 py-1 text-slate-500; }
+.markdown-body table { @apply my-3 w-full text-[12px] border-collapse; }
+.markdown-body thead { @apply bg-slate-50; }
+.markdown-body th { @apply border border-slate-200 px-3 py-2 text-left font-semibold text-slate-600; }
+.markdown-body td { @apply border border-slate-100 px-3 py-2 text-slate-600; }
+.markdown-body tr:hover { @apply bg-slate-50/50; }
+.markdown-body strong { @apply font-semibold text-slate-800; }
+.markdown-body a { @apply text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-700; }
+.markdown-body hr { @apply my-4 border-slate-200; }

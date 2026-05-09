@@ -300,7 +300,7 @@ public class AdminService {
             throw new BusinessException("目标用户不存在");
         }
 
-        membershipService.assignMembershipPlan(userId, user.getRole(), request.getPlanCode().trim());
+        membershipService.assignMembershipPlanByAdmin(userId, user.getRole(), request.getPlanCode().trim());
     }
 
     /**

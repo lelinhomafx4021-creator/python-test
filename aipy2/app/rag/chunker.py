@@ -32,6 +32,7 @@ A: 核心思想是"递归地尝试不同粒度的分隔符"：
 ========================
 """
 
+from app.core.logger import logger
 from app.rag.parser import DocChunk
 
 
@@ -183,6 +184,5 @@ def chunk_documents(
                 }
             ))
 
-    print(f"[切片] 输入 {len(docs)} 个文档块 → 输出 {len(result)} 个切片 "
-          f"(chunk_size={chunk_size}, overlap={overlap})")
+    logger.info("[切片] 输入 %d 个文档块 → 输出 %d 个切片 (chunk_size=%d, overlap=%d)", len(docs), len(result), chunk_size, overlap)
     return result

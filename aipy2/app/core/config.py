@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     # Tavily API 地址
     SEARCHER_API_URL: str = "https://api.tavily.com"
 
+    # LLM 配置
+    LLM_MODEL: str = "deepseek-v4-flash"
+    LLM_BASE_URL: str = "https://api.deepseek.com"
+
+    # 飞书 Webhook URL（用于 VIP 申请通知）
+    FEISHU_WEBHOOK_URL: str = ""
+    # Server酱 Key（用于 VIP 申请微信通知）
+    SERVERCHAN_KEY: str = ""
+
     # Langfuse 可观测性追踪配置
     LANGFUSE_PUBLIC_KEY: str = ""
     LANGFUSE_SECRET_KEY: str = ""

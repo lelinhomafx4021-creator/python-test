@@ -49,11 +49,10 @@ def get_llm(
         # DeepSeek API 使用 max_tokens 参数名
         extra_kwargs["max_tokens"] = max_completion_tokens
     return ChatOpenAI(
-        # 使用 DeepSeek V4 Flash 模型
-        model="deepseek-v4-flash",
+        model=settings.LLM_MODEL,
         temperature=temperature,
         api_key=settings.DEEPSEEK_API,
-        base_url="https://api.deepseek.com",
+        base_url=settings.LLM_BASE_URL,
         streaming=streaming,
         **extra_kwargs,
     )
@@ -92,11 +91,8 @@ async def init_llm_components():
         logger.info("[PG] 异步连接池与 Checkpointer 初始化完成")
 
 
-def can_reach_postgres() -> bool:
-    """判断当前 PostgreSQL 是否可达
-    
-    用途：在启动时检查数据库连接，避免服务启动失败
-    """
+def is_llm_components_ready() -> bool:
+    """判断异步组件是否已初始化完成"""
     return _memory_pool is not None and checkpointer is not None
 
 

@@ -27,6 +27,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -58,11 +61,7 @@ import java.util.UUID;
 @Tag(name = "AI对话", description = "AI 智能对话、会话管理、聊天历史查询")
 public class AiGatewayController {
 
-    /**
-     * Jackson ObjectMapper 实例。
-     * 用于解析 Python SSE 回传的 JSON 事件数据。
-     * 声明为 static final 避免每次请求都创建新的 ObjectMapper（线程安全）。
-     */
+    private static final Logger log = LoggerFactory.getLogger(AiGatewayController.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /** Python AI 通信服务 */
@@ -207,9 +206,8 @@ public class AiGatewayController {
                             }
                         }
                         // 其他阶段（如 "thinking"、"tool_call"）不做数据库操作
-                    } catch (Exception ignored) {
-                        // 解析失败不影响 SSE 流的正常推送
-                        // 这种"容错"是流式系统的常见做法
+                    } catch (Exception e) {
+                        log.debug("SSE 事件解析失败 traceId={}", traceId, e);
                     }
                 });
     }

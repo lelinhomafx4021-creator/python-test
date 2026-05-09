@@ -5,6 +5,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Redis JSON 缓存服务。
@@ -12,6 +14,8 @@ import java.time.Duration;
  */
 @Service
 public class RedisJsonCacheService {
+
+    private static final Logger log = LoggerFactory.getLogger(RedisJsonCacheService.class);
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
@@ -31,7 +35,8 @@ public class RedisJsonCacheService {
                 return null;
             }
             return objectMapper.readValue(json, clazz);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("Redis 缓存读取失败 key={}", key, e);
             return null;
         }
     }
@@ -43,8 +48,8 @@ public class RedisJsonCacheService {
         try {
             String json = objectMapper.writeValueAsString(value);
             stringRedisTemplate.opsForValue().set(key, json, ttl);
-        } catch (Exception ignored) {
-            // 缓存失败不影响主流程
+        } catch (Exception e) {
+            log.warn("Redis 缓存写入失败 key={}", key, e);
         }
     }
 

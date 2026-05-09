@@ -48,7 +48,7 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 // 扩大缓冲区：AI 投资分析的回答可能很长，需要更大的内存限制
                 .exchangeStrategies(ExchangeStrategies.builder()
-                        .codecs(c -> c.defaultCodecs().maxInMemorySize(10 * 1024 * 1024)) // 10 MB
+                        .codecs(c -> c.defaultCodecs().maxInMemorySize(properties.getMaxInMemorySize()))
                         .build())
                 .build();
     }

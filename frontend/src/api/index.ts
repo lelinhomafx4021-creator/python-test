@@ -2,14 +2,35 @@ import axios, { type AxiosError } from 'axios'
 import { reactive } from 'vue'
 import MarkdownIt from 'markdown-it'
 import type {
+  AdminDashboard,
   AdminTicket,
+  AdminUser,
+  AdminUserPortfolio,
   AuthUser,
+  ChatMessage,
+  FeatureQuota,
+  HandoffTicket,
+  HotNewsItem,
+  MarketQuote,
+  MarketStock,
+  MembershipInfo,
   NavKey,
+  PaperAccount,
+  PaperCashTransfer,
+  PaperOrder,
+  PaperPosition,
   PaperPortfolioSnapshot,
+  Sector,
+  SessionSummary,
+  UserNotification,
+  UserProfile,
   VipApplication,
+  Watchlist,
 } from '../types/terminal'
 
-const GW = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080'
+// 本地开发直连 Java，隧道/部署时用空字符串走 Vite 代理
+const isTunnel = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
+const GW = import.meta.env.VITE_API_BASE_URL ?? (isTunnel ? '' : 'http://127.0.0.1:8080')
 const AUTH = `${GW}/gateway/auth`
 const AI = `${GW}/gateway/ai`
 const API = `${GW}/api/v1`
@@ -35,52 +56,52 @@ export const store = reactive({
   sidebarCollapsed: false,
   userMenuOpen: false,
 
-  membership: null as any,
-  profile: null as any,
-  quotas: [] as any[],
-  notifications: [] as any[],
+  membership: null as MembershipInfo | null,
+  profile: null as UserProfile | null,
+  quotas: [] as FeatureQuota[],
+  notifications: [] as UserNotification[],
 
-  quotes: [] as any[],
-  sectors: [] as any[],
-  hotNews: [] as any[],
-  marketStocks: [] as any[],
+  quotes: [] as MarketQuote[],
+  sectors: [] as Sector[],
+  hotNews: [] as HotNewsItem[],
+  marketStocks: [] as MarketStock[],
   marketTotal: 0,
   marketKeyword: '',
   marketPage: 1,
 
-  watchlists: [] as any[],
+  watchlists: [] as Watchlist[],
   watchlistId: null as number | null,
   watchlistName: '',
   watchlistSymbol: '',
   watchlistNote: '',
 
-  paper: null as any,
-  positions: [] as any[],
-  orders: [] as any[],
-  transfers: [] as any[],
-  transactions: [] as any[],
+  paper: null as PaperAccount | null,
+  positions: [] as PaperPosition[],
+  orders: [] as PaperOrder[],
+  transfers: [] as PaperCashTransfer[],
+  transactions: [] as PaperOrder[],
   transactionTotal: 0,
   transactionPage: 1,
   orderSymbol: '',
   orderSide: 'BUY' as 'BUY' | 'SELL',
   orderQty: 100,
 
-  sessions: [] as any[],
-  messages: [] as any[],
+  sessions: [] as SessionSummary[],
+  messages: [] as ChatMessage[],
   sessionId: null as string | null,
   draft: '',
   streaming: false,
 
-  tickets: [] as any[],
+  tickets: [] as HandoffTicket[],
 
   profileForm: { nickname: '', phone: '', riskLevel: 'balanced', investmentYears: 0, interestedSectors: '', bio: '' },
   saving: false,
   uploading: false,
 
-  adminOverview: null as any,
-  adminUsers: [] as any[],
-  adminTickets: [] as any[],
-  adminPortfolio: null as any,
+  adminOverview: null as AdminDashboard | null,
+  adminUsers: [] as AdminUser[],
+  adminTickets: [] as AdminTicket[],
+  adminPortfolio: null as AdminUserPortfolio | null,
   adminPortfolioLoading: false,
   adminKeyword: '',
   vipApplications: [] as VipApplication[],
@@ -88,19 +109,20 @@ export const store = reactive({
 
 const headers = () => store.token ? { satoken: store.token } : {}
 
-const asArray = <T = any>(value: any): T[] => {
-  if (Array.isArray(value)) return value
-  if (Array.isArray(value?.items)) return value.items
-  if (Array.isArray(value?.records)) return value.records
+const asArray = <T>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).items)) return (value as Record<string, unknown>).items as T[]
+  if (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).records)) return (value as Record<string, unknown>).records as T[]
   return []
 }
 
-const get = async (url: string, key: string, fallback: any = []) => {
+const get = async (url: string, key: keyof typeof store, fallback: unknown = []) => {
   const res = await axios.get(url, { headers: headers() })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(store as any)[key] = res.data.data ?? fallback
 }
 
-const isUnauthorized = (e: unknown) => (e as AxiosError).response?.status === 401
+const isUnauthorized = (e: unknown) => e instanceof Error && 'response' in e && (e as AxiosError).response?.status === 401
 
 const safe = async (fn: () => Promise<void>) => {
   try {
@@ -250,7 +272,7 @@ export const sendRegisterEmailCode = async () => {
 export const logout = async () => {
   try {
     await axios.post(`${AUTH}/logout`, {}, { headers: headers() })
-  } catch {}
+  } catch { /* logout 接口失败不影响本地清理 */ }
   clearToken()
   store.user = null
   store.sidebarOpen = false

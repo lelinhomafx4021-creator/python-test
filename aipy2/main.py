@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
 
         # 校验 RAG 相关业务表是否已经通过 Alembic 建好。
         # 这里不再偷偷建表，而是要求正式先执行 `alembic upgrade head`。
-        if settings.is_dev and not llm_core.can_reach_postgres():
+        if settings.is_dev and not llm_core.is_llm_components_ready():
             logger.warning(">>> PostgreSQL 当前不可达，已跳过 RAG schema 校验")
         else:
             v_store = VectorStore(

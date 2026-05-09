@@ -106,7 +106,7 @@ const handleLogout = async () => {
     await logout()
     router.replace('/overview')
     toast.info('已退出登录')
-  } catch {}
+  } catch { /* logout 内部已处理错误 */ }
 }
 
 const handleCreateWatchlist = async () => {

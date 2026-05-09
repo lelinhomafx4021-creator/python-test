@@ -26,9 +26,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     /** 注入登录拦截器（构造函数注入，比 @Autowired 字段注入更推荐） */
     private final LoginInterceptor loginInterceptor;
+    private final CorsProperties corsProperties;
 
-    public WebMvcConfig(LoginInterceptor loginInterceptor) {
+    public WebMvcConfig(LoginInterceptor loginInterceptor, CorsProperties corsProperties) {
         this.loginInterceptor = loginInterceptor;
+        this.corsProperties = corsProperties;
     }
 
     /**
@@ -42,7 +44,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")                                      // 对所有路径生效
-                .allowedOriginPatterns("http://localhost:5173", "http://127.0.0.1:5173")
+                .allowedOriginPatterns(corsProperties.getAllowedOriginList().toArray(new String[0]))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")                                    // 允许所有请求头
                 .exposedHeaders("satoken")                              // 暴露 Sa-Token 响应头

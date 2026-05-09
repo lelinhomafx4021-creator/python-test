@@ -33,6 +33,12 @@ import java.util.Arrays;
 @EnableWebSecurity // 启用 Spring Security 的 Web 安全支持
 public class SecurityConfig {
 
+    private final CorsProperties corsProperties;
+
+    public SecurityConfig(CorsProperties corsProperties) {
+        this.corsProperties = corsProperties;
+    }
+
     /**
      * 配置安全过滤器链。
      *
@@ -92,8 +98,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 只允许我们自己的前端地址访问
-        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:5173", "http://127.0.0.1:5173"));
+        // 从配置文件读取允许的前端地址，支持部署时通过环境变量覆盖
+        configuration.setAllowedOriginPatterns(corsProperties.getAllowedOriginList());
         // 允许常见的 RESTful 方法 + OPTIONS（预检请求）
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         // 允许携带的请求头：Authorization（标准）、Content-Type（JSON）、自定义头

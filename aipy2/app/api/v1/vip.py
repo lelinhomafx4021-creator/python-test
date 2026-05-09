@@ -1,6 +1,5 @@
 """VIP 申请审核接口。"""
 
-import os
 from datetime import datetime
 from typing import Optional
 
@@ -8,11 +7,12 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.core.config import settings
 from app.core.logger import logger
 
-FEISHU_WEBHOOK_URL = os.getenv("FEISHU_WEBHOOK_URL", "")
-SERVERCHAN_KEY = os.getenv("SERVERCHAN_KEY", "")
-
+# NOTE: VIP applications are stored in-process memory only.
+# All data is lost on server restart. For production use, replace this
+# with a database-backed model (e.g. a SQLAlchemy/PostgreSQL table).
 _applications: list[dict] = []
 _next_id = 1
 
@@ -31,12 +31,12 @@ class VipReviewRequest(BaseModel):
 
 
 async def _send_feishu_notification(app: dict) -> bool:
-    if not FEISHU_WEBHOOK_URL:
+    if not settings.FEISHU_WEBHOOK_URL:
         return False
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                FEISHU_WEBHOOK_URL,
+                settings.FEISHU_WEBHOOK_URL,
                 json={
                     "msg_type": "interactive",
                     "card": {
@@ -71,7 +71,7 @@ async def _send_feishu_notification(app: dict) -> bool:
 
 
 async def _send_wechat_notification(app: dict) -> bool:
-    if not SERVERCHAN_KEY:
+    if not settings.SERVERCHAN_KEY:
         return False
     try:
         title = f"新的VIP申请 - {app['username']}"
@@ -85,7 +85,7 @@ async def _send_wechat_notification(app: dict) -> bool:
         )
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"https://sctapi.ftqq.com/{SERVERCHAN_KEY}.send",
+                f"https://sctapi.ftqq.com/{settings.SERVERCHAN_KEY}.send",
                 data={"title": title, "desp": desp},
                 timeout=5,
             )

@@ -124,8 +124,9 @@ public class PythonAiClientService {
                         auditProducer.send(new AiChatAuditEvent(
                                 traceId, userId, sessionId, "/ai/chat/stream", message, Instant.now()
                         ));
-                    } catch (Exception ignored) {
-                        // 审计失败不影响主业务
+                    } catch (Exception e) {
+                        // 审计失败不影响主业务，但记录日志便于排查
+                        log.warn("[streamChatSse] 审计消息发送失败: {}", e.getMessage());
                     }
                 });
     }

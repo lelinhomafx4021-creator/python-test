@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿﻿$ErrorActionPreference = "Stop"
 
 # 本地一键启动脚本：
 # 1. 拉起根目录 docker compose 中的中间件
@@ -114,9 +114,10 @@ if (-not (Test-Path $pythonEnvFile)) {
     throw "已创建 aipy2/.env，请先补齐真实配置后重新执行。"
 }
 
-Write-Step "启动中间件容器"
+Write-Step "启动中间件容器 (mysql, redis, rabbitmq, postgres)"
 $dockerComposeInvoker = Get-DockerComposeInvoker
-& $dockerComposeInvoker.FilePath $dockerComposeInvoker.Arguments.Split(" ")
+$dockerArgs = ($dockerComposeInvoker.Arguments + " mysql redis rabbitmq postgres").Split(" ")
+& $dockerComposeInvoker.FilePath $dockerArgs
 
 Write-Step "启动 Python AI"
 Start-BackgroundProcess `
@@ -151,10 +152,6 @@ Write-Step "启动完成"
 Write-Host "前端工作台：http://127.0.0.1:5173" -ForegroundColor Green
 Write-Host "Java 网关：http://127.0.0.1:8080" -ForegroundColor Green
 Write-Host "Python AI：http://127.0.0.1:8000" -ForegroundColor Green
-Write-Host "Langfuse：http://127.0.0.1:3000" -ForegroundColor Green
-Write-Host "Sentinel 控制台：http://127.0.0.1:8858" -ForegroundColor Green
 Write-Host "RabbitMQ 管理台：http://127.0.0.1:15672" -ForegroundColor Green
-Write-Host "Redis 端口：6379" -ForegroundColor Green
-Write-Host "Postgres 端口：5432" -ForegroundColor Green
 Write-Host "演示账号：admin / 123456" -ForegroundColor Green
 Write-Host "日志目录：$logsDir" -ForegroundColor Green

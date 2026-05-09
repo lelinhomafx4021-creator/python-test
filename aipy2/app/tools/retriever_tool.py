@@ -104,6 +104,7 @@ async def _search_web_async(query: str, top_k: int = 3) -> str:
             timeout=10,
         )
     except Exception:
+        logger.warning("Tavily 网络搜索失败", exc_info=True)
         return ""
 
     results = response.get("results", [])

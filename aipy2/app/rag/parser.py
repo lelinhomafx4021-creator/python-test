@@ -33,6 +33,8 @@ from pathlib import Path
 # 3. 所以这里明确从 pymupdf 导入，避免歧义
 import pymupdf as fitz
 
+from app.core.logger import logger
+
 # python-docx 的 Document 和我们自己定义的 DocChunk 重名了
 # 所以 import 时重命名为 WordDoc，避免混淆
 from docx import Document as WordDoc
@@ -112,7 +114,7 @@ def parse_pdf(file_path: str) -> list[DocChunk]:
                 }
             ))
 
-    print(f"[PDF解析] {file_name}: 共 {total_pages} 页，提取了 {len(chunks)} 个文本块")
+    logger.info("[PDF解析] %s: 共 %d 页，提取了 %d 个文本块", file_name, total_pages, len(chunks))
     return chunks
 
 
@@ -149,7 +151,7 @@ def parse_docx(file_path: str) -> list[DocChunk]:
     # 因为有些段落只有一两个字（比如标题），太碎了
     # 切片的工作交给后面的 chunker 来做，这里只负责"解析"
     if not paragraphs:
-        print(f"[Word解析] {file_name}: 没有提取到文本")
+        logger.warning("[Word解析] %s: 没有提取到文本", file_name)
         return []
 
     full_text = "\n".join(paragraphs)
@@ -163,8 +165,7 @@ def parse_docx(file_path: str) -> list[DocChunk]:
         }
     )]
 
-    print(f"[Word解析] {file_name}: 提取了 {len(paragraphs)} 个段落，"
-          f"共 {len(full_text)} 字符")
+    logger.info("[Word解析] %s: 提取了 %d 个段落，共 %d 字符", file_name, len(paragraphs), len(full_text))
     return chunks
 
 
@@ -244,12 +245,12 @@ def parse_dir(dir_path: str) -> list[DocChunk]:
     files.sort(key=lambda item: item.name.lower())
 
     if not files:
-        print(f"[警告] 目录 {dir_path} 下没有找到 PDF/DOCX 文件")
+        logger.warning("[扫描] 目录 %s 下没有找到 PDF/DOCX 文件", dir_path)
         return []
 
-    print(f"[扫描] 在 {dir_path} 下找到 {len(files)} 个文件:")
+    logger.info("[扫描] 在 %s 下找到 %d 个文件", dir_path, len(files))
     for f in files:
-        print(f"  - {f.name}")
+        logger.debug("  - %s", f.name)
 
     # 逐个解析，合并结果
     all_chunks = []
@@ -261,8 +262,8 @@ def parse_dir(dir_path: str) -> list[DocChunk]:
         except Exception as e:
             # 单个文件解析失败不应该中断整个流程
             # 这是"优雅降级"的思想：能处理的处理，不能的跳过并记录
-            print(f"[错误] 解析 {file.name} 失败: {e}")
+            logger.error("[解析] 解析 %s 失败", file.name, exc_info=True)
             continue
 
-    print(f"[汇总] 共解析出 {len(all_chunks)} 个文档块")
+    logger.info("[汇总] 共解析出 %d 个文档块", len(all_chunks))
     return all_chunks

@@ -77,7 +77,7 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         log.warn("[WS] 行情连接异常: {} - {}", session.getId(), exception.getMessage());
         subscriptions.remove(session);
-        try { session.close(); } catch (Exception ignored) {}
+        try { session.close(); } catch (Exception e) { log.debug("[WS] 关闭异常连接失败: {}", e.getMessage()); }
     }
 
     /**
@@ -169,7 +169,7 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
                 }
             } catch (Exception e) {
                 log.warn("[WS] 推送失败 session={}: {}", session.getId(), e.getMessage());
-                try { session.close(); } catch (Exception ignored) {}
+                try { session.close(); } catch (Exception closeEx) { log.debug("[WS] 关闭失败会话异常: {}", closeEx.getMessage()); }
                 it.remove();
             }
         }

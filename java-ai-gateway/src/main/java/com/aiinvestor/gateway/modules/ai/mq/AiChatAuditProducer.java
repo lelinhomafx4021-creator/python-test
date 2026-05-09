@@ -1,8 +1,8 @@
 package com.aiinvestor.gateway.modules.ai.mq;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,20 +25,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class AiChatAuditProducer {
 
-    /**
-     * RabbitMQ 操作模板。
-     * required=false：本地不启动 RabbitMQ 也不会导致项目启动失败。
-     */
-    @Autowired(required = false)
-    private RabbitTemplate rabbitTemplate;
+    @Nullable
+    private final RabbitTemplate rabbitTemplate;
+    private final String auditExchange;
+    private final String auditRoutingKey;
 
-    /** 交换机名称（从配置文件读取） */
-    @Value("${app.mq.audit-exchange:}")
-    private String auditExchange;
-
-    /** 路由键（从配置文件读取） */
-    @Value("${app.mq.audit-routing-key:}")
-    private String auditRoutingKey;
+    public AiChatAuditProducer(@Nullable RabbitTemplate rabbitTemplate,
+                               @Value("${app.mq.audit-exchange:}") String auditExchange,
+                               @Value("${app.mq.audit-routing-key:}") String auditRoutingKey) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.auditExchange = auditExchange;
+        this.auditRoutingKey = auditRoutingKey;
+    }
 
     /**
      * 发送审计事件到 RabbitMQ。

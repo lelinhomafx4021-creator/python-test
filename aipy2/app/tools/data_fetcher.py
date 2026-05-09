@@ -21,6 +21,7 @@ from typing import Any
 
 import httpx
 
+from app.tools.common import build_market_code, build_secid
 from app.tools.retriever_tool import run_retrieval_async
 from app.tools.news_tool import collect_hot_news
 
@@ -44,19 +45,11 @@ def _extract_stock_code(query: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _build_secid(code: str) -> str:
-    """股票代码转东方财富secid格式：沪市1.xxxx，深市0.xxxx。"""
-    if code.startswith(("5", "6", "9")):
-        return f"1.{code}"
-    return f"0.{code}"
-
-
 # ============ 并行获取各数据源 ============
 
 async def fetch_market_data(code: str, client: httpx.AsyncClient) -> dict[str, Any] | None:
     """【行情数据】从腾讯API获取实时行情。"""
-    prefix = "sh" if code.startswith(("5", "6", "9")) else "sz"
-    url = f"https://qt.gtimg.cn/q={prefix}{code}"
+    url = f"https://qt.gtimg.cn/q={build_market_code(code)}"
     try:
         resp = await client.get(url, timeout=8)
         text = resp.content.decode("gb18030", errors="ignore")
@@ -84,7 +77,7 @@ async def fetch_market_data(code: str, client: httpx.AsyncClient) -> dict[str, A
 
 async def fetch_financial_data(code: str, client: httpx.AsyncClient) -> dict[str, Any] | None:
     """【财务数据】从东方财富Push2获取PE、营收、利润、负债率等。"""
-    secid = _build_secid(code)
+    secid = build_secid(code)
     params = {"secid": secid, "fields": EASTMONEY_PUSH2_FIELDS}
     headers = {"User-Agent": "Mozilla/5.0"}
     try:

@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import jakarta.validation.ConstraintViolationException;
+
 import java.util.stream.Collectors;
 
 /**
@@ -69,6 +72,25 @@ public class GlobalExceptionHandler {
         // 从 BindingResult 中提取所有字段的校验失败信息
         String msg = e.getBindingResult().getFieldErrors().stream()
                 .map(err -> err.getField() + ": " + err.getDefaultMessage())
+                .collect(Collectors.joining(", "));
+        return ApiResult.fail(400, "参数校验失败: " + msg);
+    }
+
+    /**
+     * 处理请求参数缺失异常（@RequestParam 必填参数未传）。
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ApiResult<Void> handleMissingParam(MissingServletRequestParameterException e) {
+        return ApiResult.fail(400, "缺少必填参数: " + e.getParameterName());
+    }
+
+    /**
+     * 处理 @RequestParam / @PathVariable 上的约束校验异常（@NotBlank / @Min 等）。
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ApiResult<Void> handleConstraintViolation(ConstraintViolationException e) {
+        String msg = e.getConstraintViolations().stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .collect(Collectors.joining(", "));
         return ApiResult.fail(400, "参数校验失败: " + msg);
     }

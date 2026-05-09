@@ -51,6 +51,7 @@ from pgvector.psycopg2 import register_vector
 # 不再需要 fastembed，改用阿里云 DashScope 的 Embedding API
 
 # 导入我们的数据结构
+from app.core.logger import logger
 from app.rag.parser import DocChunk
 
 
@@ -88,7 +89,7 @@ class VectorStore:
         self.api_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
         self.vector_size = 1024
         
-        print("[PG] 正在连接数据库...")
+        logger.info("[PG] 正在连接数据库...")
         self.conn = psycopg2.connect(db_url)
         self.conn.autocommit = True
 

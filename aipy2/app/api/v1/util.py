@@ -160,7 +160,7 @@ async def generate_title(request: Request):
         # 1) 读取前端传入的原始问题
         body = await request.json()
         query = body.get("query", "新对话")
-        print(f"[标题生成] 收到问题：{query}")
+        logger.info("[标题生成] 收到问题：%s", query)
 
         # 2) 调用大模型，让其按结构化格式返回标题
         res = await llm.ainvoke(
@@ -171,7 +171,7 @@ async def generate_title(request: Request):
         )
         title = _parse_title(res)
 
-        print(f"[标题生成] 生成结果：{title}")
+        logger.info("[标题生成] 生成结果：%s", title)
         return {"code": 200, "data": {"title": title}, "message": "成功"}
     except Exception as e:
         # 失败时统一返回兜底标题，保证前端有可展示内容

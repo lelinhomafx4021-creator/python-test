@@ -49,7 +49,7 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.db import engine
-from app.core.llm import can_reach_postgres
+from app.core.llm import is_llm_components_ready
 from app.core.logger import logger
 from app.graph.investor_graph import multi_graph_agent
 from app.models.agent_run_audit import AgentRunAudit
@@ -311,7 +311,7 @@ class InvestorService:
     ):
         """后台持久化一次 Agent 运行的技术审计。"""
         try:
-            if settings.is_dev and not can_reach_postgres():
+            if settings.is_dev and not is_llm_components_ready():
                 logger.warning("PostgreSQL 当前不可达，已跳过 Agent 运行审计落库")
                 return
 

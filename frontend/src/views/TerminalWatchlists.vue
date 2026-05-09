@@ -5,7 +5,9 @@ import axios from 'axios'
 import type { KLineDataPoint, MarketStock, Watchlist } from '../types/terminal'
 import KLineChart from '../components/KLineChart.vue'
 
-const API_BASE = 'http://127.0.0.1:8080/api/v1'
+const isTunnel = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
+const GW = import.meta.env.VITE_API_BASE_URL ?? (isTunnel ? '' : 'http://127.0.0.1:8080')
+const API_BASE = `${GW}/api/v1`
 
 const formatTime = (value?: string) => {
   if (!value) return '--'

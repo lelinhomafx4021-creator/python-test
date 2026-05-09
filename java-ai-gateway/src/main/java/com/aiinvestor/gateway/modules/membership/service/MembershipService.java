@@ -115,7 +115,7 @@ public class MembershipService {
      * 管理员直接切换用户会员方案。
      */
     @Transactional
-    public void assignMembershipPlan(Long userId, String role, String planCode) {
+    public void assignMembershipPlanByAdmin(Long userId, String role, String planCode) {
         assignMembershipPlan(userId, planCode, "admin_console");
     }
 
@@ -228,7 +228,7 @@ public class MembershipService {
             }
             return result;
         } catch (Exception e) {
-            throw new BusinessException("会员方案配额配置损坏，无法初始化");
+            throw new BusinessException("会员方案配额配置损坏，无法初始化", e);
         }
     }
 

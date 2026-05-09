@@ -234,7 +234,7 @@ class MultiGraphInvestorAgent:
                                     streamed_answer_parts.append(piece)
                                     yield _content_delta_event(node_name, piece)
                         except Exception:
-                            pass
+                            logger.warning("流式消息处理异常", exc_info=True)
 
                     # 更新 Token 消耗
                     if "total_tokens" in updates:

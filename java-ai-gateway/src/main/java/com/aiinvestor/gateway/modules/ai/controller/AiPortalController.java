@@ -26,6 +26,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -39,6 +42,7 @@ import java.util.UUID;
 @Tag(name = "AI对话(标准API)", description = "AI 标准化对话接口（POST /chat/stream、/chat、/handoff-tickets）")
 public class AiPortalController {
 
+    private static final Logger log = LoggerFactory.getLogger(AiPortalController.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AiGatewayController aiGatewayController;
@@ -132,7 +136,8 @@ public class AiPortalController {
             if ("final_answer".equals(node.path("stage").asText())) {
                 return node.path("data").path("answer").asText("");
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.debug("final_answer 解析失败", e);
             return null;
         }
         return null;

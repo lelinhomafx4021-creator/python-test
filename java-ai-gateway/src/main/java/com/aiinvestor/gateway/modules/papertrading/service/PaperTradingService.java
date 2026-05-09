@@ -18,6 +18,7 @@ import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperCashTransferRe
 import com.aiinvestor.gateway.modules.papertrading.dto.CreatePaperOrderRequest;
 import com.aiinvestor.gateway.modules.papertrading.mq.TransactionEvent;
 import com.aiinvestor.gateway.modules.papertrading.mq.TransactionEventProducer;
+import com.aiinvestor.gateway.modules.papertrading.config.PaperTradingProperties;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperAccountVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperCashTransferVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperOrderVO;
@@ -50,8 +51,6 @@ import java.util.stream.Collectors;
 @Service
 public class PaperTradingService {
 
-    private static final BigDecimal INITIAL_CASH = new BigDecimal("1000000");
-
     private final PaperAccountMapper paperAccountMapper;
     private final PaperCashTransferMapper paperCashTransferMapper;
     private final PaperPositionMapper paperPositionMapper;
@@ -63,6 +62,7 @@ public class PaperTradingService {
     private final AppCacheProperties appCacheProperties;
     private final UserNotificationService userNotificationService;
     private final TransactionEventProducer transactionEventProducer;
+    private final PaperTradingProperties paperTradingProperties;
 
     public PaperTradingService(PaperAccountMapper paperAccountMapper,
                                PaperCashTransferMapper paperCashTransferMapper,
@@ -74,7 +74,8 @@ public class PaperTradingService {
                                StringRedisTemplate stringRedisTemplate,
                                AppCacheProperties appCacheProperties,
                                UserNotificationService userNotificationService,
-                               TransactionEventProducer transactionEventProducer) {
+                               TransactionEventProducer transactionEventProducer,
+                               PaperTradingProperties paperTradingProperties) {
         this.paperAccountMapper = paperAccountMapper;
         this.paperCashTransferMapper = paperCashTransferMapper;
         this.paperPositionMapper = paperPositionMapper;
@@ -86,6 +87,7 @@ public class PaperTradingService {
         this.appCacheProperties = appCacheProperties;
         this.userNotificationService = userNotificationService;
         this.transactionEventProducer = transactionEventProducer;
+        this.paperTradingProperties = paperTradingProperties;
     }
 
     /**
@@ -539,7 +541,7 @@ public class PaperTradingService {
 
     private void refreshAccountSnapshot(PaperAccountDO account, BigDecimal marketValue) {
         BigDecimal totalAsset = account.getCashBalance().add(marketValue);
-        BigDecimal totalPnl = totalAsset.subtract(INITIAL_CASH);
+        BigDecimal totalPnl = totalAsset.subtract(paperTradingProperties.getInitialCash());
 
         account.setTotalAsset(totalAsset);
         account.setTotalPnl(totalPnl);
@@ -582,9 +584,9 @@ public class PaperTradingService {
         PaperAccountDO created = new PaperAccountDO();
         created.setUserId(userId);
         created.setAccountNo("SIM-" + userId + "-" + System.currentTimeMillis());
-        created.setCashBalance(INITIAL_CASH);
+        created.setCashBalance(paperTradingProperties.getInitialCash());
         created.setFrozenCash(BigDecimal.ZERO);
-        created.setTotalAsset(INITIAL_CASH);
+        created.setTotalAsset(paperTradingProperties.getInitialCash());
         created.setTotalPnl(BigDecimal.ZERO);
         created.setStatus("active");
         paperAccountMapper.insert(created);

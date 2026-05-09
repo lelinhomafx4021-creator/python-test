@@ -13,8 +13,13 @@ import {
 import { ref, onMounted } from 'vue'
 
 const router = useRouter()
-const goToApp = () => router.push('/overview')
 const goToVip = () => router.push('/vip-apply')
+const goToApp = () => router.push('/overview')
+
+// 如果已登录，直接跳主页
+if (localStorage.getItem('ai-investor-token')) {
+  router.replace('/overview')
+}
 
 const show = ref(false)
 onMounted(() => { setTimeout(() => show.value = true, 50) })
@@ -303,5 +308,7 @@ const plans = [
         </div>
       </footer>
     </main>
+
   </div>
 </template>
+

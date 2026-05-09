@@ -45,6 +45,11 @@ public class AliyunOssProperties {
      */
     private String directory = "avatars";
 
+    /**
+     * 最大上传文件大小（字节），默认 5MB。
+     */
+    private long maxFileSize = 5 * 1024 * 1024;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -99,5 +104,13 @@ public class AliyunOssProperties {
 
     public void setDirectory(String directory) {
         this.directory = directory;
+    }
+
+    public long getMaxFileSize() {
+        return maxFileSize;
+    }
+
+    public void setMaxFileSize(long maxFileSize) {
+        this.maxFileSize = maxFileSize;
     }
 }

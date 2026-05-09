@@ -12,6 +12,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.logger import logger
+from app.tools.common import build_market_code
 
 TENCENT_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 CACHE_TTL_SECONDS = 300
@@ -50,15 +51,8 @@ def _cache_set(key: str, value: Any) -> None:
     _memory_cache[key] = (time.time(), value)
 
 
-def _build_market_code(symbol: str) -> str:
-    symbol = symbol.strip()
-    if not symbol.isdigit() or len(symbol) != 6:
-        raise ValueError("symbol 必须是 6 位数字代码")
-    return f"sh{symbol}" if symbol.startswith(("5", "6", "9")) else f"sz{symbol}"
-
-
 async def _fetch_daily_kline(symbol: str, period: str, days: int) -> list[dict[str, Any]]:
-    market_code = _build_market_code(symbol)
+    market_code = build_market_code(symbol)
     params = {"param": f"{market_code},{period},,,{days},qfq"}
 
     async with httpx.AsyncClient() as client:
@@ -183,7 +177,7 @@ def _latest_trade_dates(rows: list[dict[str, Any]], limit: int) -> list[str]:
 
 
 def _fetch_intraday_1d(symbol: str) -> list[dict[str, Any]]:
-    market_code = _build_market_code(symbol)
+    market_code = build_market_code(symbol)
     df = ak.stock_zh_a_minute(symbol=market_code, period="1", adjust="")
     rows = _normalize_intraday_df(df, symbol)
     if not rows:

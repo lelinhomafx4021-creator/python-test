@@ -16,16 +16,22 @@ import java.util.List;
 @Configuration
 public class SentinelRuleConfig {
 
+    private final SentinelProperties sentinelProperties;
+
+    public SentinelRuleConfig(SentinelProperties sentinelProperties) {
+        this.sentinelProperties = sentinelProperties;
+    }
+
     /**
      * 应用启动后初始化 Sentinel 限流规则。
-     * 保护行情查询(20 QPS)、模拟下单(10 QPS)、AI流式问答(8 QPS)入口。
+     * 规则列表从 application.yml 的 app.sentinel.rules 配置读取。
      */
     @PostConstruct
     public void initRules() {
         List<FlowRule> rules = new ArrayList<>();
-        rules.add(buildRule("/api/v1/market/quotes", 20));
-        rules.add(buildRule("/api/v1/paper/orders", 10));
-        rules.add(buildRule("/gateway/ai/chat/stream", 8));
+        for (SentinelProperties.Rule ruleConfig : sentinelProperties.getRules()) {
+            rules.add(buildRule(ruleConfig.getResource(), ruleConfig.getQps()));
+        }
         FlowRuleManager.loadRules(rules);
     }
 

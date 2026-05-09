@@ -1,8 +1,8 @@
 package com.aiinvestor.gateway.modules.papertrading.mq;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,20 +24,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class TransactionEventProducer {
 
-    /**
-     * RabbitMQ 操作模板。
-     * required=false：本地不启动 RabbitMQ 也不会导致项目启动失败。
-     */
-    @Autowired(required = false)
-    private RabbitTemplate rabbitTemplate;
+    @Nullable
+    private final RabbitTemplate rabbitTemplate;
+    private final String transactionExchange;
+    private final String transactionRoutingKey;
 
-    /** 交换机名称（从配置文件读取） */
-    @Value("${app.mq.transaction-exchange:}")
-    private String transactionExchange;
-
-    /** 路由键（从配置文件读取） */
-    @Value("${app.mq.transaction-routing-key:}")
-    private String transactionRoutingKey;
+    public TransactionEventProducer(@Nullable RabbitTemplate rabbitTemplate,
+                                    @Value("${app.mq.transaction-exchange:}") String transactionExchange,
+                                    @Value("${app.mq.transaction-routing-key:}") String transactionRoutingKey) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.transactionExchange = transactionExchange;
+        this.transactionRoutingKey = transactionRoutingKey;
+    }
 
     /**
      * 发送交易事件到 RabbitMQ。

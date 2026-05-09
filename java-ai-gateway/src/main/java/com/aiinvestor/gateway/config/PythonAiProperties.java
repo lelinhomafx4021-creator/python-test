@@ -41,4 +41,10 @@ public class PythonAiProperties {
      */
     @NotBlank
     private String baseUrl;
+
+    /**
+     * WebClient 内存缓冲区大小（字节），默认 10MB。
+     * AI 投资分析的返回数据可能很大，需要比默认 256KB 更大的缓冲区。
+     */
+    private int maxInMemorySize = 10 * 1024 * 1024;
 }

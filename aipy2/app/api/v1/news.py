@@ -32,6 +32,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.logger import logger
+from app.tools.common import format_time, safe_text
 
 # ---------------------------------------------------------------------------
 # 配置常量
@@ -113,32 +114,6 @@ def _is_vip_content(title: str, summary: str = "") -> bool:
 
 
 # ---------------------------------------------------------------------------
-# 通用工具函数
-# ---------------------------------------------------------------------------
-
-def _safe_text(value: Any, fallback: str = "") -> str:
-    """把任意值安全转换成字符串。"""
-    if value is None:
-        return fallback
-    text = str(value).strip()
-    return text or fallback
-
-
-def _format_time(value: Any) -> Optional[str]:
-    """统一格式化时间字段为 ISO 格式。"""
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text:
-        return None
-    try:
-        return str(datetime.fromisoformat(text.replace("Z", "+00:00")))
-    except Exception:
-        # 如果无法解析，原样返回
-        return text
-
-
-# ---------------------------------------------------------------------------
 # 同花顺新闻采集（异步）
 # ---------------------------------------------------------------------------
 
@@ -175,21 +150,21 @@ async def _fetch_10jqka_news(client: httpx.AsyncClient) -> list[dict[str, Any]]:
 
     result: list[dict[str, Any]] = []
     for item in items:
-        title = _safe_text(item.get("title"))
+        title = safe_text(item.get("title"))
         if not title:
             continue
 
-        summary = _safe_text(item.get("digest"), title)[:200]
+        summary = safe_text(item.get("digest"), title)[:200]
         sentiment = _analyze_sentiment(title, summary)
         is_vip = _is_vip_content(title, summary)
 
         result.append({
             "title": title,
             "summary": summary,
-            "tag": _safe_text(item.get("tag"), "财经资讯"),
+            "tag": safe_text(item.get("tag"), "财经资讯"),
             "source": "同花顺",
-            "url": _safe_text(item.get("url")),
-            "publishedAt": _format_time(item.get("ctime")),
+            "url": safe_text(item.get("url")),
+            "publishedAt": format_time(item.get("ctime")),
             "sentiment": sentiment,
             "vipOnly": is_vip,
         })
@@ -237,11 +212,11 @@ async def _fetch_eastmoney_news(client: httpx.AsyncClient) -> list[dict[str, Any
 
     result: list[dict[str, Any]] = []
     for item in items:
-        title = _safe_text(item.get("title"))
+        title = safe_text(item.get("title"))
         if not title:
             continue
 
-        summary = _safe_text(item.get("digest"), title)[:200]
+        summary = safe_text(item.get("digest"), title)[:200]
         sentiment = _analyze_sentiment(title, summary)
         is_vip = _is_vip_content(title, summary)
 
@@ -253,10 +228,10 @@ async def _fetch_eastmoney_news(client: httpx.AsyncClient) -> list[dict[str, Any
         result.append({
             "title": title,
             "summary": summary,
-            "tag": _safe_text(item.get("media_name"), "东方财富"),
+            "tag": safe_text(item.get("media_name"), "东方财富"),
             "source": "东方财富",
-            "url": _safe_text(item.get("url_unique") or item.get("art_url")),
-            "publishedAt": _format_time(pub_time),
+            "url": safe_text(item.get("url_unique") or item.get("art_url")),
+            "publishedAt": format_time(pub_time),
             "sentiment": sentiment,
             "vipOnly": is_vip,
         })

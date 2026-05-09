@@ -17,8 +17,6 @@ import java.util.UUID;
 @Service
 public class AliyunOssService {
 
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
-
     private final AliyunOssProperties properties;
 
     public AliyunOssService(AliyunOssProperties properties) {
@@ -40,8 +38,9 @@ public class AliyunOssService {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(emptyMessage);
         }
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new BusinessException("图片不能超过 5MB");
+        if (file.getSize() > properties.getMaxFileSize()) {
+            long maxMb = properties.getMaxFileSize() / (1024 * 1024);
+            throw new BusinessException("图片不能超过 " + maxMb + "MB");
         }
 
         String contentType = file.getContentType();
@@ -71,7 +70,7 @@ public class AliyunOssService {
             PutObjectRequest request = new PutObjectRequest(bucket, key, inputStream, metadata);
             ossClient.putObject(request);
         } catch (IOException ex) {
-            throw new BusinessException("图片上传失败，请稍后重试");
+            throw new BusinessException("图片上传失败，请稍后重试", ex);
         } finally {
             ossClient.shutdown();
         }

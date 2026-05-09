@@ -4,6 +4,8 @@ import com.aiinvestor.gateway.modules.ai.dao.entity.ChatTurnDO;
 import com.aiinvestor.gateway.modules.ai.dao.mapper.ChatTurnMapper;
 import com.aiinvestor.gateway.modules.ai.vo.ChatSessionSummaryVO;
 import com.aiinvestor.gateway.modules.ai.vo.ChatTurnVO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,6 +27,8 @@ import java.util.List;
  */
 @Service
 public class ChatHistoryService {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatHistoryService.class);
 
     private final ChatTurnMapper chatTurnMapper;
     private final PythonAiClientService pythonAiClientService;
@@ -104,9 +108,7 @@ public class ChatHistoryService {
                     aiSessionMapper.updateTitle(userId, sessionId, aiTitle);
                 }
             } catch (Exception e) {
-                // 异步任务的异常绝不能向上抛
-                // 原因：CompletableFuture 中未捕获的异常只会被静默吞掉
-                //       或导致未处理的 Future 异常。这里记录日志即可。
+                log.warn("异步生成会话标题失败 userId={} sessionId={}", userId, sessionId, e);
             }
         });
     }

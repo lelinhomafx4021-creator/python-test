@@ -18,6 +18,8 @@ import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Python 行情客户端。
@@ -25,6 +27,8 @@ import java.util.Map;
  */
 @Service
 public class PythonMarketClient {
+
+    private static final Logger log = LoggerFactory.getLogger(PythonMarketClient.class);
 
     private final WebClient pythonAiWebClient;
     private final StockMapper stockMapper;
@@ -235,7 +239,8 @@ public class PythonMarketClient {
         }
         try {
             return new BigDecimal(node.asText());
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.debug("BigDecimal 解析失败 value={}", node.asText(), e);
             return null;
         }
     }

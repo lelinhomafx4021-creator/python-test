@@ -1,5 +1,5 @@
 <!--
-智能副驾对话区组件
+智能副驾对话区组件 (v2)
 
 功能：
 1. 显示历史会话列表（左侧）
@@ -7,14 +7,6 @@
 3. 支持流式回答显示
 4. 支持 AI 思考过程折叠展示
 5. 支持人工工单跳转
-
-Props：
-- sessions：历史会话列表
-- messages：当前会话消息
-- currentSessionId：当前选中的会话 ID
-- draft：输入框草稿内容
-- isStreaming：是否正在流式生成
-- ticketCount：人工工单数量
 -->
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
@@ -25,42 +17,40 @@ import {
   MessageSquare,
   Plus,
   SendHorizontal,
+  Sparkles,
   Ticket,
   UserRound,
 } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { ChatMessage, SessionSummary } from '../types/terminal'
 
-// 定义组件接收的 Props
 const props = defineProps<{
-  sessions: SessionSummary[] // 历史会话列表
-  messages: ChatMessage[] // 当前会话消息
-  currentSessionId: string | null // 当前选中的会话 ID
-  draft: string // 输入框草稿
-  isStreaming: boolean // 是否正在流式生成
-  ticketCount: number // 人工工单数量
-  renderMarkdown: (content: string) => string // Markdown 渲染函数
+  sessions: SessionSummary[]
+  messages: ChatMessage[]
+  currentSessionId: string | null
+  draft: string
+  isStreaming: boolean
+  ticketCount: number
+  renderMarkdown: (content: string) => string
 }>()
 
-// 定义组件触发的事件
 const emit = defineEmits<{
-  'update:draft': [value: string] // 更新输入框草稿
-  create: [] // 创建新会话
-  loadSession: [sessionId: string] // 加载历史会话
-  send: [] // 发送消息
-  openHandoffs: [] // 打开人工工单
+  'update:draft': [value: string]
+  create: []
+  loadSession: [sessionId: string]
+  send: []
+  openHandoffs: []
 }>()
 
-// 会话列表分页控制
-const sessionPage = ref(1) // 当前页码
-const sessionPageSize = 10 // 每页显示数量
+const sessionPage = ref(1)
+const sessionPageSize = 10
 const composerRef = useTemplateRef<HTMLTextAreaElement>('composerRef')
+const chatBodyRef = useTemplateRef<HTMLDivElement>('chatBodyRef')
 
-// 预设的问题建议（引导用户提问）
 const suggestions = [
-  '请从估值、盈利和行业位置分析贵州茅台', // 个股分析
-  '比较金融与新能源板块近一周强弱变化', // 板块对比
-  '帮我整理一个适合稳健配置的自选观察框架', // 策略框架
+  { icon: '📊', text: '分析贵州茅台的估值和盈利能力' },
+  { icon: '⚖️', text: '比较金融与新能源板块近一周走势' },
+  { icon: '🎯', text: '帮我制定稳健型自选观察框架' },
 ]
 
 watch(
@@ -77,7 +67,6 @@ const pagedSessions = computed(() => {
   return props.sessions.slice(start, start + sessionPageSize)
 })
 
-// 自动调整输入框高度（根据内容行数自适应）
 const resizeComposer = async () => {
   await nextTick()
   const el = composerRef.value
@@ -88,18 +77,24 @@ const resizeComposer = async () => {
 
 watch(() => props.draft, resizeComposer, { immediate: true })
 
-// 输入框内容变化时更新草稿
+// 自动滚动到底部
+const scrollToBottom = async () => {
+  await nextTick()
+  const el = chatBodyRef.value
+  if (el) el.scrollTop = el.scrollHeight
+}
+
+watch(() => props.messages.length, scrollToBottom)
+watch(() => props.isStreaming, scrollToBottom)
+
 const updateDraft = (event: Event) => {
-  const value = (event.target as HTMLTextAreaElement).value
-  emit('update:draft', value)
+  emit('update:draft', (event.target as HTMLTextAreaElement).value)
 }
 
-// 点击建议时填充到输入框
-const useSuggestion = (value: string) => {
-  emit('update:draft', value)
+const useSuggestion = (text: string) => {
+  emit('update:draft', text)
 }
 
-// 格式化时间为中文格式（月/日 时:分）
 const formatTime = (value?: string) => {
   if (!value) return '--'
   const date = new Date(value)
@@ -114,143 +109,179 @@ const formatTime = (value?: string) => {
 </script>
 
 <template>
-  <div class="grid h-[calc(100vh-96px)] gap-3 xl:grid-cols-[200px_minmax(0,1fr)]">
-    <section class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors duration-300">
-      <div class="border-b border-slate-200 px-3 py-3 transition-colors duration-300">
+  <div class="flex h-[calc(100vh-96px)] gap-3">
+    <!-- ========== 左侧：会话列表 ========== -->
+    <section class="hidden w-[220px] shrink-0 flex-col rounded-2xl border border-slate-200/80 bg-white xl:flex">
+      <div class="border-b border-slate-100 p-3">
         <button
-          class="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[12px] font-medium text-slate-700 transition-all duration-150 hover:bg-white hover:text-slate-900 active:scale-[0.97]"
+          class="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 text-[13px] font-medium text-white shadow-sm transition-all duration-200 hover:shadow-md hover:shadow-indigo-200 active:scale-[0.97]"
           @click="emit('create')"
         >
           <Plus class="h-4 w-4" />
-          发起新会话
+          新会话
         </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto px-2.5 py-2.5 custom-scrollbar">
-          <button
-            v-for="session in pagedSessions"
-            :key="session.sessionId"
-            class="mb-1.5 w-full rounded-xl border px-3 py-2.5 text-left transition-all duration-150 active:scale-[0.98]"
-            :class="
+      <div class="flex-1 overflow-y-auto p-2 custom-scrollbar">
+        <button
+          v-for="session in pagedSessions"
+          :key="session.sessionId"
+          class="group mb-1 w-full rounded-xl px-3 py-2.5 text-left transition-all duration-200"
+          :class="
             currentSessionId === session.sessionId
-              ? 'border-slate-200 bg-slate-50 text-slate-900'
-              : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50'
+              ? 'bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
           "
           @click="emit('loadSession', session.sessionId)"
         >
           <div class="flex items-start gap-2.5">
-            <MessageSquare class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <div class="min-w-0">
-              <div class="truncate text-[12px] font-medium">{{ session.title || '新会话' }}</div>
-              <div class="mt-1 text-[11px] text-slate-500">{{ formatTime(session.lastAt) }}</div>
+            <MessageSquare
+              class="mt-0.5 h-3.5 w-3.5 shrink-0 transition-colors"
+              :class="currentSessionId === session.sessionId ? 'text-indigo-400' : 'text-slate-300 group-hover:text-slate-400'"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-[12px] font-medium leading-tight">{{ session.title || '新会话' }}</div>
+              <div class="mt-1 text-[11px] text-slate-400">{{ formatTime(session.lastAt) }}</div>
             </div>
           </div>
         </button>
 
-        <div v-if="!sessions.length" class="rounded-xl bg-slate-50 px-3 py-4 text-[12px] leading-6 text-slate-500 transition-colors duration-300">
-          还没有历史会话，可以直接从右侧开始一轮研究。
+        <div v-if="!sessions.length" class="px-2 py-6 text-center">
+          <MessageSquare class="mx-auto mb-2 h-8 w-8 text-slate-200" />
+          <p class="text-[12px] leading-5 text-slate-400">还没有历史会话</p>
         </div>
       </div>
 
-      <PaginationBar
-        :page="sessionPage"
-        :page-size="sessionPageSize"
-        :total="sessions.length"
-        @update:page="sessionPage = $event"
-      />
+      <div class="border-t border-slate-100 px-2 py-2">
+        <PaginationBar
+          :page="sessionPage"
+          :page-size="sessionPageSize"
+          :total="sessions.length"
+          @update:page="sessionPage = $event"
+        />
+      </div>
     </section>
 
-    <section class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors duration-300">
-      <div class="border-b border-slate-200 px-4 py-3 transition-colors duration-300">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 class="text-[16px] font-semibold text-slate-950 transition-colors duration-300">智能副驾对话区</h3>
-            <p class="mt-1 text-[11px] text-slate-500 transition-colors duration-300">研究步骤、思考过程和最终回答集中展示</p>
+    <!-- ========== 右侧：对话区 ========== -->
+    <section class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+      <!-- 顶栏 -->
+      <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+        <div class="flex items-center gap-3">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm shadow-indigo-200">
+            <Sparkles class="h-4 w-4" />
           </div>
-          <button
-            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-600 transition-all duration-150 hover:bg-white hover:text-slate-900 active:scale-[0.97]"
-            @click="emit('openHandoffs')"
-          >
-            <Ticket class="h-3.5 w-3.5" />
-            人工工单 {{ ticketCount }}
-          </button>
+          <div>
+            <h3 class="text-[14px] font-semibold text-slate-800">AI 投研助手</h3>
+            <p class="text-[11px] text-slate-400">支持个股分析、板块对比、策略建议</p>
+          </div>
         </div>
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-500 transition-all duration-150 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 active:scale-[0.97]"
+          @click="emit('openHandoffs')"
+        >
+          <Ticket class="h-3.5 w-3.5" />
+          人工工单
+          <span
+            v-if="ticketCount"
+            class="ml-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+          >{{ ticketCount }}</span>
+        </button>
       </div>
 
+      <!-- 消息区 -->
       <div
-        class="flex-1 overflow-y-auto px-4 py-4 custom-scrollbar"
-        :class="messages.length ? '' : 'flex items-center justify-center'"
+        ref="chatBodyRef"
+        class="flex-1 overflow-y-auto custom-scrollbar"
+        :class="messages.length ? 'px-5 py-5' : 'flex items-center justify-center'"
       >
-        <div v-if="!messages.length" class="mx-auto flex w-full max-w-[760px] flex-col items-center text-center">
-          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition-colors duration-300">
-            <Bot class="h-4 w-4" />
+        <!-- 空状态：欢迎页 -->
+        <div v-if="!messages.length" class="mx-auto flex w-full max-w-[520px] flex-col items-center px-4 text-center">
+          <div class="relative mb-4">
+            <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
+              <Bot class="h-8 w-8" />
+            </div>
+            <div class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-400 shadow-sm">
+              <Sparkles class="h-2.5 w-2.5 text-white" />
+            </div>
           </div>
-          <h4 class="text-[28px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">开始一轮研究</h4>
-          <p class="mt-2 max-w-[560px] text-[13px] leading-6 text-slate-500 transition-colors duration-300">
-            直接问个股、板块、持仓或交易计划。需要人工跟进时，也可以转人工工单。
+
+          <h4 class="text-[22px] font-bold tracking-tight text-slate-800">你好，今天想研究什么？</h4>
+          <p class="mt-2 max-w-[400px] text-[13px] leading-6 text-slate-400">
+            我可以帮你分析个股、对比板块、制定投资策略。遇到复杂问题也可以转人工。
           </p>
 
-          <div class="mt-5 flex flex-wrap justify-center gap-2">
+          <div class="mt-6 flex w-full flex-col gap-2">
             <button
               v-for="item in suggestions"
-              :key="item"
-              class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.97]"
-              @click="useSuggestion(item)"
+              :key="item.text"
+              class="group flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-all duration-200 hover:border-indigo-200 hover:bg-indigo-50/50 hover:shadow-sm active:scale-[0.99]"
+              @click="useSuggestion(item.text)"
             >
-              {{ item }}
+              <span class="text-[18px]">{{ item.icon }}</span>
+              <span class="text-[13px] text-slate-600 group-hover:text-indigo-700">{{ item.text }}</span>
             </button>
           </div>
         </div>
 
-        <div v-else class="mx-auto max-w-[980px] space-y-3">
+        <!-- 消息列表 -->
+        <div v-else class="mx-auto max-w-[860px] space-y-5">
           <div
             v-for="(message, index) in messages"
             :key="index"
-            class="flex"
+            class="flex animate-[fadeIn_0.3s_ease-out]"
             :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
           >
-            <div class="flex w-full gap-2.5" :class="message.role === 'user' ? 'max-w-[70%] flex-row-reverse' : 'max-w-[78%]'">
-              <div
-                class="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                :class="message.role === 'assistant' ? 'bg-slate-100 text-slate-600' : 'bg-stone-100 text-slate-600'"
-              >
-                <component :is="message.role === 'assistant' ? Bot : UserRound" class="h-3.5 w-3.5" />
+            <!-- 用户消息 -->
+            <div v-if="message.role === 'user'" class="flex max-w-[70%] flex-row-reverse items-end gap-2.5">
+              <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-white shadow-sm">
+                <UserRound class="h-3.5 w-3.5" />
+              </div>
+              <div class="rounded-2xl rounded-br-md bg-slate-800 px-4 py-2.5 text-[13px] leading-6 text-white shadow-sm">
+                {{ message.content }}
+              </div>
+            </div>
+
+            <!-- AI 消息 -->
+            <div v-else class="flex w-full max-w-[85%] items-start gap-2.5">
+              <div class="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm shadow-indigo-200">
+                <Bot class="h-3.5 w-3.5" />
               </div>
 
               <div class="min-w-0 flex-1">
+                <!-- 思考过程 -->
                 <div
-                  v-if="message.role === 'assistant' && message.thoughts?.length"
-                  class="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition-colors duration-300"
+                  v-if="message.thoughts?.length"
+                  class="mb-2 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/80"
                 >
                   <button
-                    class="flex w-full items-center justify-between text-[11px] font-medium text-slate-600 transition-colors duration-150 hover:text-slate-900 active:scale-[0.98]"
+                    class="flex w-full items-center justify-between px-3.5 py-2 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100/80 hover:text-slate-700"
                     @click="message.showThoughts = !message.showThoughts"
                   >
-                    <span>思考过程（{{ message.thoughts.length }} 步）</span>
-                    <component :is="message.showThoughts ? ChevronUp : ChevronDown" class="h-4 w-4" />
+                    <span class="flex items-center gap-1.5">
+                      <Sparkles class="h-3 w-3 text-indigo-400" />
+                      思考过程（{{ message.thoughts.length }} 步）
+                    </span>
+                    <component :is="message.showThoughts ? ChevronUp : ChevronDown" class="h-3.5 w-3.5" />
                   </button>
 
-                  <div v-if="message.showThoughts" class="mt-2 space-y-1.5">
-                    <div
-                      v-for="thought in message.thoughts"
-                      :key="`${thought.time}-${thought.text}`"
-                      class="rounded-lg bg-white px-3 py-2 text-[12px] leading-5 text-slate-500 transition-colors duration-300"
-                    >
-                      <span class="mr-2 text-[10px] text-slate-400">{{ thought.time }}</span>
-                      {{ thought.text }}
+                  <div v-if="message.showThoughts" class="border-t border-slate-100 px-3.5 py-2.5">
+                    <div class="space-y-1.5">
+                      <div
+                        v-for="(thought, ti) in message.thoughts"
+                        :key="ti"
+                        class="flex items-start gap-2 rounded-lg px-2 py-1.5 text-[12px] leading-5 text-slate-500"
+                      >
+                        <span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-300"></span>
+                        <span class="shrink-0 text-[10px] text-slate-400 tabular-nums">{{ thought.time }}</span>
+                        <span>{{ thought.text }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
+                <!-- 回答内容 -->
                 <div
-                  v-if="message.role === 'user'"
-                  class="rounded-2xl border border-stone-200 bg-stone-100 px-3.5 py-2.5 text-[13px] leading-6 text-slate-900 transition-colors duration-300"
-                >
-                  {{ message.content }}
-                </div>
-                <div
-                  v-else
-                  class="markdown-body rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-[13px] leading-6 shadow-sm transition-colors duration-300"
+                  class="markdown-body rounded-2xl rounded-tl-md border border-slate-100 bg-white px-4 py-3 text-[13px] leading-7 shadow-sm"
                   v-html="renderMarkdown(message.content || (isStreaming && index === messages.length - 1 ? '正在生成回答...' : ''))"
                 ></div>
               </div>
@@ -259,34 +290,53 @@ const formatTime = (value?: string) => {
         </div>
       </div>
 
-      <div class="border-t border-slate-200 bg-white px-4 py-3 transition-colors duration-300">
-        <div class="mx-auto max-w-[980px] rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors duration-300">
-          <textarea
-            ref="composerRef"
-            :value="draft"
-            rows="1"
-            placeholder="输入研究问题，系统会保留历史会话并支持流式回答。"
-            class="w-full resize-none overflow-y-auto bg-transparent text-[14px] leading-6 text-slate-900 outline-none placeholder:text-slate-400 transition-colors duration-300"
-            style="min-height: 44px; max-height: 180px"
-            @input="updateDraft"
-            @keydown.enter.exact.prevent="emit('send')"
-          ></textarea>
-
-          <div class="mt-2 flex items-center justify-between gap-3">
-            <div class="text-[11px] text-slate-500 transition-colors duration-300">
-              {{ isStreaming ? '正在实时生成回答，请稍候。' : '回车发送，Shift + 回车换行。' }}
-            </div>
+      <!-- 输入区 -->
+      <div class="border-t border-slate-100 bg-gradient-to-b from-slate-50/50 to-white px-5 py-4">
+        <div class="mx-auto max-w-[860px]">
+          <div
+            class="flex items-end gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm transition-all duration-200 focus-within:border-indigo-300 focus-within:shadow-md focus-within:shadow-indigo-50"
+          >
+            <textarea
+              ref="composerRef"
+              :value="draft"
+              rows="1"
+              placeholder="输入你的研究问题..."
+              class="min-h-[40px] flex-1 resize-none overflow-y-auto bg-transparent text-[14px] leading-6 text-slate-800 outline-none placeholder:text-slate-400"
+              style="max-height: 180px"
+              @input="updateDraft"
+              @keydown.enter.exact.prevent="emit('send')"
+            ></textarea>
             <button
-              class="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-800 px-3.5 text-[12px] font-medium text-white transition-all duration-150 hover:bg-slate-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-slate-300"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
+              :class="
+                draft.trim() && !isStreaming
+                  ? 'bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-sm shadow-indigo-200 hover:shadow-md hover:shadow-indigo-300 active:scale-95'
+                  : 'bg-slate-100 text-slate-400'
+              "
               :disabled="!draft.trim() || isStreaming"
               @click="emit('send')"
             >
-              <SendHorizontal class="h-3.5 w-3.5" />
-              {{ isStreaming ? '生成中' : '发送' }}
+              <SendHorizontal class="h-4 w-4" />
             </button>
+          </div>
+          <div class="mt-2 flex items-center justify-between px-1">
+            <span class="text-[11px] text-slate-400">
+              {{ isStreaming ? '⚡ 正在生成回答...' : 'Enter 发送 · Shift + Enter 换行' }}
+            </span>
+            <span v-if="isStreaming" class="flex items-center gap-1.5 text-[11px] text-indigo-500">
+              <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400"></span>
+              实时生成中
+            </span>
           </div>
         </div>
       </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

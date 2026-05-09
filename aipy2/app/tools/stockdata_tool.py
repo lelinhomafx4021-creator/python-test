@@ -20,12 +20,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import urllib.parse
 from typing import Any
 
 import requests
 from langchain_core.tools import tool
+
+from app.tools.common import build_market_code
+
+logger = logging.getLogger(__name__)
 
 
 TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={code}"
@@ -62,20 +67,6 @@ HOT_SYMBOLS = [
 # 创建 requests 会话对象，复用 TCP 连接提升性能
 _http = requests.Session()
 _http.trust_env = False  # 不使用系统代理，避免开发环境干扰
-
-
-def _build_market_code(symbol: str) -> str:
-    """把 6 位股票代码转换成腾讯接口需要的市场前缀格式
-    
-    股票代码规则：
-    - 以 5/6/9 开头：上海市场（sh）
-    - 其他：深圳市场（sz）
-    
-    示例：600519 -> sh600519, 000001 -> sz000001
-    """
-    if not re.fullmatch(r"\d{6}", symbol):
-        raise ValueError("symbol 必须是 6 位数字，例如 600519")
-    return f"sh{symbol}" if symbol.startswith(("5", "6", "9")) else f"sz{symbol}"
 
 
 def _safe_float(raw: str | None) -> float | None:
@@ -120,8 +111,8 @@ def _parse_tencent_quote_payload(payload: str, fallback_symbol: str) -> dict[str
             time_str = fields[31].strip()
             if len(date_str) == 8 and len(time_str) == 6:
                 quote_time = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]} {time_str[:2]}:{time_str[2:4]}:{time_str[4:6]}"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("解析行情时间失败: %s", e)
     
     return {
         "symbol": fields[2] or fallback_symbol,
@@ -146,7 +137,7 @@ def _fetch_batch_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
     if not normalized_symbols:
         return {}
 
-    market_codes = [_build_market_code(symbol) for symbol in normalized_symbols]
+    market_codes = [build_market_code(symbol) for symbol in normalized_symbols]
     response = _http.get(
         TENCENT_QUOTE_URL.format(code=",".join(market_codes)),
         headers={
@@ -310,7 +301,8 @@ def load_market_page(page: int = 1, page_size: int = 40) -> dict[str, Any]:
             "total": len(HOT_SYMBOLS),
             "items": _build_stock_items([{"symbol": symbol, "name": symbol} for symbol in sliced_symbols]),
         }
-    except Exception:
+    except Exception as e:
+        logger.warning("构建热门股票列表失败: %s", e)
         return _empty_market_page(page, page_size)
 
 
@@ -326,12 +318,14 @@ def search_market_stocks(keyword: str, page: int = 1, page_size: int = 40) -> di
 
     try:
         sina_candidates = _request_sina_suggest(normalized_keyword)
-    except Exception:
+    except Exception as e:
+        logger.warning("新浪搜索接口异常: %s", e)
         sina_candidates = []
 
     try:
         tencent_candidates = _request_tencent_suggest(normalized_keyword)
-    except Exception:
+    except Exception as e:
+        logger.warning("腾讯搜索接口异常: %s", e)
         tencent_candidates = []
 
     filtered_sina = [

@@ -63,8 +63,11 @@ mybatis-plus:
 python:
   ai:
     base-url: ${PYTHON_AI_BASE_URL:http://localhost:8000}
+    max-in-memory-size: ${PYTHON_AI_MAX_IN_MEMORY_SIZE:10485760}
 
 app:
+  cors:
+    allowed-origins: ${APP_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   cache:
     market-quote-ttl-seconds: 30
     account-lock-seconds: 10
@@ -75,6 +78,16 @@ app:
     audit-routing-key: ai.chat.audit.routing
     transaction-exchange: transaction.event.exchange
     transaction-routing-key: transaction.event
+  sentinel:
+    rules:
+      - resource: /api/v1/market/quotes
+        qps: 20
+      - resource: /api/v1/paper/orders
+        qps: 10
+      - resource: /gateway/ai/chat/stream
+        qps: 8
+  paper-trading:
+    initial-cash: 1000000
 
 aliyun:
   oss:
@@ -85,6 +98,7 @@ aliyun:
     access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
     public-base-url: ${ALIYUN_OSS_PUBLIC_BASE_URL:}
     directory: avatar
+    max-file-size: ${ALIYUN_OSS_MAX_FILE_SIZE:5242880}
 
 management:
   health:
