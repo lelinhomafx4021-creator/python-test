@@ -4,9 +4,11 @@ services:
     image: mysql:8.0
     restart: always
     container_name: ai-investor-mysql
+    command: --default-time-zone='+08:00'
     environment:
       MYSQL_ROOT_PASSWORD: "123456"
       MYSQL_DATABASE: ai_investor
+      TZ: Asia/Shanghai
     ports:
       - "3306:3306"
     volumes:

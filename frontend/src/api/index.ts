@@ -26,6 +26,7 @@ import type {
   UserProfile,
   VipApplication,
   Watchlist,
+  Announcement,
 } from '../types/terminal'
 
 // 本地开发直连 Java，隧道/部署时用空字符串走 Vite 代理
@@ -93,6 +94,7 @@ export const store = reactive({
   streaming: false,
 
   tickets: [] as HandoffTicket[],
+  announcements: [] as Announcement[],
 
   profileForm: { nickname: '', phone: '', riskLevel: 'balanced', investmentYears: 0, interestedSectors: '', bio: '' },
   saving: false,
@@ -185,6 +187,7 @@ const reset = () => {
     vipApplications: [],
     marketKeyword: '', marketPage: 1, adminKeyword: '', watchlistName: '', watchlistSymbol: '', watchlistNote: '',
     orderSymbol: '', orderSide: 'BUY', orderQty: 100, view: 'overview',
+    loginForm: { username: '', password: '' },
     registerForm: { username: '', password: '', nickname: '', phone: '', email: '', emailCode: '' },
     emailCodeSending: false, emailCodeCooldown: 0,
   })
@@ -552,7 +555,7 @@ export const sendChat = async () => {
       s.close()
       _sse = null
       store.streaming = false
-      await refreshAll()
+      await refreshChatContext()
       return
     }
     if (p.stage === 'error') {
@@ -566,7 +569,7 @@ export const sendChat = async () => {
       s.close()
       _sse = null
       store.streaming = false
-      await refreshAll()
+      await refreshChatContext()
       return
     }
     if (p.data?.step && (store.messages[ai] as any).thoughts) {
@@ -584,7 +587,7 @@ export const sendChat = async () => {
     if (!(store.messages[ai] as any).content.trim()) {
       ;(store.messages[ai] as any).content = '连接中断'
     }
-    await refreshAll()
+    await refreshChatContext()
   }
 }
 
@@ -655,6 +658,18 @@ export const updateTicketStatus = async (payload: { traceId: string; status: str
   })
 }
 
+/** 聊天结束后只刷新必要的上下文（会话列表、配额、通知），不刷行情/模拟盘等 */
+export const refreshChatContext = async () => {
+  if (!store.user) return
+  await safe(async () => {
+    await Promise.all([
+      optionalTask('chat sessions', fetchSessions),
+      optionalTask('quotas', () => get(`${API}/quotas/me`, 'quotas')),
+      optionalTask('notifications', () => get(`${API}/notifications`, 'notifications')),
+    ])
+  })
+}
+
 export const refreshAll = async () => {
   if (!store.user) return
   await safe(async () => {
@@ -672,6 +687,7 @@ export const refreshAll = async () => {
       optionalTask('handoff tickets', fetchTickets),
       optionalTask('paper transactions', fetchTransactions),
       optionalTask('notifications', () => get(`${API}/notifications`, 'notifications')),
+      optionalTask('announcements', fetchAnnouncements),
       optionalTask('admin workspace', fetchAdmin),
     ])
     await Promise.all([
@@ -699,6 +715,7 @@ export const refreshTerminal = async () => {
       optionalTask('handoff tickets', fetchTickets),
       optionalTask('paper transactions', fetchTransactions),
       optionalTask('notifications', () => get(`${API}/notifications`, 'notifications')),
+      optionalTask('announcements', fetchAnnouncements),
     ])
     await Promise.all([
       optionalTask('paper snapshot', () => fetchSnapshot()),
@@ -716,6 +733,48 @@ export const refreshAdminWorkspace = async () => {
       optionalTask('admin workspace', fetchAdmin),
       optionalTask('handoff tickets', fetchTickets),
     ])
+  })
+}
+
+export const pollMembership = async () => {
+  if (!store.user) return
+  await safe(async () => {
+    await get(`${API}/memberships/me`, 'membership')
+    await get(`${API}/quotas/me`, 'quotas')
+  })
+}
+
+/* ─── 公告 ─── */
+
+export const fetchAnnouncements = async () => {
+  await get(`${API}/announcements`, 'announcements')
+}
+
+export const fetchAdminAnnouncements = async () => {
+  await safe(async () => {
+    const res = await axios.get(`${API}/admin/announcements`, { headers: headers() })
+    store.announcements = asArray<Announcement>(res.data?.data)
+  })
+}
+
+export const createAnnouncement = async (title: string, content: string, type: string) => {
+  await safe(async () => {
+    await axios.post(`${API}/admin/announcements`, { title, content, type }, { headers: headers() })
+    await fetchAdminAnnouncements()
+  })
+}
+
+export const publishAnnouncement = async (id: number) => {
+  await safe(async () => {
+    await axios.put(`${API}/admin/announcements/${id}/publish`, {}, { headers: headers() })
+    await fetchAdminAnnouncements()
+  })
+}
+
+export const deleteAnnouncement = async (id: number) => {
+  await safe(async () => {
+    await axios.delete(`${API}/admin/announcements/${id}`, { headers: headers() })
+    await fetchAdminAnnouncements()
   })
 }
 

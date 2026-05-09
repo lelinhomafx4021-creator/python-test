@@ -37,7 +37,16 @@
       "Bash(echo \"Starting... PID: $!\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/gateway/auth/login)",
       "Bash(rm -f d:/ai-investor/tutorial_*.md)",
-      "Bash(git -C d:/ai-investor log --oneline --all -- .github/workflows/ci.yml)"
+      "Bash(git -C d:/ai-investor log --oneline --all -- .github/workflows/ci.yml)",
+      "Bash(python -c \"from app.tools.common import extract_stock_code; print\\(extract_stock_code\\('帮我看看600519'\\)\\)\")",
+      "Bash(npx vue-tsc *)",
+      "Bash(python -c \"from app.tools.common import extract_stock_code; from app.tools.news_tool import collect_hot_news; print\\('ok'\\)\")",
+      "Bash(docker volume *)",
+      "Bash(docker stop *)",
+      "Bash(docker rm *)",
+      "Bash(docker run *)",
+      "Bash(docker-compose up *)",
+      "Bash(docker exec *)"
     ],
     "additionalDirectories": [
       "D:\\ai-investor\\aipy2\\.idea",

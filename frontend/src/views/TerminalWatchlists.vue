@@ -4,22 +4,11 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import axios from 'axios'
 import type { KLineDataPoint, MarketStock, Watchlist } from '../types/terminal'
 import KLineChart from '../components/KLineChart.vue'
+import { formatTime } from '../utils/format'
 
 const isTunnel = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
 const GW = import.meta.env.VITE_API_BASE_URL ?? (isTunnel ? '' : 'http://127.0.0.1:8080')
 const API_BASE = `${GW}/api/v1`
-
-const formatTime = (value?: string) => {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 const props = defineProps<{
   watchlists: Watchlist[]

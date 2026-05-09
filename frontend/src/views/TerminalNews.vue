@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { Newspaper, RefreshCw } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { HotNewsItem } from '../types/terminal'
+import { formatTime } from '../utils/format'
 
 const props = defineProps<{
  items: HotNewsItem[]
@@ -29,18 +30,6 @@ const pagedItems = computed(() => {
  return props.items.slice(start, start + pageSize)
 })
 
-// 格式化时间戳为本地日期时间
-const formatTime = (value?: string) => {
- if (!value) return '刚刚'
- const date = new Date(value)
- if (Number.isNaN(date.getTime())) return value
- return date.toLocaleString('zh-CN', {
- month: '2-digit',
- day: '2-digit',
- hour: '2-digit',
- minute: '2-digit',
- })
-}
 </script>
 
 <template>
@@ -80,7 +69,7 @@ const formatTime = (value?: string) => {
  <div class="flex flex-wrap items-center gap-2">
  <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600 transition-colors duration-300">{{ item.tag || '热点' }}</span>
  <span class="text-[12px] text-slate-400">{{ item.source || '财经新闻' }}</span>
- <span class="ml-auto text-[12px] text-slate-400">{{ formatTime(item.publishedAt) }}</span>
+ <span class="ml-auto text-[12px] text-slate-400">{{ formatTime(item.publishedAt, '刚刚') }}</span>
  </div>
 
  <div class="mt-2 text-[16px] font-semibold leading-7 text-slate-950 transition-colors duration-300">{{ item.title }}</div>

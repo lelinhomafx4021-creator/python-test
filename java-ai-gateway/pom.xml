@@ -150,6 +150,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <jvmArguments>-Duser.timezone=Asia/Shanghai</jvmArguments>
+                </configuration>
             </plugin>
         </plugins>
     </build>

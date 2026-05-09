@@ -16,12 +16,11 @@
 
 import asyncio
 import logging
-import re
 from typing import Any
 
 import httpx
 
-from app.tools.common import build_market_code, build_secid
+from app.tools.common import build_market_code, build_secid, extract_stock_code
 from app.tools.retriever_tool import run_retrieval_async
 from app.tools.news_tool import collect_hot_news
 
@@ -37,12 +36,6 @@ EASTMONEY_PUSH2_FIELDS = (
 
 # 东方财富公告API — 获取个股最新公告
 EASTMONEY_ANN_URL = "https://np-anotice-stock.eastmoney.com/api/security/ann"
-
-
-def _extract_stock_code(query: str) -> str | None:
-    """从用户问题中提取6位股票代码。"""
-    match = re.search(r"(?<!\d)(\d{6})(?!\d)", query)
-    return match.group(1) if match else None
 
 
 # ============ 并行获取各数据源 ============
@@ -180,7 +173,7 @@ async def fetch_all_data_parallel(
         "symbol": "603283",     # 提取到的股票代码（可能为None）
     }
     """
-    symbol = _extract_stock_code(query)
+    symbol = extract_stock_code(query)
     
     # 行情 + 财务 + 公告：需要股票代码，用共享的httpx客户端
     if symbol:

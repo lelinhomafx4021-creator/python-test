@@ -5,6 +5,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,5 +59,14 @@ public class RedisJsonCacheService {
      */
     public void delete(String key) {
         stringRedisTemplate.delete(key);
+    }
+
+    /**
+     * 批量写入缓存。
+     */
+    public void setAll(Map<String, Object> entries, Duration ttl) {
+        for (var entry : entries.entrySet()) {
+            set(entry.getKey(), entry.getValue(), ttl);
+        }
     }
 }

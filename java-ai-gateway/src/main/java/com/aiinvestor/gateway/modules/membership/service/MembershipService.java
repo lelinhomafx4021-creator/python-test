@@ -1,5 +1,7 @@
 package com.aiinvestor.gateway.modules.membership.service;
 
+import com.aiinvestor.gateway.modules.identity.dao.entity.UserDO;
+import com.aiinvestor.gateway.modules.identity.dao.mapper.UserMapper;
 import com.aiinvestor.gateway.modules.membership.dao.entity.MembershipPlanDO;
 import com.aiinvestor.gateway.modules.membership.dao.entity.UserFeatureQuotaDO;
 import com.aiinvestor.gateway.modules.membership.dao.entity.UserMembershipDO;
@@ -30,15 +32,18 @@ public class MembershipService {
     private final MembershipPlanMapper membershipPlanMapper;
     private final UserMembershipMapper userMembershipMapper;
     private final UserFeatureQuotaMapper userFeatureQuotaMapper;
+    private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
 
     public MembershipService(MembershipPlanMapper membershipPlanMapper,
                              UserMembershipMapper userMembershipMapper,
                              UserFeatureQuotaMapper userFeatureQuotaMapper,
+                             UserMapper userMapper,
                              ObjectMapper objectMapper) {
         this.membershipPlanMapper = membershipPlanMapper;
         this.userMembershipMapper = userMembershipMapper;
         this.userFeatureQuotaMapper = userFeatureQuotaMapper;
+        this.userMapper = userMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -112,11 +117,24 @@ public class MembershipService {
     }
 
     /**
-     * 管理员直接切换用户会员方案。
+     * 管理员直接切换用户会员方案，同时同步用户角色。
      */
     @Transactional
     public void assignMembershipPlanByAdmin(Long userId, String role, String planCode) {
         assignMembershipPlan(userId, planCode, "admin_console");
+        syncUserRole(userId, planCode);
+    }
+
+    private void syncUserRole(Long userId, String planCode) {
+        UserDO user = userMapper.selectById(userId);
+        if (user == null || "admin".equalsIgnoreCase(user.getRole())) {
+            return;
+        }
+        String targetRole = "vip".equals(planCode) ? "vip" : "normal";
+        if (!targetRole.equalsIgnoreCase(user.getRole())) {
+            user.setRole(targetRole);
+            userMapper.updateById(user);
+        }
     }
 
     @Transactional

@@ -8,6 +8,7 @@
 |------|------|------|------|
 | 01 | Markdown 语法 | [01-markdown.md](./01-markdown.md) | ✅ 已完成 |
 | 02 | Git 基础 | [02-git-basics.md](./02-git-basics.md) | ✅ 已完成 |
+| 03 | 项目目录结构详解 | [03-project-structure.md](./03-project-structure.md) | ✅ 已完成 |
 | 03 | Docker 基础 | [03-docker.md](./03-docker.md) |   待写 |
 | 04 | GitHub Actions CI/CD | [04-github-actions.md](./04-github-actions.md) |   待写 |
 | 05 | REST API 设计 | [05-rest-api.md](./05-rest-api.md) |   待写 |

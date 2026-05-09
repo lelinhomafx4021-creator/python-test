@@ -2,11 +2,11 @@
 
 import json
 import logging
-import re
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.tools.common import extract_stock_code
 from app.tools.retriever_tool import run_retrieval_async
 from app.tools.stockdata_tool import get_stock_quote_core
 
@@ -60,8 +60,6 @@ class StockAnalysisSkill:
     【高级技能：数据管家】 -> 【类比 Java】：这是一个 @Service 类
     """
 
-    _symbol_pattern = re.compile(r"(?<!\d)\d{6}(?!\d)")
-
     async def run(self, payload: StockAnalysisSkillInput) -> StockAnalysisSkillOutput:
         """执行技能主流程：查询检索资料、提取股票代码、补充行情与证据。"""
         logger.info(f"开始执行专家技能，目标问题：{payload.query}")
@@ -73,7 +71,7 @@ class StockAnalysisSkill:
         logger.info(f"准备异步检索以下词条：{merged_queries}")
         knowledge = await run_retrieval_async(queries=merged_queries, mode="auto", top_k=payload.top_k)
 
-        symbol = self._extract_symbol(payload.query)
+        symbol = extract_stock_code(payload.query)
 
         # 教学修改：使用前端传过来的 Pydantic 参数来控制逻辑
         quote = None
@@ -90,11 +88,6 @@ class StockAnalysisSkill:
             quote=quote,
             symbol=symbol,
         )
-
-    def _extract_symbol(self, query: str) -> str | None:
-        """从用户问题中提取 6 位股票代码。"""
-        match = self._symbol_pattern.search(query)
-        return match.group(0) if match else None
 
     def _get_quote_safe(self, symbol: str) -> dict[str, Any] | None:
         """安全获取实时行情：失败返回 None，不向上抛异常。"""

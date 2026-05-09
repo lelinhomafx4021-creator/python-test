@@ -13,6 +13,10 @@ import {
   updateTicketStatus,
   updateUserMembership,
   updateUserRole,
+  fetchAdminAnnouncements,
+  createAnnouncement,
+  publishAnnouncement,
+  deleteAnnouncement,
 } from './api/index'
 import { useToast } from './composables/useToast'
 import TerminalHeader from './components/TerminalHeader.vue'
@@ -129,6 +133,34 @@ const handleUpdateTicketStatus = async (payload: { traceId: string; status: stri
   }
 }
 
+const handleCreateAnnouncement = async (payload: { title: string; content: string; type: string }) => {
+  try {
+    await createAnnouncement(payload.title, payload.content, payload.type)
+    toast.success('公告已创建')
+  } catch {
+    toast.error('创建失败')
+  }
+}
+
+const handlePublishAnnouncement = async (id: number) => {
+  try {
+    await publishAnnouncement(id)
+    toast.success('公告已发布')
+  } catch {
+    toast.error('发布失败')
+  }
+}
+
+const handleDeleteAnnouncement = async (id: number) => {
+  if (!window.confirm('确定要删除这条公告吗？')) return
+  try {
+    await deleteAnnouncement(id)
+    toast.success('公告已删除')
+  } catch {
+    toast.error('删除失败')
+  }
+}
+
 const restoreAdminSession = async () => {
   if (!store.token) {
     await goToUnifiedLogin('请先登录，系统会按账号等级自动进入对应终端')
@@ -144,6 +176,7 @@ const restoreAdminSession = async () => {
 
     store.view = 'admin'
     await refreshAdminWorkspace()
+    await fetchAdminAnnouncements()
   } catch {
     await logout()
     await goToUnifiedLogin('登录状态已失效，请重新登录')
@@ -217,6 +250,7 @@ function closeUserMenu() {
             :portfolio="store.adminPortfolio"
             :loading-portfolio="store.adminPortfolioLoading"
             :vip-applications="store.vipApplications"
+            :announcements="store.announcements"
             @update:keyword="store.adminKeyword = $event"
             @search="handleSearch"
             @open-portfolio="fetchAdminPortfolio"
@@ -224,6 +258,9 @@ function closeUserMenu() {
             @update-user-role="handleUpdateUserRole"
             @update-user-membership="handleUpdateUserMembership"
             @review-vip="handleReviewVip"
+            @create-announcement="handleCreateAnnouncement"
+            @publish-announcement="handlePublishAnnouncement"
+            @delete-announcement="handleDeleteAnnouncement"
           />
 
           <TerminalAdminTickets

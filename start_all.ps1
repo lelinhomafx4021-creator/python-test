@@ -1,4 +1,4 @@
-﻿﻿$ErrorActionPreference = "Stop"
+﻿﻿﻿﻿﻿$ErrorActionPreference = "Stop"
 
 # 本地一键启动脚本：
 # 1. 拉起根目录 docker compose 中的中间件

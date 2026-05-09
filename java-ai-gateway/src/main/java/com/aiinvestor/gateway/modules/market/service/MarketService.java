@@ -103,26 +103,17 @@ public class MarketService {
             stockPage.setTotal(stockPage.getItems().size());
         }
         
-        // 缓存行情数据
-        for (MarketStockListItemVO item : stockPage.getItems()) {
-            MarketQuoteVO quote = new MarketQuoteVO(
-                    item.getSymbol(),
-                    item.getName(),
-                    item.getLastPrice(),
-                    item.getChangePercent(),
-                    item.getChangeAmount(),
-                    item.getHighPrice(),
-                    item.getLowPrice(),
-                    item.getOpenPrice(),
-                    item.getVolume(),
-                    item.getTurnover(),
-                    item.getTurnoverRate(),
-                    null,
-                    LocalDateTime.now()
-            );
-            cacheAndPersistQuote(quote);
-            ensureStockRecord(quote);
-        }
+        // 批量缓存行情数据（减少 N+1）
+        List<MarketQuoteVO> quotes = stockPage.getItems().stream()
+                .map(item -> new MarketQuoteVO(
+                        item.getSymbol(), item.getName(), item.getLastPrice(),
+                        item.getChangePercent(), item.getChangeAmount(),
+                        item.getHighPrice(), item.getLowPrice(), item.getOpenPrice(),
+                        item.getVolume(), item.getTurnover(), item.getTurnoverRate(),
+                        null, LocalDateTime.now()))
+                .toList();
+        batchCacheAndPersistQuotes(quotes);
+        batchEnsureStockRecords(quotes);
         
         return stockPage;
     }
@@ -219,9 +210,9 @@ public class MarketService {
             List<MarketQuoteVO> freshQuotes = pythonMarketClient.fetchQuotes(missedSymbols);
             for (MarketQuoteVO quote : freshQuotes) {
                 result.put(quote.getSymbol(), quote);
-                cacheAndPersistQuote(quote);
-                ensureStockRecord(quote);
             }
+            batchCacheAndPersistQuotes(freshQuotes);
+            batchEnsureStockRecords(freshQuotes);
 
             for (String symbol : missedSymbols) {
                 if (result.containsKey(symbol)) {
@@ -287,6 +278,82 @@ public class MarketService {
             created.setPinyin(PinyinHelper.toPinyinInitials(created.getName()).toLowerCase());
         }
         stockMapper.insert(created);
+    }
+
+    /** 批量缓存并持久化行情（1 次 Redis 批写 + N 次 DB upsert）。 */
+    private void batchCacheAndPersistQuotes(List<MarketQuoteVO> quotes) {
+        Duration ttl = Duration.ofSeconds(appCacheProperties.getMarketQuoteTtlSeconds());
+        Map<String, Object> redisEntries = new LinkedHashMap<>();
+        List<MarketQuoteDO> dbEntities = new ArrayList<>();
+
+        for (MarketQuoteVO quote : quotes) {
+            redisEntries.put(cacheKey(quote.getSymbol()), quote);
+
+            MarketQuoteDO entity = new MarketQuoteDO();
+            entity.setSymbol(quote.getSymbol());
+            entity.setLastPrice(quote.getLastPrice());
+            entity.setChangePct(quote.getChangePercent());
+            entity.setChangeAmount(quote.getChangeAmount());
+            entity.setHighPrice(quote.getHighPrice());
+            entity.setLowPrice(quote.getLowPrice());
+            entity.setOpenPrice(quote.getOpenPrice());
+            entity.setVolume(quote.getVolume());
+            entity.setTurnover(quote.getTurnover());
+            entity.setTurnoverRate(quote.getTurnoverRate());
+            entity.setAmplitude(quote.getAmplitude());
+            entity.setQuoteTime(quote.getQuoteTime() == null ? LocalDateTime.now() : quote.getQuoteTime());
+            dbEntities.add(entity);
+        }
+
+        redisJsonCacheService.setAll(redisEntries, ttl);
+        for (MarketQuoteDO entity : dbEntities) {
+            marketQuoteMapper.upsert(entity);
+        }
+    }
+
+    /** 批量确保股票记录存在（1 次批量查询 + 按需 insert/update）。 */
+    private void batchEnsureStockRecords(List<MarketQuoteVO> quotes) {
+        List<String> symbols = quotes.stream().map(MarketQuoteVO::getSymbol).toList();
+        List<StockDO> existingStocks = stockMapper.selectList(
+                new LambdaQueryWrapper<StockDO>().in(StockDO::getSymbol, symbols)
+        );
+        Map<String, StockDO> existingMap = new LinkedHashMap<>();
+        for (StockDO s : existingStocks) {
+            existingMap.put(s.getSymbol(), s);
+        }
+
+        List<StockDO> toInsert = new ArrayList<>();
+        List<StockDO> toUpdate = new ArrayList<>();
+
+        for (MarketQuoteVO quote : quotes) {
+            StockDO existing = existingMap.get(quote.getSymbol());
+            if (existing != null) {
+                if (quote.getName() != null && !quote.getName().isBlank() && !quote.getName().equals(existing.getName())) {
+                    existing.setName(quote.getName());
+                    existing.setPinyin(PinyinHelper.toPinyinInitials(quote.getName()).toLowerCase());
+                    toUpdate.add(existing);
+                }
+            } else {
+                StockDO created = new StockDO();
+                created.setSymbol(quote.getSymbol());
+                String name = (quote.getName() == null || quote.getName().isBlank()) ? quote.getSymbol() : quote.getName();
+                created.setName(name);
+                created.setExchange(resolveExchange(quote.getSymbol()));
+                created.setMarket("A");
+                created.setStatus("active");
+                if (!name.isBlank()) {
+                    created.setPinyin(PinyinHelper.toPinyinInitials(name).toLowerCase());
+                }
+                toInsert.add(created);
+            }
+        }
+
+        for (StockDO s : toInsert) {
+            stockMapper.insert(s);
+        }
+        for (StockDO s : toUpdate) {
+            stockMapper.updateById(s);
+        }
     }
 
     private void fillFromSnapshot(String symbol, Map<String, MarketQuoteVO> result) {

@@ -23,6 +23,7 @@ import {
 } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { ChatMessage, SessionSummary } from '../types/terminal'
+import { formatTime } from '../utils/format'
 
 const props = defineProps<{
   sessions: SessionSummary[]
@@ -95,17 +96,6 @@ const useSuggestion = (text: string) => {
   emit('update:draft', text)
 }
 
-const formatTime = (value?: string) => {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '--'
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 </script>
 
 <template>

@@ -11,6 +11,7 @@ import {
   startPaperRefresh, stopPaperRefresh,
   fetchTransactions,
   isAdminRole,
+  pollMembership,
 } from './api/index'
 import type { NavItem, NavKey } from './types/terminal'
 import { useToast } from './composables/useToast'
@@ -242,6 +243,8 @@ watch(() => store.token, (token) => {
   else wsDisconnect()
 })
 
+let membershipPollTimer: ReturnType<typeof setInterval> | null = null
+
 onMounted(async () => {
   if (store.token) {
     try {
@@ -253,6 +256,7 @@ onMounted(async () => {
       await refreshTerminal()
       router.replace('/overview')
       wsConnect()
+      membershipPollTimer = setInterval(() => { pollMembership() }, 30_000)
     } catch {
       await logout()
     }
@@ -265,6 +269,7 @@ onUnmounted(() => {
   closeSSE()
   stopPaperRefresh()
   wsDisconnect()
+  if (membershipPollTimer) clearInterval(membershipPollTimer)
   window.removeEventListener('click', closeUserMenu)
 })
 
@@ -358,6 +363,7 @@ function closeUserMenu() {
             :orders="store.orders"
             :sessions="store.sessions"
             :handoff-count="store.tickets.length"
+            :announcements="store.announcements"
             @open="openView"
           />
 

@@ -254,7 +254,6 @@ public class PaperTradingService {
         );
 
         // 异步发送充值/提现事件（通过 MQ）
-        PaperAccountDO updatedAccount = paperAccountMapper.selectById(account.getId());
         transactionEventProducer.send(new TransactionEvent(
                 userId,
                 "withdraw".equalsIgnoreCase(direction) ? "WITHDRAW" : "DEPOSIT",
@@ -263,7 +262,7 @@ public class PaperTradingService {
                 null,
                 null,
                 amount,
-                updatedAccount.getCashBalance(),
+                account.getCashBalance(),
                 ("withdraw".equalsIgnoreCase(direction) ? "提现" : "充值") + " " + amount.toPlainString() + " 元",
                 Instant.now()
         ));
@@ -487,6 +486,7 @@ public class PaperTradingService {
 
         List<PaperPositionVO> positions = new ArrayList<>();
         BigDecimal totalMarketValue = BigDecimal.ZERO;
+        List<PaperPositionDO> toUpdate = new ArrayList<>();
 
         for (PaperPositionDO item : positionEntities) {
             MarketQuoteVO quote = quoteMap.get(item.getSymbol());
@@ -505,7 +505,7 @@ public class PaperTradingService {
                     || item.getFloatingPnl().compareTo(latestFloatingPnl) != 0) {
                 item.setMarketValue(latestMarketValue);
                 item.setFloatingPnl(latestFloatingPnl);
-                paperPositionMapper.updateById(item);
+                toUpdate.add(item);
             }
 
             positions.add(new PaperPositionVO(
@@ -522,6 +522,10 @@ public class PaperTradingService {
                     quote == null ? null : quote.getChangeAmount(),
                     quote == null ? null : quote.getQuoteTime()
             ));
+        }
+
+        for (PaperPositionDO p : toUpdate) {
+            paperPositionMapper.updateById(p);
         }
 
         refreshAccountSnapshot(account, totalMarketValue);

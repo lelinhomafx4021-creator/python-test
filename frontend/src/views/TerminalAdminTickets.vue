@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Clock3, Sparkles, Ticket } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { AdminTicket } from '../types/terminal'
+import { formatTime, statusClass } from '../utils/format'
 
 const props = defineProps<{
   tickets: AdminTicket[]
@@ -65,28 +66,10 @@ const openCount = computed(() => ticketsList.value.filter((ticket) => (ticket.st
 const processingCount = computed(() => ticketsList.value.filter((ticket) => ticket.status === 'processing').length)
 const closedCount = computed(() => ticketsList.value.filter((ticket) => ticket.status === 'closed').length)
 
-const formatTime = (value?: string) => {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 const statusLabel = (status?: string) => {
   if (status === 'closed') return '已关闭'
   if (status === 'processing') return '处理中'
   return '待处理'
-}
-
-const statusClass = (status?: string) => {
-  if (status === 'closed') return 'bg-slate-100 text-slate-600'
-  if (status === 'processing') return 'bg-amber-50 text-amber-700'
-  return 'bg-emerald-50 text-emerald-700'
 }
 
 const previewText = (ticket: AdminTicket) => {

@@ -5,14 +5,21 @@ import com.aiinvestor.gateway.modules.shared.vo.ApiResult;
 import com.aiinvestor.gateway.modules.admin.dto.AdminUpdateMembershipRequest;
 import com.aiinvestor.gateway.modules.admin.dto.AdminUpdateTicketStatusRequest;
 import com.aiinvestor.gateway.modules.admin.dto.AdminUpdateUserRoleRequest;
+import com.aiinvestor.gateway.modules.admin.dto.AnnouncementDTO;
 import com.aiinvestor.gateway.modules.admin.service.AdminService;
 import com.aiinvestor.gateway.modules.admin.vo.AdminDashboardVO;
 import com.aiinvestor.gateway.modules.ai.vo.HandoffTicketVO;
 import com.aiinvestor.gateway.modules.admin.vo.AdminUserPortfolioVO;
 import com.aiinvestor.gateway.modules.admin.vo.AdminUserVO;
+import com.aiinvestor.gateway.modules.shared.service.AnnouncementService;
+import com.aiinvestor.gateway.modules.shared.context.UserContext;
+import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
+import com.aiinvestor.gateway.modules.shared.vo.AnnouncementVO;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,9 +41,11 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AnnouncementService announcementService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, AnnouncementService announcementService) {
         this.adminService = adminService;
+        this.announcementService = announcementService;
     }
 
     /** 查询管理端首页总览。 */
@@ -104,5 +113,56 @@ public class AdminController {
             @PathVariable String traceId,
                                                               @Valid @RequestBody AdminUpdateTicketStatusRequest request) {
         return ApiResult.ok(adminService.updateTicketStatus(traceId, request));
+    }
+
+    // ========== 公告管理 ==========
+
+    @Operation(summary = "获取所有公告", description = "获取全部公告（含草稿）")
+    @GetMapping("/announcements")
+    public ApiResult<List<AnnouncementVO>> listAnnouncements() {
+        if (!"admin".equals(UserContext.get().getRole())) {
+            throw new BusinessException("权限不足，仅管理员可操作");
+        }
+        return ApiResult.ok(announcementService.listAll());
+    }
+
+    @Operation(summary = "创建公告", description = "新建一条公告")
+    @PostMapping("/announcements")
+    public ApiResult<AnnouncementVO> createAnnouncement(
+            @Valid @RequestBody AnnouncementDTO dto) {
+        if (!"admin".equals(UserContext.get().getRole())) {
+            throw new BusinessException("权限不足，仅管理员可操作");
+        }
+        Long userId = UserContext.getUserId();
+        return ApiResult.ok(announcementService.create(userId, dto.getTitle(), dto.getContent(), dto.getType()));
+    }
+
+    @Operation(summary = "更新公告", description = "修改公告内容")
+    @PutMapping("/announcements/{id}")
+    public ApiResult<AnnouncementVO> updateAnnouncement(
+            @PathVariable Long id,
+            @Valid @RequestBody AnnouncementDTO dto) {
+        if (!"admin".equals(UserContext.get().getRole())) {
+            throw new BusinessException("权限不足，仅管理员可操作");
+        }
+        return ApiResult.ok(announcementService.update(id, dto.getTitle(), dto.getContent(), dto.getType()));
+    }
+
+    @Operation(summary = "发布公告", description = "将公告状态改为已发布")
+    @PutMapping("/announcements/{id}/publish")
+    public ApiResult<AnnouncementVO> publishAnnouncement(@PathVariable Long id) {
+        if (!"admin".equals(UserContext.get().getRole())) {
+            throw new BusinessException("权限不足，仅管理员可操作");
+        }
+        return ApiResult.ok(announcementService.publish(id));
+    }
+
+    @Operation(summary = "删除公告", description = "删除指定公告")
+    @DeleteMapping("/announcements/{id}")
+    public ApiResult<Boolean> deleteAnnouncement(@PathVariable Long id) {
+        if (!"admin".equals(UserContext.get().getRole())) {
+            throw new BusinessException("权限不足，仅管理员可操作");
+        }
+        return ApiResult.ok(announcementService.delete(id));
     }
 }

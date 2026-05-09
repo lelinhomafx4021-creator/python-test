@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { BriefcaseBusiness, Shield, Users, WalletCards } from 'lucide-vue-next'
+import { BriefcaseBusiness, Shield, Users, WalletCards, Megaphone, Plus, Trash2 } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
-import type { AdminDashboard, AdminTicket, AdminUser, AdminUserPortfolio, VipApplication } from '../types/terminal'
+import type { AdminDashboard, AdminTicket, AdminUser, AdminUserPortfolio, VipApplication, Announcement } from '../types/terminal'
 
 const props = defineProps<{
   overview: AdminDashboard | null
@@ -12,6 +12,7 @@ const props = defineProps<{
   portfolio: AdminUserPortfolio | null
   loadingPortfolio: boolean
   vipApplications: VipApplication[]
+  announcements: Announcement[]
 }>()
 
 const emit = defineEmits<{
@@ -22,6 +23,9 @@ const emit = defineEmits<{
   'update-user-role': [payload: { userId: number; role: string }]
   'update-user-membership': [payload: { userId: number; planCode: string }]
   'review-vip': [payload: { appId: number; action: 'approve' | 'reject'; rejectReason: string }]
+  'create-announcement': [payload: { title: string; content: string; type: string }]
+  'publish-announcement': [number]
+  'delete-announcement': [number]
 }>()
 
 const userPage = ref(1)
@@ -108,6 +112,18 @@ const reviewVip = (app: VipApplication, action: 'approve' | 'reject') => {
     action,
     rejectReason: rejectReasons.value[app.id] || '',
   })
+}
+
+const annTitle = ref('')
+const annContent = ref('')
+const annType = ref('notice')
+
+const submitAnnouncement = () => {
+  if (!annTitle.value.trim() || !annContent.value.trim()) return
+  emit('create-announcement', { title: annTitle.value, content: annContent.value, type: annType.value })
+  annTitle.value = ''
+  annContent.value = ''
+  annType.value = 'notice'
 }
 </script>
 
@@ -196,6 +212,88 @@ const reviewVip = (app: VipApplication, action: 'approve' | 'reject') => {
         </div>
       </div>
       <div v-else class="px-4 py-6 text-[12px] text-slate-500">当前没有 VIP 审核申请。</div>
+    </div>
+
+    <!-- 公告管理 -->
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-4 py-3">
+        <div class="flex items-center gap-2">
+          <Megaphone class="h-4 w-4 text-slate-600" />
+          <div class="text-[15px] font-semibold text-slate-950">系统公告</div>
+        </div>
+        <div class="mt-1 text-[12px] text-slate-500">发布系统维护通知、功能更新等公告。</div>
+      </div>
+
+      <!-- 新建公告表单 -->
+      <div class="border-b border-slate-100 px-4 py-3">
+        <div class="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
+          <input
+            v-model="annTitle"
+            type="text"
+            placeholder="公告标题"
+            class="rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none transition focus:border-slate-400"
+          />
+          <select
+            v-model="annType"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 outline-none"
+          >
+            <option value="notice">通知</option>
+            <option value="maintenance">维护</option>
+            <option value="urgent">紧急</option>
+          </select>
+          <button
+            class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-[13px] text-white transition hover:bg-slate-800"
+            @click="submitAnnouncement"
+          >
+            <Plus class="h-3.5 w-3.5" />
+            创建
+          </button>
+        </div>
+        <textarea
+          v-model="annContent"
+          rows="2"
+          placeholder="公告内容"
+          class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none transition focus:border-slate-400"
+        />
+      </div>
+
+      <!-- 公告列表 -->
+      <div v-if="announcements.length" class="divide-y divide-slate-100">
+        <div v-for="ann in announcements" :key="ann.id" class="flex items-center justify-between gap-3 px-4 py-3">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span
+                class="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
+                :class="{
+                  'bg-blue-100 text-blue-700': ann.type === 'notice',
+                  'bg-amber-100 text-amber-700': ann.type === 'maintenance',
+                  'bg-red-100 text-red-700': ann.type === 'urgent',
+                }"
+              >{{ ann.type === 'notice' ? '通知' : ann.type === 'maintenance' ? '维护' : '紧急' }}</span>
+              <span
+                class="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
+                :class="ann.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+              >{{ ann.status === 'published' ? '已发布' : '草稿' }}</span>
+              <span class="truncate text-[13px] font-medium text-slate-900">{{ ann.title }}</span>
+            </div>
+            <div class="mt-1 truncate text-[12px] text-slate-500">{{ ann.content }}</div>
+          </div>
+          <div class="flex shrink-0 gap-1.5">
+            <button
+              v-if="ann.status !== 'published'"
+              class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 transition hover:bg-slate-50"
+              @click="emit('publish-announcement', ann.id)"
+            >发布</button>
+            <button
+              class="rounded-lg border border-rose-200 px-2.5 py-1.5 text-[12px] text-rose-600 transition hover:bg-rose-50"
+              @click="emit('delete-announcement', ann.id)"
+            >
+              <Trash2 class="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div v-else class="px-4 py-6 text-[12px] text-slate-500">暂无公告。</div>
     </div>
 
     <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

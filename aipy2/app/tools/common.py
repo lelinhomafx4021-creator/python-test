@@ -5,6 +5,7 @@
 函数列表：
 - build_market_code: 股票代码转腾讯行情接口市场前缀格式（sh/sz）
 - build_secid: 股票代码转东方财富 secid 格式（1.xxxx/0.xxxx）
+- extract_stock_code: 从文本中提取6位股票代码
 - safe_text: 任意值安全转字符串
 - format_time: 时间字段统一格式化为 ISO 格式
 """
@@ -61,6 +62,15 @@ def build_secid(symbol: str) -> str:
     if symbol.startswith(("5", "6", "9")):
         return f"1.{symbol}"
     return f"0.{symbol}"
+
+
+_STOCK_CODE_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
+
+
+def extract_stock_code(text: str) -> str | None:
+    """从文本中提取第一个 6 位股票代码。"""
+    match = _STOCK_CODE_RE.search(text)
+    return match.group(1) if match else None
 
 
 def safe_text(value: Any, fallback: str = "") -> str:

@@ -4,12 +4,14 @@
  * 包含：账户总览、会员配额、股票列表、财经热点、板块与自选、最近委托
  * 新增：NewsFeed 新闻组件、PortfolioPieChart 持仓饼图、EquityCurve 权益曲线
  */
-import { ArrowRight, Bot, ChartColumn, CreditCard, Radar, Star, Ticket } from 'lucide-vue-next'
+import { ArrowRight, Bot, ChartColumn, CreditCard, Megaphone, Radar, Star, Ticket } from 'lucide-vue-next'
 import { Crown } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { formatTime } from '../utils/format'
 import axios from 'axios'
 import type {
+  Announcement,
   FeatureQuota,
   HotNewsItem,
   MarketQuote,
@@ -45,6 +47,7 @@ const props = defineProps<{
   orders: PaperOrder[]
   sessions: SessionSummary[]
   handoffCount: number
+  announcements: Announcement[]
 }>()
 
 const emit = defineEmits<{
@@ -68,18 +71,6 @@ const quotaLabel = (code: string) => {
     alert_count: '提醒数量上限',
   }
   return map[code] || code
-}
-
-const formatTime = (value?: string) => {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 const infraCards = [
@@ -220,6 +211,29 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
 
 <template>
   <div class="space-y-3">
+    <!-- 系统公告横幅 -->
+    <div v-if="announcements.length" class="rounded-2xl border border-blue-200 bg-blue-50/60 px-5 py-3">
+      <div class="flex items-center gap-2">
+        <Megaphone class="h-4 w-4 shrink-0 text-blue-600" />
+        <div class="min-w-0 flex-1 overflow-hidden">
+          <div class="flex animate-marquee gap-8 whitespace-nowrap">
+            <span v-for="ann in announcements" :key="ann.id" class="inline-flex items-center gap-2 text-[13px]">
+              <span
+                class="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
+                :class="{
+                  'bg-blue-100 text-blue-700': ann.type === 'notice',
+                  'bg-amber-100 text-amber-700': ann.type === 'maintenance',
+                  'bg-red-100 text-red-700': ann.type === 'urgent',
+                }"
+              >{{ ann.type === 'notice' ? '通知' : ann.type === 'maintenance' ? '维护' : '紧急' }}</span>
+              <span class="font-medium text-slate-800">{{ ann.title }}</span>
+              <span class="text-slate-500">{{ ann.content }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- VIP 升级横幅（非VIP用户显示） -->
     <div
       v-if="!membership || membership.planCode !== 'vip'"

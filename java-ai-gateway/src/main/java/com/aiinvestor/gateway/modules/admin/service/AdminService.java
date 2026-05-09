@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -86,37 +87,30 @@ public class AdminService {
     public AdminDashboardVO getDashboard() {
         assertAdmin();
 
-        long totalUsers = userMapper.selectCount(null);
-        long totalVipUsers = userMembershipMapper.selectCount(
+        // 9 个独立查询并行执行，总耗时从 sum 降为 max
+        CompletableFuture<Long> fTotalUsers = CompletableFuture.supplyAsync(() -> userMapper.selectCount(null));
+        CompletableFuture<Long> fTotalVip = CompletableFuture.supplyAsync(() -> userMembershipMapper.selectCount(
                 new LambdaQueryWrapper<UserMembershipDO>()
                         .eq(UserMembershipDO::getPlanCode, "vip")
-                        .eq(UserMembershipDO::getStatus, "active")
-        );
-        long totalAdminUsers = userMapper.selectCount(
-                new LambdaQueryWrapper<UserDO>().eq(UserDO::getRole, "admin")
-        );
-        long totalAiSessions = aiSessionMapper.selectCount(new LambdaQueryWrapper<AiSessionDO>());
-        long totalHandoffTickets = aiHandoffTicketMapper.selectCount(new LambdaQueryWrapper<AiHandoffTicketDO>());
-        long openHandoffTickets = aiHandoffTicketMapper.selectCount(
+                        .eq(UserMembershipDO::getStatus, "active")));
+        CompletableFuture<Long> fTotalAdmin = CompletableFuture.supplyAsync(() -> userMapper.selectCount(
+                new LambdaQueryWrapper<UserDO>().eq(UserDO::getRole, "admin")));
+        CompletableFuture<Long> fTotalSessions = CompletableFuture.supplyAsync(() -> aiSessionMapper.selectCount(new LambdaQueryWrapper<AiSessionDO>()));
+        CompletableFuture<Long> fTotalTickets = CompletableFuture.supplyAsync(() -> aiHandoffTicketMapper.selectCount(new LambdaQueryWrapper<AiHandoffTicketDO>()));
+        CompletableFuture<Long> fOpenTickets = CompletableFuture.supplyAsync(() -> aiHandoffTicketMapper.selectCount(
                 new LambdaQueryWrapper<AiHandoffTicketDO>()
-                        .and(wrapper -> wrapper.isNull(AiHandoffTicketDO::getStatus)
-                                .or()
-                                .ne(AiHandoffTicketDO::getStatus, "closed"))
-        );
-        long totalWatchlists = watchlistMapper.selectCount(new LambdaQueryWrapper<WatchlistDO>());
-        long totalPaperAccounts = paperAccountMapper.selectCount(new LambdaQueryWrapper<PaperAccountDO>());
-        long totalTransactionLogs = transactionLogMapper.selectCount(new LambdaQueryWrapper<TransactionLogDO>());
+                        .and(w -> w.isNull(AiHandoffTicketDO::getStatus).or().ne(AiHandoffTicketDO::getStatus, "closed"))));
+        CompletableFuture<Long> fTotalWatchlists = CompletableFuture.supplyAsync(() -> watchlistMapper.selectCount(new LambdaQueryWrapper<WatchlistDO>()));
+        CompletableFuture<Long> fTotalPaper = CompletableFuture.supplyAsync(() -> paperAccountMapper.selectCount(new LambdaQueryWrapper<PaperAccountDO>()));
+        CompletableFuture<Long> fTotalTxLogs = CompletableFuture.supplyAsync(() -> transactionLogMapper.selectCount(new LambdaQueryWrapper<TransactionLogDO>()));
+
+        CompletableFuture.allOf(fTotalUsers, fTotalVip, fTotalAdmin, fTotalSessions,
+                fTotalTickets, fOpenTickets, fTotalWatchlists, fTotalPaper, fTotalTxLogs).join();
 
         return new AdminDashboardVO(
-                totalUsers,
-                totalVipUsers,
-                totalAdminUsers,
-                totalAiSessions,
-                totalHandoffTickets,
-                openHandoffTickets,
-                totalWatchlists,
-                totalPaperAccounts,
-                totalTransactionLogs
+                fTotalUsers.join(), fTotalVip.join(), fTotalAdmin.join(),
+                fTotalSessions.join(), fTotalTickets.join(), fOpenTickets.join(),
+                fTotalWatchlists.join(), fTotalPaper.join(), fTotalTxLogs.join()
         );
     }
 

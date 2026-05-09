@@ -13,17 +13,19 @@ from app.tools.common import format_time, safe_text
 # 抓取超时上限（秒），避免网络异常时线程长期阻塞
 _NEWS_FETCH_TIMEOUT_SECONDS = 8
 
+# 模块级线程池，所有新闻抓取共用，避免每次调用都创建/销毁线程池
+_news_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="news-fetch")
+
 
 def _run_with_timeout(task_name: str, supplier: Callable[[], Any]) -> Any:
     """给第三方联网抓取增加超时保护，避免断网时长时间卡死。"""
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="news-fetch") as executor:
-        future = executor.submit(supplier)
-        try:
-            return future.result(timeout=_NEWS_FETCH_TIMEOUT_SECONDS)
-        except FutureTimeoutError:
-            logger.warning("热点新闻抓取超时，task=%s, timeout=%ss", task_name, _NEWS_FETCH_TIMEOUT_SECONDS)
-        except Exception as exc:
-            logger.warning("热点新闻抓取失败，task=%s, error=%s", task_name, exc)
+    future = _news_executor.submit(supplier)
+    try:
+        return future.result(timeout=_NEWS_FETCH_TIMEOUT_SECONDS)
+    except FutureTimeoutError:
+        logger.warning("热点新闻抓取超时，task=%s, timeout=%ss", task_name, _NEWS_FETCH_TIMEOUT_SECONDS)
+    except Exception as exc:
+        logger.warning("热点新闻抓取失败，task=%s, error=%s", task_name, exc)
     return None
 
 

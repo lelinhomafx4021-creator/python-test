@@ -8,6 +8,7 @@
 import { computed } from'vue'
 import { ReceiptText, ScrollText } from'lucide-vue-next'
 import PaginationBar from'../components/PaginationBar.vue'
+import { formatTime } from'../utils/format'
 
 /** 单条交易记录（后端返回的流水数据） */
 type TransactionItem = {
@@ -48,18 +49,6 @@ const priceFmt = (value?: number) =>
  typeof value ==='number'
  ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
  :'--'
-
-const formatTime = (value?: string) => {
- if (!value) return'暂无'
- const date = new Date(value)
- if (Number.isNaN(date.getTime())) return'暂无'
- return date.toLocaleString('zh-CN', {
- month:'2-digit',
- day:'2-digit',
- hour:'2-digit',
- minute:'2-digit',
- })
-}
 
 /** 交易类型 → 中文 + 颜色 */
 const typeMap: Record<string, { label: string; cls: string }> = {
@@ -149,7 +138,7 @@ const summary = computed(() => {
  :key="tx.id"
  class="grid grid-cols-[120px_90px_90px_70px_90px_120px_120px_120px_1fr] items-center border-t border-slate-100 px-5 py-3 text-[13px]"
  >
- <div class="text-slate-500">{{ formatTime(tx.createdAt) }}</div>
+ <div class="text-slate-500">{{ formatTime(tx.createdAt, '暂无') }}</div>
  <div>
  <span class="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium" :class="typeBadge(tx.transactionType).cls">
  {{ typeBadge(tx.transactionType).label }}
@@ -189,7 +178,7 @@ const summary = computed(() => {
  {{ typeBadge(tx.transactionType).label }}
  </span>
  <span v-if="tx.symbol" class="text-[12px] font-medium text-slate-700">{{ tx.symbol }}</span>
- <span class="ml-auto text-[11px] text-slate-400">{{ formatTime(tx.createdAt) }}</span>
+ <span class="ml-auto text-[11px] text-slate-400">{{ formatTime(tx.createdAt, '暂无') }}</span>
  </div>
 
  <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">

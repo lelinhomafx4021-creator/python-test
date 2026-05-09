@@ -223,6 +223,17 @@ export type UserNotification = {
   readAt?: string
 }
 
+export type Announcement = {
+  id: number
+  title: string
+  content: string
+  type: string
+  status: string
+  publishedAt?: string
+  createdBy?: number
+  createdAt?: string
+}
+
 export type NavItem = {
   key: NavKey
   label: string

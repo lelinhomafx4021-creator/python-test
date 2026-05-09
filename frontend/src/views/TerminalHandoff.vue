@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { ChevronDown, ChevronUp, Clock3, Headset, Sparkles } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { HandoffTicket } from '../types/terminal'
+import { formatTime, statusClass } from '../utils/format'
 
 const props = defineProps<{
   tickets: HandoffTicket[]
@@ -35,18 +36,6 @@ const openCount = computed(() => props.tickets.filter((ticket) => (ticket.status
 const processingCount = computed(() => props.tickets.filter((ticket) => ticket.status === 'processing').length)
 const closedCount = computed(() => props.tickets.filter((ticket) => ticket.status === 'closed').length)
 
-const formatTime = (value?: string) => {
-  if (!value) return '暂无'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '暂无'
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 const reasonText = (reason?: string) => {
   const map: Record<string, string> = {
     user_requested_human: '你主动要求人工协助',
@@ -62,12 +51,6 @@ const statusText = (status?: string) => {
     closed: '已完成',
   }
   return map[status || ''] || '待处理'
-}
-
-const statusClass = (status?: string) => {
-  if (status === 'closed') return 'bg-slate-100 text-slate-600'
-  if (status === 'processing') return 'bg-amber-50 text-amber-700'
-  return 'bg-emerald-50 text-emerald-700'
 }
 
 const summaryText = (ticket: HandoffTicket) => {
@@ -130,7 +113,7 @@ const toggleExpand = (traceId: string) => {
               </span>
               <span class="inline-flex items-center gap-1 text-[12px] text-slate-400">
                 <Clock3 class="h-3.5 w-3.5" />
-                {{ formatTime(ticket.createdAt) }}
+                {{ formatTime(ticket.createdAt, '暂无') }}
               </span>
             </div>
 

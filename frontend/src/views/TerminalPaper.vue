@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { ArrowUpDown, Landmark, ReceiptText } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { PaperAccount, PaperCashTransfer, PaperOrder, PaperPosition } from '../types/terminal'
+import { formatTime } from '../utils/format'
 
 const props = defineProps<{
  paperAccount?: PaperAccount | null
@@ -29,18 +30,6 @@ const orderPage = ref(1)
 const transferPage = ref(1)
 const pageSize = 8
 
-const formatTime = (value?: string) => {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-}
 
 const depositAmount = ref(5000)
 const depositRemark = ref('银行卡充值演示')
