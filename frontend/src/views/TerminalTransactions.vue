@@ -8,7 +8,7 @@
 import { computed } from'vue'
 import { ReceiptText, ScrollText } from'lucide-vue-next'
 import PaginationBar from'../components/PaginationBar.vue'
-import { formatTime } from'../utils/format'
+import { formatMoney, formatPrice, formatTime } from '../utils/format'
 
 /** 单条交易记录（后端返回的流水数据） */
 type TransactionItem = {
@@ -35,20 +35,6 @@ const props = defineProps<{
 const emit = defineEmits<{
 'update:page': [value: number]
 }>()
-
-/* ─── 工具函数 ─── */
-
-const money = (value?: number) =>
- new Intl.NumberFormat('zh-CN', {
- style:'currency',
- currency:'CNY',
- maximumFractionDigits: 2,
- }).format(value || 0)
-
-const priceFmt = (value?: number) =>
- typeof value ==='number'
- ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
- :'--'
 
 /** 交易类型 → 中文 + 颜色 */
 const typeMap: Record<string, { label: string; cls: string }> = {
@@ -102,15 +88,15 @@ const summary = computed(() => {
  </div>
  <div class="rounded-[20px] bg-white/8 px-4 py-3 text-center">
  <div class="text-xs text-slate-300">当前余额</div>
- <div class="mt-1 text-2xl font-semibold">{{ money(summary.balance) }}</div>
+ <div class="mt-1 text-2xl font-semibold">{{ formatMoney(summary.balance) }}</div>
  </div>
  <div class="rounded-[20px] bg-white/8 px-4 py-3 text-center">
  <div class="text-xs text-slate-300">总买入金额</div>
- <div class="mt-1 text-2xl font-semibold">{{ money(summary.buyAmount) }}</div>
+ <div class="mt-1 text-2xl font-semibold">{{ formatMoney(summary.buyAmount) }}</div>
  </div>
  <div class="rounded-[20px] bg-white/8 px-4 py-3 text-center">
  <div class="text-xs text-slate-300">总卖出金额</div>
- <div class="mt-1 text-2xl font-semibold">{{ money(summary.sellAmount) }}</div>
+ <div class="mt-1 text-2xl font-semibold">{{ formatMoney(summary.sellAmount) }}</div>
  </div>
  </div>
  </div>
@@ -149,9 +135,9 @@ const summary = computed(() => {
  {{ directionLabel(tx.transactionType) }}
  </div>
  <div class="text-slate-900">{{ tx.quantity ? tx.quantity +' 股' :'--' }}</div>
- <div class="text-right text-slate-500">{{ priceFmt(tx.price) }}</div>
- <div class="text-right font-medium text-slate-900">{{ money(tx.amount) }}</div>
- <div class="text-right text-slate-500">{{ money(tx.balanceAfter) }}</div>
+ <div class="text-right text-slate-500">{{ formatPrice(tx.price) }}</div>
+ <div class="text-right font-medium text-slate-900">{{ formatMoney(tx.amount) }}</div>
+ <div class="text-right text-slate-500">{{ formatMoney(tx.balanceAfter) }}</div>
  <div class="truncate text-slate-500">{{ tx.description ||'--' }}</div>
  </div>
  </div>
@@ -185,11 +171,11 @@ const summary = computed(() => {
  <div class="text-slate-500">数量</div>
  <div class="text-right font-medium text-slate-900">{{ tx.quantity ? tx.quantity +' 股' :'--' }}</div>
  <div class="text-slate-500">价格</div>
- <div class="text-right text-slate-900">{{ priceFmt(tx.price) }}</div>
+ <div class="text-right text-slate-900">{{ formatPrice(tx.price) }}</div>
  <div class="text-slate-500">金额</div>
- <div class="text-right font-semibold text-slate-900">{{ money(tx.amount) }}</div>
+ <div class="text-right font-semibold text-slate-900">{{ formatMoney(tx.amount) }}</div>
  <div class="text-slate-500">余额</div>
- <div class="text-right text-slate-500">{{ money(tx.balanceAfter) }}</div>
+ <div class="text-right text-slate-500">{{ formatMoney(tx.balanceAfter) }}</div>
  </div>
 
  <div v-if="tx.description" class="mt-3 rounded-2xl bg-slate-50 px-3 py-2 text-[12px] leading-6 text-slate-600">

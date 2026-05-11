@@ -8,7 +8,7 @@ import { ArrowRight, Bot, ChartColumn, CreditCard, Megaphone, Radar, Star, Ticke
 import { Crown } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { computed, onMounted, ref, watch } from 'vue'
-import { formatTime } from '../utils/format'
+import { formatMoney, formatNumber, formatPercent, formatTime } from '../utils/format'
 import axios from 'axios'
 import type {
   Announcement,
@@ -28,10 +28,7 @@ import NewsFeed from '../components/NewsFeed.vue'
 import PortfolioPieChart from '../components/PortfolioPieChart.vue'
 import EquityCurve from '../components/EquityCurve.vue'
 
-/* ─── API 基础地址 ─── */
-const isTunnel = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
-const GW = import.meta.env.VITE_API_BASE_URL ?? (isTunnel ? '' : 'http://127.0.0.1:8080')
-const API_BASE = `${GW}/api/v1`
+import { API } from '../api/index'
 
 const router = useRouter()
 
@@ -53,16 +50,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   open: ['chat' | 'watchlist' | 'paper' | 'handoff' | 'news']
 }>()
-
-const money = (value?: number) =>
-  new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value || 0)
-
-const numberText = (value?: number) =>
-  typeof value === 'number'
-    ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-    : '--'
-
-const percent = (value?: number) => `${value && value > 0 ? '+' : ''}${(value || 0).toFixed(2)}%`
 
 const quotaLabel = (code: string) => {
   const map: Record<string, string> = {
@@ -145,7 +132,7 @@ const fetchEquityData = async () => {
   try {
     // 尝试从API获取每日资产快照
     if (props.paperAccount?.id) {
-      const res = await axios.get(`${API_BASE}/paper/accounts/${props.paperAccount.id}/daily-assets`, {})
+      const res = await axios.get(`${API}/paper/accounts/${props.paperAccount.id}/daily-assets`, {})
       const raw = res.data?.data || res.data || []
       if (Array.isArray(raw) && raw.length > 0) {
         equityData.value = raw.map((d: any) => ({
@@ -263,7 +250,7 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
         <div class="flex items-center justify-between gap-3">
           <div>
             <div class="text-[11px] text-slate-400">账户总览</div>
-            <div class="mt-1 text-[26px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">{{ money(paperAccount?.totalAsset) }}</div>
+            <div class="mt-1 text-[26px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">{{ formatMoney(paperAccount?.totalAsset) }}</div>
           </div>
           <button
             class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-white hover:shadow-sm active:scale-[0.98]"
@@ -277,11 +264,11 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
         <div class="mt-3 grid gap-2 md:grid-cols-4">
           <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-colors duration-150 hover:bg-slate-100/80">
             <div class="text-[11px] text-slate-400">可用资金</div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ money(paperAccount?.cashBalance) }}</div>
+            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ formatMoney(paperAccount?.cashBalance) }}</div>
           </div>
           <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-colors duration-150 hover:bg-slate-100/80">
             <div class="text-[11px] text-slate-400">累计盈亏</div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ money(paperAccount?.totalPnl) }}</div>
+            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ formatMoney(paperAccount?.totalPnl) }}</div>
           </div>
           <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-colors duration-150 hover:bg-slate-100/80">
             <div class="text-[11px] text-slate-400">持仓数量</div>
@@ -310,12 +297,12 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
             >
               <div class="font-medium text-slate-900 transition-colors duration-300">{{ position.symbol }}</div>
               <div class="truncate text-slate-600 transition-colors duration-300">{{ position.name }}</div>
-              <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ numberText(position.latestPrice) }}</div>
+              <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ formatNumber(position.latestPrice) }}</div>
               <div class="text-right tabular-nums" :class="(position.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-                {{ percent(position.changePercent) }}
+                {{ formatPercent(position.changePercent) }}
               </div>
               <div class="text-right tabular-nums" :class="position.floatingPnl >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-                {{ money(position.floatingPnl) }}
+                {{ formatMoney(position.floatingPnl) }}
               </div>
             </div>
           </div>
@@ -405,12 +392,12 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
           >
             <div class="font-medium text-slate-900 transition-colors duration-300">{{ quote.symbol }}</div>
             <div class="truncate text-slate-600 transition-colors duration-300">{{ quote.name }}</div>
-            <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ numberText(quote.lastPrice) }}</div>
+            <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ formatNumber(quote.lastPrice) }}</div>
             <div class="text-right tabular-nums" :class="(quote.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-              {{ percent(quote.changePercent) }}
+              {{ formatPercent(quote.changePercent) }}
             </div>
-            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ numberText((quote.turnover || 0) / 100000000) }} 亿</div>
-            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ numberText(quote.amplitude) }}%</div>
+            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ formatNumber((quote.turnover || 0) / 100000000) }} 亿</div>
+            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ formatNumber(quote.amplitude) }}%</div>
             <div class="text-right text-[11px] tabular-nums text-slate-400">{{ formatTime(quote.quoteTime) }}</div>
           </div>
         </div>

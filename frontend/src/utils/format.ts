@@ -32,3 +32,34 @@ const STATUS_MAP: Record<string, string> = {
 
 /** 工单状态对应的 Tailwind 样式类 */
 export const statusClass = (status?: string) => STATUS_MAP[status ?? ''] ?? 'bg-emerald-50 text-emerald-700'
+
+// ── 数值格式化（消除各组件中的重复定义） ──
+
+/** 金额：¥1,234.56（千分位 + 两位小数），空值返回 fallback */
+export const formatMoney = (value?: number, fallback = '--') =>
+  value != null
+    ? new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value)
+    : fallback
+
+/** 普通数值：1,234.56（千分位 + 两位小数），空值返回 fallback */
+export const formatNumber = (value?: number, fallback = '--', decimals = 2) =>
+  value != null
+    ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
+    : fallback
+
+/** 价格/数量：1,234.56（千分位 + 两位小数，整数用，空值返回 fallback） */
+export const formatPrice = (value?: number, fallback = '--', decimals = 2) =>
+  value != null
+    ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
+    : fallback
+
+/** 百分比：+12.50%（正数带 + 号，两位小数），空值返回 fallback */
+export const formatPercent = (value?: number, fallback = '--', showSign = true) => {
+  if (value == null) return fallback
+  const sign = showSign && value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(2)}%`
+}
+
+/** 整数：1,235（千分位，无小数），空值返回 fallback */
+export const formatInt = (value?: number, fallback = '--') =>
+  value != null ? new Intl.NumberFormat('zh-CN').format(value) : fallback

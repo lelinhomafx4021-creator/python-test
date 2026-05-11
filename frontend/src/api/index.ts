@@ -34,8 +34,50 @@ const isTunnel = typeof window !== 'undefined' && !window.location.hostname.incl
 const GW = import.meta.env.VITE_API_BASE_URL ?? (isTunnel ? '' : 'http://127.0.0.1:8080')
 const AUTH = `${GW}/gateway/auth`
 const AI = `${GW}/gateway/ai`
-const API = `${GW}/api/v1`
+export const API = `${GW}/api/v1`
 const TOKEN_KEY = 'ai-investor-token'
+
+/**
+ * fetch-based SSE 客户端，替代原生 EventSource（原生不支持自定义 Header）。
+ * 解决 Token 只能放 URL 查询参数的安全问题。
+ */
+const createSSE = (
+  url: string,
+  headers: Record<string, string>,
+  onMessage: (data: string, close: () => void) => void,
+  onError: (close: () => void) => void,
+) => {
+  const controller = new AbortController()
+  let closed = false
+  const close = () => {
+    closed = true
+    controller.abort()
+  }
+
+  fetch(url, { headers, signal: controller.signal })
+    .then(async (response) => {
+      if (!response.ok || !response.body) { onError(close); return }
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (!closed) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (trimmed.startsWith('data:')) {
+            onMessage(trimmed.slice(5).trimStart(), close)
+          }
+        }
+      }
+    })
+    .catch(() => { if (!closed) onError(close) })
+
+  return close
+}
 
 export const normalizeRole = (role?: string | null) => (role || '').trim().toLowerCase()
 export const isAdminRole = (role?: string | null) => normalizeRole(role) === 'admin'
@@ -194,8 +236,12 @@ const reset = () => {
   stopEmailCodeCooldown()
 }
 
-const md = new MarkdownIt({ breaks: true, linkify: true })
-export const renderMd = (s: string) => md.render(s || '')
+const md = new MarkdownIt({ breaks: true, linkify: false })
+export const renderMd = (s: string) => {
+  const html = md.render(s || '')
+  // 过滤 javascript: 协议链接，防止 XSS
+  return html.replace(/href="javascript:[^"]*"/gi, 'href="#"')
+}
 
 export const fetchMe = async () => {
   const res = await axios.get(`${AUTH}/me`, { headers: headers() })
@@ -490,7 +536,7 @@ export const stopPaperRefresh = () => {
   }
 }
 
-let _sse: EventSource | null = null
+let _sse: (() => void) | null = null
 
 export const fetchSessions = async () => {
   const res = await axios.get(`${AI}/sessions`, { headers: headers() })
@@ -518,7 +564,7 @@ export const loadSession = async (sid: string) => {
 
 export const closeSSE = () => {
   if (_sse) {
-    _sse.close()
+    _sse()
     _sse = null
   }
   store.streaming = false
@@ -535,60 +581,62 @@ export const sendChat = async () => {
   const ai = store.messages.push({ role: 'assistant', content: '', thoughts: [], showThoughts: true }) - 1
 
   store.streaming = true
-  const url = `${AI}/chat/stream?message=${encodeURIComponent(q)}&sessionId=${sid}&satoken=${encodeURIComponent(store.token)}`
+  // Token 通过 HTTP Header 传递，不再暴露在 URL 查询参数中
+  const url = `${AI}/chat/stream?message=${encodeURIComponent(q)}&sessionId=${sid}`
   closeSSE()
-  const s = new EventSource(url)
-  _sse = s
 
-  s.onmessage = async (e) => {
-    const p = (() => { try { return JSON.parse(e.data) } catch { return null } })()
-    if (!p) {
-      ;(store.messages[ai] as any).content += e.data
-      return
-    }
-    if (p.stage === 'content_delta') {
-      ;(store.messages[ai] as any).content += p.data?.delta || ''
-      return
-    }
-    if (p.stage === 'final_answer') {
-      ;(store.messages[ai] as any).content = p.data?.answer || ''
-      s.close()
-      _sse = null
-      store.streaming = false
-      await refreshChatContext()
-      return
-    }
-    if (p.stage === 'error') {
-      ;(store.messages[ai] as any).content = p.data?.msg || '服务暂不可用'
-      s.close()
-      _sse = null
-      store.streaming = false
-      return
-    }
-    if (p.stage === 'done') {
-      s.close()
-      _sse = null
-      store.streaming = false
-      await refreshChatContext()
-      return
-    }
-    if (p.data?.step && (store.messages[ai] as any).thoughts) {
-      const last = (store.messages[ai] as any).thoughts[(store.messages[ai] as any).thoughts.length - 1]
-      if (last?.text !== p.data.step) {
-        ;(store.messages[ai] as any).thoughts.push({ time: new Date().toLocaleTimeString('zh-CN'), text: p.data.step })
+  _sse = createSSE(
+    url,
+    { satoken: store.token },
+    async (data, close) => {
+      const p = (() => { try { return JSON.parse(data) } catch { return null } })()
+      if (!p) {
+        ;(store.messages[ai] as any).content += data
+        return
       }
-    }
-  }
-
-  s.onerror = async () => {
-    s.close()
-    _sse = null
-    store.streaming = false
-    if (!(store.messages[ai] as any).content.trim()) {
-      ;(store.messages[ai] as any).content = '连接中断'
-    }
-    await refreshChatContext()
-  }
+      if (p.stage === 'content_delta') {
+        ;(store.messages[ai] as any).content += p.data?.delta || ''
+        return
+      }
+      if (p.stage === 'final_answer') {
+        ;(store.messages[ai] as any).content = p.data?.answer || ''
+        close()
+        _sse = null
+        store.streaming = false
+        await refreshChatContext()
+        return
+      }
+      if (p.stage === 'error') {
+        ;(store.messages[ai] as any).content = p.data?.msg || '服务暂不可用'
+        close()
+        _sse = null
+        store.streaming = false
+        return
+      }
+      if (p.stage === 'done') {
+        close()
+        _sse = null
+        store.streaming = false
+        await refreshChatContext()
+        return
+      }
+      if (p.data?.step && (store.messages[ai] as any).thoughts) {
+        const last = (store.messages[ai] as any).thoughts[(store.messages[ai] as any).thoughts.length - 1]
+        if (last?.text !== p.data.step) {
+          ;(store.messages[ai] as any).thoughts.push({ time: new Date().toLocaleTimeString('zh-CN'), text: p.data.step })
+        }
+      }
+    },
+    async (close) => {
+      close()
+      _sse = null
+      store.streaming = false
+      if (!(store.messages[ai] as any).content.trim()) {
+        ;(store.messages[ai] as any).content = '连接中断'
+      }
+      await refreshChatContext()
+    },
+  )
 }
 
 export const newChat = () => {
@@ -666,34 +714,6 @@ export const refreshChatContext = async () => {
       optionalTask('chat sessions', fetchSessions),
       optionalTask('quotas', () => get(`${API}/quotas/me`, 'quotas')),
       optionalTask('notifications', () => get(`${API}/notifications`, 'notifications')),
-    ])
-  })
-}
-
-export const refreshAll = async () => {
-  if (!store.user) return
-  await safe(async () => {
-    await Promise.all([
-      optionalTask('profile', fetchProfile),
-      optionalTask('membership', () => get(`${API}/memberships/me`, 'membership')),
-      optionalTask('quotas', () => get(`${API}/quotas/me`, 'quotas')),
-      optionalTask('quotes', fetchQuotes),
-      optionalTask('market stocks', fetchMarketStocks),
-      optionalTask('hot news', fetchHotNews),
-      optionalTask('sectors', fetchSectors),
-      optionalTask('watchlists', fetchWatchlists),
-      optionalTask('paper account', fetchPaper),
-      optionalTask('chat sessions', fetchSessions),
-      optionalTask('handoff tickets', fetchTickets),
-      optionalTask('paper transactions', fetchTransactions),
-      optionalTask('notifications', () => get(`${API}/notifications`, 'notifications')),
-      optionalTask('announcements', fetchAnnouncements),
-      optionalTask('admin workspace', fetchAdmin),
-    ])
-    await Promise.all([
-      optionalTask('paper snapshot', () => fetchSnapshot()),
-      optionalTask('paper orders', fetchOrders),
-      optionalTask('paper transfers', fetchTransfers),
     ])
   })
 }

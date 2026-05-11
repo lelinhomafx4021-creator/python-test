@@ -4,11 +4,9 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import axios from 'axios'
 import type { KLineDataPoint, MarketStock, Watchlist } from '../types/terminal'
 import KLineChart from '../components/KLineChart.vue'
-import { formatTime } from '../utils/format'
+import { formatNumber, formatPercent, formatTime } from '../utils/format'
 
-const isTunnel = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
-const GW = import.meta.env.VITE_API_BASE_URL ?? (isTunnel ? '' : 'http://127.0.0.1:8080')
-const API_BASE = `${GW}/api/v1`
+import { API } from '../api/index'
 
 const props = defineProps<{
   watchlists: Watchlist[]
@@ -41,12 +39,6 @@ const selectedWatchlist = computed(
   () => props.watchlists.find((item) => item.id === props.selectedWatchlistId) || props.watchlists[0] || null,
 )
 
-const numberText = (value?: number) =>
-  typeof value === 'number'
-    ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-    : '--'
-
-const percent = (value?: number) => `${value && value > 0 ? '+' : ''}${(value || 0).toFixed(2)}%`
 const totalPages = computed(() => Math.max(1, Math.ceil(props.marketTotal / props.marketPageSize)))
 
 const quickTradeVisible = ref(false)
@@ -130,7 +122,7 @@ const fetchKlineData = async (
   klineLoading.value = true
   klineData.value = []
   try {
-    const res = await axios.get(`${API_BASE}/kline`, {
+    const res = await axios.get(`${API}/kline`, {
       params: {
         symbol,
         period,
@@ -197,7 +189,7 @@ const onSearchInput = (event: Event) => {
   searchTimer = setTimeout(async () => {
     searchLoading.value = true
     try {
-      const res = await axios.get(`${API_BASE}/market/stocks?page=1&pageSize=10&keyword=${encodeURIComponent(value.trim())}`, {
+      const res = await axios.get(`${API}/market/stocks?page=1&pageSize=10&keyword=${encodeURIComponent(value.trim())}`, {
         headers: { satoken: localStorage.getItem('satoken') || '' },
       })
       searchSuggestions.value = res.data.data?.items || []
@@ -382,11 +374,11 @@ onUnmounted(() => {
               查看
             </button>
           </div>
-          <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ numberText(stock.lastPrice) }}</div>
+          <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ formatNumber(stock.lastPrice) }}</div>
           <div class="text-right tabular-nums" :class="(stock.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-            {{ percent(stock.changePercent) }}
+            {{ formatPercent(stock.changePercent) }}
           </div>
-          <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ numberText((stock.turnover || 0) / 100000000) }} 亿</div>
+          <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ formatNumber((stock.turnover || 0) / 100000000) }} 亿</div>
           <div class="text-right">
             <button
               class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.96]"
@@ -504,7 +496,7 @@ onUnmounted(() => {
                 </div>
                 <div class="flex items-center gap-2">
                   <div :class="(item.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'" class="text-[11px] tabular-nums">
-                    {{ percent(item.changePercent) }}
+                    {{ formatPercent(item.changePercent) }}
                   </div>
                   <button
                     class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.96]"
@@ -522,7 +514,7 @@ onUnmounted(() => {
               </div>
 
               <div class="mt-2 grid gap-2 md:grid-cols-3 text-[11px] text-slate-400">
-                <div>最新价：<span class="tabular-nums text-slate-900 transition-colors duration-300">{{ numberText(item.lastPrice) }}</span></div>
+                <div>最新价：<span class="tabular-nums text-slate-900 transition-colors duration-300">{{ formatNumber(item.lastPrice) }}</span></div>
                 <div>
                   <Bell class="mr-1 inline h-3.5 w-3.5" />
                   {{ item.alertEnabled ? '提醒已开启' : '提醒未开启' }}

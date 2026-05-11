@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { ArrowUpDown, Landmark, ReceiptText } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { PaperAccount, PaperCashTransfer, PaperOrder, PaperPosition } from '../types/terminal'
-import { formatTime } from '../utils/format'
+import { formatMoney, formatPercent, formatPrice, formatTime } from '../utils/format'
 
 const props = defineProps<{
  paperAccount?: PaperAccount | null
@@ -76,20 +76,6 @@ const pagedTransfers = computed(() => {
  return props.transfers.slice(start, start + pageSize)
 })
 
-const money = (value?: number) =>
- new Intl.NumberFormat('zh-CN', {
- style: 'currency',
- currency: 'CNY',
- maximumFractionDigits: 2,
- }).format(value || 0)
-
-const price = (value?: number) =>
- typeof value === 'number'
- ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
- : '--'
-
-const percent = (value?: number) => `${value && value > 0 ? '+' : ''}${(value || 0).toFixed(2)}%`
-
 const accountStatusText = (status?: string) => {
  const map: Record<string, string> = {
  active: '正常可用',
@@ -141,17 +127,17 @@ const submitWithdraw = () => {
  <div class="mt-4 grid gap-2">
  <div class="rounded-2xl bg-slate-50 px-4 py-3">
  <div class="text-[12px] text-slate-500">总资产</div>
- <div class="mt-1 text-[22px] font-semibold text-slate-950">{{ money(paperAccount?.totalAsset) }}</div>
+ <div class="mt-1 text-[22px] font-semibold text-slate-950">{{ formatMoney(paperAccount?.totalAsset) }}</div>
  </div>
 
  <div class="grid grid-cols-2 gap-2">
  <div class="rounded-2xl bg-slate-50 px-4 py-3">
  <div class="text-[12px] text-slate-500">可用资金</div>
- <div class="mt-1 text-[16px] font-semibold text-slate-950">{{ money(paperAccount?.cashBalance) }}</div>
+ <div class="mt-1 text-[16px] font-semibold text-slate-950">{{ formatMoney(paperAccount?.cashBalance) }}</div>
  </div>
  <div class="rounded-2xl bg-slate-50 px-4 py-3">
  <div class="text-[12px] text-slate-500">累计盈亏</div>
- <div class="mt-1 text-[16px] font-semibold text-slate-950">{{ money(paperAccount?.totalPnl) }}</div>
+ <div class="mt-1 text-[16px] font-semibold text-slate-950">{{ formatMoney(paperAccount?.totalPnl) }}</div>
  </div>
  </div>
 
@@ -286,7 +272,7 @@ const submitWithdraw = () => {
  :key="transfer.id"
  class="grid grid-cols-[120px_120px_1fr_120px_140px] items-center border-t border-slate-100 px-5 py-3 text-[13px]"
  >
- <div class="font-medium text-slate-900">{{ money(transfer.amount) }}</div>
+ <div class="font-medium text-slate-900">{{ formatMoney(transfer.amount) }}</div>
  <div class="text-emerald-600">{{ transferStatusText(transfer.status) }}</div>
  <div class="truncate text-slate-500">{{ transfer.remark || transfer.channelName }}</div>
  <div class="text-slate-500">{{ transfer.channelName }}</div>
@@ -331,13 +317,13 @@ const submitWithdraw = () => {
  <div class="font-medium text-slate-900">{{ position.symbol }}</div>
  <div class="truncate text-slate-600">{{ position.name }}</div>
  <div class="text-right text-slate-900">{{ position.positionQty }}</div>
- <div class="text-right text-slate-900">{{ price(position.latestPrice) }}</div>
+ <div class="text-right text-slate-900">{{ formatPrice(position.latestPrice) }}</div>
  <div class="text-right" :class="(position.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
- {{ percent(position.changePercent) }}
+ {{ formatPercent(position.changePercent) }}
  </div>
- <div class="text-right text-slate-500">{{ money(position.marketValue) }}</div>
+ <div class="text-right text-slate-500">{{ formatMoney(position.marketValue) }}</div>
  <div class="text-right" :class="position.floatingPnl >= 0 ? 'text-rose-600' : 'text-emerald-600'">
- {{ money(position.floatingPnl) }}
+ {{ formatMoney(position.floatingPnl) }}
  </div>
  </div>
  </div>
@@ -383,7 +369,7 @@ const submitWithdraw = () => {
  {{ order.side === 'BUY' ? '买入' : '卖出' }}
  </div>
  <div class="text-slate-900">{{ order.orderQty }} 股</div>
- <div class="text-slate-500">{{ price(order.orderPrice) }}</div>
+ <div class="text-slate-500">{{ formatPrice(order.orderPrice) }}</div>
  <div class="text-slate-500">{{ orderStatusText(order.orderStatus) }}</div>
  <div class="text-[12px] tabular-nums text-slate-400">{{ formatTime(order.createdAt) }}</div>
  <div class="text-right">

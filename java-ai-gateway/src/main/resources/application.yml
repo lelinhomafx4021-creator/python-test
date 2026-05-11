@@ -94,8 +94,8 @@ aliyun:
     enabled: true
     endpoint: oss-cn-beijing.aliyuncs.com
     bucket: package5
-    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:LTAI5t7Mzx1SrK63KELH7ZiM}
-    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:FTDsFcGFy56XSc9AJDfl4FphI1aQ4o}
+    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
     public-base-url: ${ALIYUN_OSS_PUBLIC_BASE_URL:}
     directory: avatar
     max-file-size: ${ALIYUN_OSS_MAX_FILE_SIZE:5242880}

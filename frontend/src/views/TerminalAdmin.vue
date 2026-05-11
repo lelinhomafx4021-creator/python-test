@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { BriefcaseBusiness, Shield, Users, WalletCards, Megaphone, Plus, Trash2 } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
+import { formatInt, formatMoney, formatPrice } from '../utils/format'
 import type { AdminDashboard, AdminTicket, AdminUser, AdminUserPortfolio, VipApplication, Announcement } from '../types/terminal'
 
 const props = defineProps<{
@@ -61,21 +62,13 @@ const updateKeyword = (event: Event) => {
   emit('update:keyword', (event.target as HTMLInputElement).value)
 }
 
-const numberText = (value?: number) => new Intl.NumberFormat('zh-CN').format(value || 0)
-const moneyText = (value?: number) =>
-  new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value || 0)
-const priceText = (value?: number) =>
-  typeof value === 'number'
-    ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-    : '--'
-
-const cards = computed(() => [
-  { key: 'users', title: '用户总数', value: numberText(props.overview?.totalUsers), icon: Users },
-  { key: 'vip', title: '会员用户', value: numberText(props.overview?.totalVipUsers), icon: Shield },
-  { key: 'sessions', title: 'AI 会话', value: numberText(props.overview?.totalAiSessions), icon: WalletCards },
-  { key: 'tickets', title: '待处理工单', value: numberText(props.overview?.openHandoffTickets), icon: Shield },
-  { key: 'watchlists', title: '自选分组', value: numberText(props.overview?.totalWatchlists), icon: Users },
-  { key: 'accounts', title: '模拟账户', value: numberText(props.overview?.totalPaperAccounts), icon: WalletCards },
+constcards = computed(() => [
+  { key: 'users', title: '用户总数', value: formatInt(props.overview?.totalUsers), icon: Users },
+  { key: 'vip', title: '会员用户', value: formatInt(props.overview?.totalVipUsers), icon: Shield },
+  { key: 'sessions', title: 'AI 会话', value: formatInt(props.overview?.totalAiSessions), icon: WalletCards },
+  { key: 'tickets', title: '待处理工单', value: formatInt(props.overview?.openHandoffTickets), icon: Shield },
+  { key: 'watchlists', title: '自选分组', value: formatInt(props.overview?.totalWatchlists), icon: Users },
+  { key: 'accounts', title: '模拟账户', value: formatInt(props.overview?.totalPaperAccounts), icon: WalletCards },
 ])
 
 const confirmRoleChange = (user: AdminUser, event: Event) => {
@@ -177,7 +170,7 @@ const submitAnnouncement = () => {
             <div class="space-y-1 text-[13px] text-slate-600">
               <div class="text-[16px] font-semibold text-slate-950">{{ app.username }}</div>
               <div>申请编号：{{ app.id }}</div>
-              <div>金额：{{ moneyText(app.paymentAmount) }}</div>
+              <div>金额：{{ formatMoney(app.paymentAmount) }}</div>
               <div>状态：{{ app.status }}</div>
               <div>备注：{{ app.paymentNote || '无' }}</div>
               <div>提交时间：{{ app.createdAt || '--' }}</div>
@@ -381,15 +374,15 @@ const submitAnnouncement = () => {
         <div class="grid gap-3 md:grid-cols-3">
           <div class="rounded-lg bg-slate-50 px-4 py-3">
             <div class="text-[12px] text-slate-500">总资产</div>
-            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ moneyText(portfolio.account?.totalAsset) }}</div>
+            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ formatMoney(portfolio.account?.totalAsset) }}</div>
           </div>
           <div class="rounded-lg bg-slate-50 px-4 py-3">
             <div class="text-[12px] text-slate-500">可用资金</div>
-            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ moneyText(portfolio.account?.cashBalance) }}</div>
+            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ formatMoney(portfolio.account?.cashBalance) }}</div>
           </div>
           <div class="rounded-lg bg-slate-50 px-4 py-3">
             <div class="text-[12px] text-slate-500">累计盈亏</div>
-            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ moneyText(portfolio.account?.totalPnl) }}</div>
+            <div class="mt-1 text-[20px] font-semibold text-slate-950">{{ formatMoney(portfolio.account?.totalPnl) }}</div>
           </div>
         </div>
 
@@ -412,9 +405,9 @@ const submitAnnouncement = () => {
                 <div class="font-medium text-slate-900">{{ position.symbol }}</div>
                 <div class="truncate text-slate-600">{{ position.name || '--' }}</div>
                 <div class="text-right text-slate-900">{{ position.positionQty }}</div>
-                <div class="text-right text-slate-900">{{ priceText(position.latestPrice) }}</div>
+                <div class="text-right text-slate-900">{{ formatPrice(position.latestPrice) }}</div>
                 <div class="text-right" :class="(position.floatingPnl || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-                  {{ moneyText(position.floatingPnl) }}
+                  {{ formatMoney(position.floatingPnl) }}
                 </div>
               </div>
             </div>
@@ -439,7 +432,7 @@ const submitAnnouncement = () => {
                 <div class="font-medium text-slate-900">{{ order.symbol }}</div>
                 <div :class="order.side === 'BUY' ? 'text-rose-600' : 'text-emerald-600'">{{ order.side === 'BUY' ? '买入' : '卖出' }}</div>
                 <div class="text-right text-slate-900">{{ order.orderQty }}</div>
-                <div class="text-right text-slate-900">{{ priceText(order.orderPrice) }}</div>
+                <div class="text-right text-slate-900">{{ formatPrice(order.orderPrice) }}</div>
                 <div class="text-right text-slate-500">{{ order.orderStatus || '--' }}</div>
               </div>
             </div>

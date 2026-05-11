@@ -6,7 +6,7 @@
  */
 import { Clock, Lock, TrendingDown, TrendingUp, Minus, Newspaper } from 'lucide-vue-next'
 import type { NewsFeedItem } from '../types/terminal'
-import { formatRelativeTime } from '../utils/format'
+import { formatTime } from '../utils/format'
 
 /* ─── Props ─── */
 defineProps<{
