@@ -76,20 +76,27 @@ const labelMap: Record<NavKey, string> = {
 <template>
   <aside
     :class="[
-      'fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-slate-200 bg-[#eef2f5] transition-all duration-200',
+      'fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-slate-200/80 bg-gradient-to-b from-indigo-50/80 via-white to-white transition-all duration-200',
       collapsed ? 'lg:w-[64px]' : 'lg:w-[260px]',
       isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
     ]"
   >
-    <div class="border-b border-slate-200 transition-colors duration-300" :class="collapsed ? 'px-2 py-3' : 'px-4 py-4'">
+    <div
+      class="border-b border-slate-200 transition-colors duration-300"
+      :class="collapsed ? 'px-2 py-3' : 'px-4 py-4'"
+    >
       <div class="flex items-start justify-between gap-3">
         <div v-if="!collapsed">
           <div class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-500 transition-colors duration-300">
             <ShieldCheck class="h-3.5 w-3.5" />
             {{ props.appBadge || '星策智投终端' }}
           </div>
-          <div class="mt-3 text-[20px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">{{ props.appTitle || '星策智投' }}</div>
-          <div class="mt-1 text-[12px] leading-6 text-slate-500 transition-colors duration-300">{{ props.appDescription || '行情、研究、交易、资讯与工单统一入口' }}</div>
+          <div class="mt-3 text-[20px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">
+            {{ props.appTitle || '星策智投' }}
+          </div>
+          <div class="mt-1 text-[12px] leading-6 text-slate-500 transition-colors duration-300">
+            {{ props.appDescription || '行情、研究、交易、资讯与工单统一入口' }}
+          </div>
         </div>
 
         <div
@@ -99,7 +106,10 @@ const labelMap: Record<NavKey, string> = {
           <ShieldCheck class="h-4 w-4" />
         </div>
 
-        <button class="rounded-xl p-2 text-slate-500 transition-all duration-150 hover:bg-white hover:scale-105 lg:hidden" @click="emit('toggle')">
+        <button
+          class="rounded-xl p-2 text-slate-500 transition-all duration-150 hover:bg-white hover:scale-105 lg:hidden"
+          @click="emit('toggle')"
+        >
           <X class="h-4 w-4" />
         </button>
       </div>
@@ -112,14 +122,17 @@ const labelMap: Record<NavKey, string> = {
         :title="collapsed ? '个人中心' : undefined"
         @click="emit('select', 'profile')"
       >
-        <div class="flex items-center gap-3" :class="collapsed ? 'justify-center' : ''">
+        <div
+          class="flex items-center gap-3"
+          :class="collapsed ? 'justify-center' : ''"
+        >
           <img
             v-if="authUser.avatarUrl"
             :src="authUser.avatarUrl"
             alt="头像"
             class="object-cover"
             :class="collapsed ? 'h-6 w-6 rounded-lg' : 'h-10 w-10 rounded-xl'"
-          />
+          >
           <div
             v-else
             class="flex items-center justify-center bg-slate-100 transition-colors duration-300"
@@ -127,27 +140,37 @@ const labelMap: Record<NavKey, string> = {
           >
             <UserRound class="h-4 w-4 text-slate-600" />
           </div>
-          <div v-if="!collapsed" class="min-w-0">
-            <div class="truncate text-[16px] font-medium text-slate-900 transition-colors duration-300">{{ authUser.nickname || authUser.username }}</div>
-            <div class="text-[12px] text-slate-500 transition-colors duration-300">{{ membershipLabel }}</div>
+          <div
+            v-if="!collapsed"
+            class="min-w-0"
+          >
+            <div class="truncate text-[16px] font-medium text-slate-900 transition-colors duration-300">
+              {{ authUser.nickname || authUser.username }}
+            </div>
+            <div class="text-[12px] text-slate-500 transition-colors duration-300">
+              {{ membershipLabel }}
+            </div>
           </div>
         </div>
       </button>
     </div>
 
-      <!-- 升级专业版按钮（非VIP用户显示） -->
-      <button
-        v-if="props.membershipLabel !== '会员版' && props.membershipLabel !== '管理员' && navItems.some(item => item.key === 'overview')"
-        class="mt-3 flex w-full items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5 text-left text-[13px] font-medium text-amber-600 transition-all duration-150 hover:bg-amber-500/[0.15]"
-        :class="collapsed ? 'justify-center px-2' : ''"
-        :title="collapsed ? '升级专业版' : undefined"
-        @click="router.push('/vip-apply')"
-      >
-        <Crown class="h-4 w-4 shrink-0" />
-        <span v-if="!collapsed">升级专业版</span>
-      </button>
+    <!-- 升级专业版按钮（非VIP用户显示） -->
+    <button
+      v-if="props.membershipLabel !== '会员版' && props.membershipLabel !== '管理员' && navItems.some(item => item.key === 'overview')"
+      class="mt-3 flex w-full items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5 text-left text-[13px] font-medium text-amber-600 transition-all duration-150 hover:bg-amber-500/[0.15]"
+      :class="collapsed ? 'justify-center px-2' : ''"
+      :title="collapsed ? '升级专业版' : undefined"
+      @click="router.push('/vip-apply')"
+    >
+      <Crown class="h-4 w-4 shrink-0" />
+      <span v-if="!collapsed">升级专业版</span>
+    </button>
 
-    <nav class="flex-1" :class="collapsed ? 'px-2 py-1' : 'px-3'">
+    <nav
+      class="flex-1"
+      :class="collapsed ? 'px-2 py-1' : 'px-3'"
+    >
       <button
         v-for="item in navItems"
         :key="item.key"
@@ -161,8 +184,14 @@ const labelMap: Record<NavKey, string> = {
         :title="collapsed ? labelMap[item.key] : undefined"
         @click="emit('select', item.key)"
       >
-        <component :is="iconMap[item.key]" class="h-4 w-4 shrink-0" />
-        <span v-if="!collapsed" class="text-[13px] font-medium">{{ labelMap[item.key] }}</span>
+        <component
+          :is="iconMap[item.key]"
+          class="h-4 w-4 shrink-0"
+        />
+        <span
+          v-if="!collapsed"
+          class="text-[13px] font-medium"
+        >{{ labelMap[item.key] }}</span>
         <span
           v-if="!collapsed && item.count !== undefined"
           class="ml-auto rounded-full px-2 py-0.5 text-[11px] tabular-nums"
@@ -173,14 +202,20 @@ const labelMap: Record<NavKey, string> = {
       </button>
     </nav>
 
-    <div class="border-t border-slate-200 transition-colors duration-300" :class="collapsed ? 'px-2 py-3' : 'px-3 py-3'">
+    <div
+      class="border-t border-slate-200 transition-colors duration-300"
+      :class="collapsed ? 'px-2 py-3' : 'px-3 py-3'"
+    >
       <button
         class="mb-1 hidden w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] text-slate-500 transition-all duration-150 hover:bg-white/70 hover:text-slate-900 active:scale-[0.98] lg:flex"
         :class="collapsed ? 'justify-center px-2' : ''"
         :title="collapsed ? '展开导航' : undefined"
         @click="emit('toggleCollapse')"
       >
-        <component :is="collapsed ? ChevronRight : ChevronLeft" class="h-4 w-4" />
+        <component
+          :is="collapsed ? ChevronRight : ChevronLeft"
+          class="h-4 w-4"
+        />
         <span v-if="!collapsed">收起导航</span>
       </button>
 

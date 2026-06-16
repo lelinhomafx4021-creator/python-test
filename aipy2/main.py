@@ -9,6 +9,7 @@
 """
 
 import asyncio
+import os
 import sys
 import time
 import traceback
@@ -17,11 +18,13 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.chat import router as chat_router
 from app.api.v1.kline import router as kline_router
 from app.api.v1.news import router as news_router
 from app.api.v1.util import router as util_router
+
 from app.core import llm as llm_core
 from app.core.config import settings
 from app.core.logger import logger
@@ -93,6 +96,15 @@ app = FastAPI(
     version="1.0.0-PRO",
     description="专业金融投研 AI 核心 (FastAPI + LangGraph + RAG)",
     lifespan=lifespan,
+)
+
+# 生产 CORS：允许前端域名跨域访问（通过 APP_CORS_ORIGINS 环境变量配置）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("APP_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 注册聊天相关路由。

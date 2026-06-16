@@ -200,13 +200,22 @@ watch(
         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
           <PieChart class="h-4 w-4 text-blue-500" />
         </div>
-        <div class="text-[15px] font-semibold text-slate-950">{{ title || '资产分布雷达' }}</div>
+        <div class="text-[15px] font-semibold text-slate-950">
+          {{ title || '资产分布雷达' }}
+        </div>
       </div>
     </div>
 
     <!-- 图表 -->
-    <div v-if="items.length" ref="chartRef" class="h-[320px] w-full px-2 pt-2" />
-    <div v-else class="flex h-[320px] flex-col items-center justify-center gap-3 text-[13px] text-slate-400">
+    <div
+      v-if="items.length"
+      ref="chartRef"
+      class="h-[320px] w-full px-2 pt-2"
+    />
+    <div
+      v-else
+      class="flex h-[320px] flex-col items-center justify-center gap-3 text-[13px] text-slate-400"
+    >
       <PieChart class="h-10 w-10 text-slate-300" />
       <span>暂无持仓数据</span>
     </div>

@@ -43,7 +43,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 管理端服务。
+ * 管理后台业务服务。
+ * <p>
+ * 封装管理员专属操作：数据总览（并行查询）、用户管理（列表/角色/会员）、
+ * 工单处理、用户持仓查看。所有写操作调用前会校验管理员身份。
+ * <p>
+ * 总览查询使用 CompletableFuture 并行执行 9 个独立统计查询，
+ * 将总耗时从串行的 sum(t1..t9) 降为 max(t1..t9)。
  */
 @Service
 public class AdminService {
@@ -59,6 +65,9 @@ public class AdminService {
     private final PaperTradingService paperTradingService;
     private final MembershipService membershipService;
 
+    /**
+     * 构造函数，注入全部依赖的 Mapper 和 Service。
+     */
     public AdminService(UserMapper userMapper,
                         UserMembershipMapper userMembershipMapper,
                         UserFeatureQuotaMapper userFeatureQuotaMapper,
@@ -83,6 +92,11 @@ public class AdminService {
 
     /**
      * 查询管理端首页总览。
+     * <p>
+     * 使用 9 个 CompletableFuture 并行统计：用户数、VIP 数、管理员数、
+     * AI 会话数、工单总数、未关闭工单数、自选分组数、模拟账户数、交易流水数。
+     *
+     * @return 仪表盘总览视图
      */
     public AdminDashboardVO getDashboard() {
         assertAdmin();
@@ -115,7 +129,13 @@ public class AdminService {
     }
 
     /**
-     * 查询用户列表。
+     * 查询用户列表（支持模糊搜索）。
+     * <p>
+     * 当 keyword 非空时，按用户名/昵称/手机号模糊匹配，最多返回 200 条。
+     * 同时对 userId 批量查询会员方案和 AI 配额，减少 N+1 问题。
+     *
+     * @param keyword 搜索关键词（匹配用户名/昵称/手机号），null 时返回全量
+     * @return 用户列表（含会员信息、AI 额度、自选分组数）
      */
     public List<AdminUserVO> listUsers(String keyword) {
         assertAdmin();
@@ -192,7 +212,12 @@ public class AdminService {
     }
 
     /**
-     * 查询人工工单列表。
+     * 查询人工工单列表（按状态筛选）。
+     * <p>
+     * 最多返回 200 条，按创建时间倒序。同时批量填充工单关联的用户信息。
+     *
+     * @param status 工单状态筛选（null 时返回全部）
+     * @return 工单列表（含关联用户名/昵称）
      */
     public List<HandoffTicketVO> listHandoffTickets(String status) {
         assertAdmin();
@@ -247,6 +272,12 @@ public class AdminService {
 
     /**
      * 查询指定用户的持仓与委托。
+     * <p>
+     * 先校验目标用户存在，再获取模拟账户快照和委托记录。
+     *
+     * @param userId       目标用户 ID
+     * @param refreshQuote 是否强制刷新实时行情（true 时跳过缓存）
+     * @return 用户持仓组合视图，包含账户、持仓和最近委托
      */
     public AdminUserPortfolioVO getUserPortfolio(Long userId, boolean refreshQuote) {
         assertAdmin();
@@ -269,6 +300,12 @@ public class AdminService {
 
     /**
      * 修改用户角色。
+     * <p>
+     * 先校验目标用户存在，再校验角色值合法（guest/normal/vip/admin 之一），
+     * 然后更新数据库。
+     *
+     * @param userId  目标用户 ID
+     * @param request 新角色信息
      */
     public void updateUserRole(Long userId, AdminUpdateUserRoleRequest request) {
         assertAdmin();
@@ -285,6 +322,11 @@ public class AdminService {
 
     /**
      * 修改用户会员方案。
+     * <p>
+     * 委托 MembershipService 为新方案创建功能配额并清理旧方案残留。
+     *
+     * @param userId  目标用户 ID
+     * @param request 新会员方案信息
      */
     public void updateMembership(Long userId, AdminUpdateMembershipRequest request) {
         assertAdmin();
@@ -299,6 +341,13 @@ public class AdminService {
 
     /**
      * 修改工单状态。
+     * <p>
+     * 通过 traceId 定位工单，校验状态值合法（open/processing/closed 之一），
+     * 记录处理人、处理时间、处理备注和用户回复内容。
+     *
+     * @param traceId 工单追踪 ID（全局唯一）
+     * @param request 新状态及处理信息
+     * @return 更新后的工单视图
      */
     public HandoffTicketVO updateTicketStatus(String traceId, AdminUpdateTicketStatusRequest request) {
         assertAdmin();
@@ -324,6 +373,9 @@ public class AdminService {
 
     /**
      * 校验当前登录人是否为管理员。
+     * <p>
+     * 从 UserContext 获取当前用户，检查角色是否为 "admin"。
+     * 非管理员调用时抛出 BusinessException。
      */
     private void assertAdmin() {
         UserDO currentUser = UserContext.get();

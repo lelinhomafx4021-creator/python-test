@@ -36,7 +36,13 @@ public class WatchlistController {
         this.watchlistService = watchlistService;
     }
 
-    /** 获取自选分组列表。 */
+    /**
+     * 获取当前用户的自选分组列表。
+     * <p>
+     * 首次访问时会自动创建默认分组"我的自选"。每个分组内含股票条目及实时行情。
+     *
+     * @return 自选分组视图列表，含分组信息和其中的股票条目
+     */
     @Operation(summary = "获取自选分组列表", description = "获取当前用户的所有自选股分组")
     @GetMapping
     public ApiResult<List<WatchlistVO>> list() {
@@ -45,7 +51,14 @@ public class WatchlistController {
         );
     }
 
-    /** 创建自选分组。 */
+    /**
+     * 创建自选分组。
+     * <p>
+     * 受会员等级配额限制，超出限额会拒绝创建。
+     *
+     * @param request 包含分组名称的创建请求
+     * @return 新建的分组视图（不含股票条目）
+     */
     @Operation(summary = "创建自选分组", description = "新建一个自选股分组")
     @PostMapping
     public ApiResult<WatchlistVO> create(@Valid @RequestBody CreateWatchlistRequest request) {
@@ -54,7 +67,15 @@ public class WatchlistController {
         );
     }
 
-    /** 添加自选股。 */
+    /**
+     * 向指定分组中添加一只自选股。
+     * <p>
+     * 重复添加同一股票会被拒绝。
+     *
+     * @param watchlistId 自选分组 ID
+     * @param request     包含股票代码和可选备注的添加请求
+     * @return 空响应（成功即表示已添加）
+     */
     @Operation(summary = "添加自选股", description = "向指定分组中添加一只股票")
     @PostMapping("/{id}/items")
     public ApiResult<Void> addItem(
@@ -65,7 +86,13 @@ public class WatchlistController {
         return ApiResult.ok(null);
     }
 
-    /** 删除自选股。 */
+    /**
+     * 从指定分组中删除一只自选股。
+     *
+     * @param watchlistId 自选分组 ID
+     * @param itemId      自选股条目 ID
+     * @return 空响应（成功即表示已删除）
+     */
     @Operation(summary = "删除自选股", description = "从指定分组中移除一只股票")
     @DeleteMapping("/{id}/items/{itemId}")
     public ApiResult<Void> deleteItem(

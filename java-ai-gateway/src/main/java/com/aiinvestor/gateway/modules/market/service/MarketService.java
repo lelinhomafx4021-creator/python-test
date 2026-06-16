@@ -55,14 +55,22 @@ public class MarketService {
     }
 
     /**
-     * 批量获取行情。
+     * 批量获取行情（优先读缓存）。
+     * <p>
+     * 读取顺序：Redis 缓存 → Python 实时行情 → MySQL 快照。
+     *
+     * @param symbols 股票代码列表
+     * @return 对应股票的最新行情视图列表
      */
     public List<MarketQuoteVO> getQuotes(List<String> symbols) {
         return loadQuotes(symbols, false);
     }
 
     /**
-     * 强制刷新行情。
+     * 强制刷新行情（跳过缓存，直连 Python 实时拉取）。
+     *
+     * @param symbols 股票代码列表
+     * @return 对应股票的最新行情视图列表，结果同时回写缓存和数据库
      */
     public List<MarketQuoteVO> refreshQuotes(List<String> symbols) {
         return loadQuotes(symbols, true);
@@ -70,6 +78,12 @@ public class MarketService {
 
     /**
      * 获取单只股票最新行情。
+     * <p>
+     * 若查不到行情数据则抛出业务异常。
+     *
+     * @param symbol 股票代码
+     * @return 该股票的最新行情视图
+     * @throws BusinessException 当股票行情不存在时
      */
     public MarketQuoteVO getLatestQuote(String symbol) {
         return getQuotes(List.of(symbol)).stream()
@@ -79,6 +93,14 @@ public class MarketService {
 
     /**
      * 获取股票列表或搜索结果。
+     * <p>
+     * 先从 Python 服务获取分页结果，再合并数据库中的拼音匹配结果。
+     * 返回时同时批量缓存行情并确保股票主数据记录存在。
+     *
+     * @param page     页码（从1开始）
+     * @param pageSize 每页条数
+     * @param keyword  搜索关键词（代码/名称/拼音首字母）；为空则返回全量
+     * @return 分页股票列表
      */
     public MarketStockPageVO listStocks(int page, int pageSize, String keyword) {
         String trimmedKeyword = keyword == null ? "" : keyword.trim();
@@ -120,6 +142,13 @@ public class MarketService {
     
     /**
      * 通过拼音首字母搜索股票。
+     * <p>
+     * 从数据库查询拼音、名称或代码匹配且状态为 active 的股票记录，
+     * 动态计算拼音首字母供前端展示。
+     *
+     * @param keyword 搜索关键词
+     * @param limit   最大返回条数
+     * @return 匹配的股票列表项
      */
     private List<MarketStockListItemVO> searchByPinyin(String keyword, int limit) {
         String pinyinKeyword = keyword.toUpperCase();
@@ -157,18 +186,31 @@ public class MarketService {
 
     /**
      * 获取热点新闻。
+     *
+     * @param limit 返回条数上限
+     * @return 热点财经新闻列表
      */
     public List<HotNewsItemVO> listHotNews(int limit) {
         return pythonMarketClient.fetchHotNews(limit);
     }
 
     /**
-     * 获取板块列表。
+     * 获取 K 线/分时数据。
+     *
+     * @param symbol 6位股票代码
+     * @param period 周期类型：daily / intraday_1d / intraday_5d
+     * @param days   数据窗口大小
+     * @return K 线数据点列表
      */
     public List<Map<String, Object>> getKline(String symbol, String period, int days) {
         return pythonMarketClient.fetchKline(symbol, period, days);
     }
 
+    /**
+     * 获取板块列表。
+     *
+     * @return 所有行业板块，按排序权重升序
+     */
     public List<SectorVO> listSectors() {
         return sectorMapper.selectList(
                         new LambdaQueryWrapper<SectorDO>().orderByAsc(SectorDO::getSortOrder, SectorDO::getId)
@@ -182,6 +224,13 @@ public class MarketService {
                 .toList();
     }
 
+    /**
+     * 核心行情加载逻辑：缓存 → Python实时 → 数据库快照 三级读取。
+     *
+     * @param symbols      股票代码列表
+     * @param forceRefresh 是否强制跳过缓存直接拉取实时数据
+     * @return 对应股票的最新行情视图列表
+     */
     private List<MarketQuoteVO> loadQuotes(List<String> symbols, boolean forceRefresh) {
         List<String> normalizedSymbols = symbols.stream()
                 .map(String::trim)
@@ -228,6 +277,11 @@ public class MarketService {
                 .toList();
     }
 
+    /**
+     * 单条行情缓存并持久化：写入 Redis 缓存 + MySQL upsert。
+     *
+     * @param quote 行情视图对象
+     */
     private void cacheAndPersistQuote(MarketQuoteVO quote) {
         redisJsonCacheService.set(
                 cacheKey(quote.getSymbol()),
@@ -251,6 +305,14 @@ public class MarketService {
         marketQuoteMapper.upsert(entity);
     }
 
+    /**
+     * 确保股票主数据记录存在。
+     * <p>
+     * 若股票已存在但名称变更，则更新名称并重新生成拼音；
+     * 若不存在则自动创建新记录（交易所根据代码前缀推断）。
+     *
+     * @param quote 行情视图对象，包含股票代码和名称
+     */
     private void ensureStockRecord(MarketQuoteVO quote) {
         StockDO stock = stockMapper.selectOne(
                 new LambdaQueryWrapper<StockDO>()
@@ -280,7 +342,13 @@ public class MarketService {
         stockMapper.insert(created);
     }
 
-    /** 批量缓存并持久化行情（1 次 Redis 批写 + N 次 DB upsert）。 */
+    /**
+     * 批量缓存并持久化行情。
+     * <p>
+     * 1 次 Redis 批量写入 + N 次数据库 upsert，减少网络往返。
+     *
+     * @param quotes 行情视图对象列表
+     */
     private void batchCacheAndPersistQuotes(List<MarketQuoteVO> quotes) {
         Duration ttl = Duration.ofSeconds(appCacheProperties.getMarketQuoteTtlSeconds());
         Map<String, Object> redisEntries = new LinkedHashMap<>();
@@ -311,7 +379,13 @@ public class MarketService {
         }
     }
 
-    /** 批量确保股票记录存在（1 次批量查询 + 按需 insert/update）。 */
+    /**
+     * 批量确保股票主数据记录存在。
+     * <p>
+     * 1 次批量查询现有记录 + 按需批量 insert/update，避免 N+1 问题。
+     *
+     * @param quotes 行情视图对象列表
+     */
     private void batchEnsureStockRecords(List<MarketQuoteVO> quotes) {
         List<String> symbols = quotes.stream().map(MarketQuoteVO::getSymbol).toList();
         List<StockDO> existingStocks = stockMapper.selectList(
@@ -356,6 +430,14 @@ public class MarketService {
         }
     }
 
+    /**
+     * 从缓存或数据库快照回填单只股票行情。
+     * <p>
+     * 当 Python 实时行情拉取失败时，降级使用本地存储的数据。
+     *
+     * @param symbol 股票代码
+     * @param result 结果集（会被修改，填充查到的行情）
+     */
     private void fillFromSnapshot(String symbol, Map<String, MarketQuoteVO> result) {
         MarketQuoteVO cached = redisJsonCacheService.get(cacheKey(symbol), MarketQuoteVO.class);
         if (cached != null) {
@@ -373,6 +455,12 @@ public class MarketService {
         }
     }
 
+    /**
+     * 根据股票代码查找股票名称。
+     *
+     * @param symbol 股票代码
+     * @return 股票名称，若未找到则返回代码本身
+     */
     private String findStockName(String symbol) {
         StockDO stock = stockMapper.selectOne(
                 new LambdaQueryWrapper<StockDO>()
@@ -382,6 +470,13 @@ public class MarketService {
         return stock == null ? symbol : stock.getName();
     }
 
+    /**
+     * 将数据库实体转换为视图对象。
+     *
+     * @param entity 数据库行情快照实体
+     * @param name   股票名称
+     * @return 前端可用的行情视图对象
+     */
     private MarketQuoteVO toQuoteVO(MarketQuoteDO entity, String name) {
         return new MarketQuoteVO(
                 entity.getSymbol(),
@@ -400,10 +495,24 @@ public class MarketService {
         );
     }
 
+    /**
+     * 根据股票代码推断所属交易所。
+     * <p>
+     * 规则：以 6/5/9 开头的代码属于上海交易所(SH)，其余属于深圳交易所(SZ)。
+     *
+     * @param symbol 股票代码
+     * @return 交易所标识：SH 或 SZ
+     */
     private String resolveExchange(String symbol) {
         return symbol.startsWith("6") || symbol.startsWith("5") || symbol.startsWith("9") ? "SH" : "SZ";
     }
 
+    /**
+     * 构建 Redis 缓存键。
+     *
+     * @param symbol 股票代码
+     * @return 格式为 "market:quote:{symbol}" 的缓存键
+     */
     private String cacheKey(String symbol) {
         return QUOTE_CACHE_PREFIX + symbol;
     }

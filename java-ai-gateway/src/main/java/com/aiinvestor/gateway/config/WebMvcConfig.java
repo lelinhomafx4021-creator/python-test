@@ -47,8 +47,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .allowedOriginPatterns(corsProperties.getAllowedOriginList().toArray(new String[0]))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")                                    // 允许所有请求头
-                .exposedHeaders("satoken")                              // 暴露 Sa-Token 响应头
-                .allowCredentials(true)                                 // 允许携带 Cookie
                 .maxAge(3600);                                          // 预检缓存时间
     }
 

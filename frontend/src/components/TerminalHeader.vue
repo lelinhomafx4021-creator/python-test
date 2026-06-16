@@ -1,7 +1,7 @@
 <!-- TerminalHeader - 终端顶部导航栏 -->
 <!-- 显示当前页面标题、会员标识、刷新、实时时钟和用户菜单 -->
 <script setup lang="ts">
-import { BellRing, ChevronDown, Menu, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { BellRing, ChevronDown, Clock, Menu, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { AuthUser, MembershipInfo, NavKey } from '../types/terminal'
 
@@ -80,10 +80,13 @@ const membershipText = (membership?: MembershipInfo | null) => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 overflow-visible border-b border-slate-200 bg-[#f7f7f5]/95 backdrop-blur transition-colors duration-300">
+  <header class="sticky top-0 z-40 overflow-visible border-b border-slate-200/80 bg-white/80 backdrop-blur-xl transition-colors duration-300">
     <div class="relative flex flex-wrap items-center justify-between gap-3 overflow-visible px-4 py-3 lg:px-6">
       <div class="flex items-center gap-3">
-        <button class="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition-all duration-150 hover:bg-slate-50 active:scale-[0.95]" @click="emit('toggle')">
+        <button
+          class="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition-all duration-150 hover:bg-slate-50 active:scale-[0.95]"
+          @click="emit('toggle')"
+        >
           <Menu class="h-4 w-4" />
         </button>
 
@@ -92,8 +95,12 @@ const membershipText = (membership?: MembershipInfo | null) => {
             <Sparkles class="h-3.5 w-3.5" />
             {{ membershipText(membership) }}
           </div>
-          <h2 class="text-[28px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">{{ titleMap[activeView] }}</h2>
-          <p class="text-[13px] text-slate-500 transition-colors duration-300">{{ subtitleMap[activeView] }}</p>
+          <h2 class="text-[28px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">
+            {{ titleMap[activeView] }}
+          </h2>
+          <p class="text-[13px] text-slate-500 transition-colors duration-300">
+            {{ subtitleMap[activeView] }}
+          </p>
         </div>
       </div>
 
@@ -118,7 +125,10 @@ const membershipText = (membership?: MembershipInfo | null) => {
           跟踪自选与委托变化
         </div>
 
-        <div class="relative" @click.stop>
+        <div
+          class="relative"
+          @click.stop
+        >
           <button
             class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.97]"
             @click="emit('toggleUserMenu')"

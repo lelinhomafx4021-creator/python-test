@@ -201,15 +201,25 @@ function closeUserMenu() {
 <template>
   <ToastNotification />
   <main class="min-h-screen bg-[#f3f4f6] text-slate-900">
-    <div v-if="store.loading" class="flex min-h-screen items-center justify-center">
+    <div
+      v-if="store.loading"
+      class="flex min-h-screen items-center justify-center"
+    >
       <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-3 shadow-sm">
         <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-950" />
         <span class="text-[13px] text-slate-500">正在恢复管理端状态...</span>
       </div>
     </div>
 
-    <div v-else-if="isAdminRole(store.user?.role)" class="flex min-h-screen">
-      <div v-if="store.sidebarOpen && !store.sidebarCollapsed" class="fixed inset-0 z-30 bg-slate-950/20 lg:hidden" @click="store.sidebarOpen = false" />
+    <div
+      v-else-if="isAdminRole(store.user?.role)"
+      class="flex min-h-screen"
+    >
+      <div
+        v-if="store.sidebarOpen && !store.sidebarCollapsed"
+        class="fixed inset-0 z-30 bg-slate-950/20 lg:hidden"
+        @click="store.sidebarOpen = false"
+      />
 
       <TerminalSidebar
         :active-view="store.view"
@@ -227,7 +237,10 @@ function closeUserMenu() {
         @logout="handleLogout"
       />
 
-      <div class="min-w-0 flex-1 overflow-visible transition-[margin-left] duration-200" :class="margin">
+      <div
+        class="min-w-0 flex-1 overflow-visible transition-[margin-left] duration-200"
+        :class="margin"
+      >
         <TerminalHeader
           :active-view="store.view"
           :auth-user="store.user!"
@@ -272,10 +285,17 @@ function closeUserMenu() {
       </div>
     </div>
 
-    <div v-else class="flex min-h-screen items-center justify-center px-6">
+    <div
+      v-else
+      class="flex min-h-screen items-center justify-center px-6"
+    >
       <div class="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-center shadow-sm">
-        <div class="text-[14px] font-medium text-slate-900">正在跳转到统一登录入口</div>
-        <div class="mt-1 text-[12px] text-slate-500">系统会根据账号等级自动进入管理员、VIP 或普通用户终端。</div>
+        <div class="text-[14px] font-medium text-slate-900">
+          正在跳转到统一登录入口
+        </div>
+        <div class="mt-1 text-[12px] text-slate-500">
+          系统会根据账号等级自动进入管理员、VIP 或普通用户终端。
+        </div>
       </div>
     </div>
   </main>

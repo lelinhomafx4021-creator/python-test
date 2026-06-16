@@ -1,3 +1,4 @@
+# 开发环境配置（启用 MyBatis SQL 日志）
 spring:
   datasource:
     url: ${DEV_MYSQL_URL:jdbc:mysql://127.0.0.1:3306/ai_investor?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}

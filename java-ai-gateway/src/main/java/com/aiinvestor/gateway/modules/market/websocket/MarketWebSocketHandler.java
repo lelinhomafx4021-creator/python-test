@@ -4,10 +4,8 @@ import com.aiinvestor.gateway.modules.market.vo.MarketQuoteVO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -32,11 +30,12 @@ import java.util.concurrent.ConcurrentHashMap;
  *   客户端 → 服务端：{"action": "subscribe", "symbols": ["601179", "601231"]}
  *   服务端 → 客户端：{"symbol": "601179", "price": 16.92, "change": -0.23, "changePct": -1.34, "volume": 1213409, "time": "2026-05-02 10:30:00"}
  */
+@Slf4j
 @Component
 @EnableScheduling
+@RequiredArgsConstructor
 public class MarketWebSocketHandler extends TextWebSocketHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(MarketWebSocketHandler.class);
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final com.aiinvestor.gateway.modules.market.service.MarketService marketService;
@@ -45,15 +44,10 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
     /** 每个 session 订阅的股票代码列表 */
     private final Map<WebSocketSession, Set<String>> subscriptions = new ConcurrentHashMap<>();
 
-    public MarketWebSocketHandler(
-            com.aiinvestor.gateway.modules.market.service.MarketService marketService,
-            ObjectMapper objectMapper) {
-        this.marketService = marketService;
-        this.objectMapper = objectMapper;
-    }
-
     /**
-     * 连接建立后回调。
+     * 连接建立后回调，初始化该 session 的订阅列表。
+     *
+     * @param session 新建立的 WebSocket 会话
      */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -62,7 +56,10 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 连接关闭后回调，清理订阅数据。
+     * 连接关闭后回调，清理该 session 的订阅数据。
+     *
+     * @param session 关闭的 WebSocket 会话
+     * @param status  关闭状态（正常/异常）
      */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
@@ -71,7 +68,10 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 传输错误回调。
+     * 传输错误回调，清理异常 session 并尝试关闭连接。
+     *
+     * @param session   出现异常的 WebSocket 会话
+     * @param exception 传输异常详情
      */
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
@@ -82,6 +82,11 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
 
     /**
      * 处理客户端文本消息（订阅/取消订阅）。
+     * <p>
+     * 协议格式：{"action": "subscribe|unsubscribe", "symbols": ["601179", "601231"]}
+     *
+     * @param session 发送消息的 WebSocket 会话
+     * @param message 客户端发来的 JSON 文本消息
      */
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {

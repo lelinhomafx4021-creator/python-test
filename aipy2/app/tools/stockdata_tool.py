@@ -36,32 +36,108 @@ logger = logging.getLogger(__name__)
 TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={code}"
 TENCENT_SUGGEST_URL = "https://smartbox.gtimg.cn/s3/?q={keyword}&t=all"
 SINA_SUGGEST_URL = "https://suggest3.sinajs.cn/suggest/type=11,12,13,14,15&key={keyword}&name=suggestdata"
-# 热门股票代码列表（涵盖各行业龙头）
+# 东方财富搜索 API — 覆盖面更广，支持拼音/代码/中文名
+EASTMONEY_SUGGEST_URL = "https://searchapi.eastmoney.com/api/suggest/get"
+# 东方财富财务数据 — 获取 EPS/BPS 用于计算 PE/PB
+EASTMONEY_DATACENTER_URL = "https://datacenter.eastmoney.com/securities/api/data/v1/get"
+
+# ─── 全量 A 股列表（通过 mootdx 从腾讯行情服务器获取） ───
+_full_stock_cache: list[dict[str, str]] | None = None
+
+
+def _load_full_stock_list() -> list[dict[str, str]]:
+    """从 mootdx 获取全量 A 股列表并缓存。"""
+    global _full_stock_cache
+    if _full_stock_cache is not None:
+        return _full_stock_cache
+
+    try:
+        from mootdx.quotes import Quotes
+        client = Quotes.factory(market='std')
+        df_sh = client.stocks(market=1)  # 上海
+        df_sz = client.stocks(market=0)  # 深圳
+
+        stocks: list[dict[str, str]] = []
+        seen: set[str] = set()
+
+        for _, row in df_sh.iterrows():
+            code = str(row.get('code', '')).strip()
+            name = str(row.get('name', '')).strip()
+            if _is_a_stock(code, name) and code not in seen:
+                seen.add(code)
+                stocks.append({'symbol': code, 'name': name})
+
+        for _, row in df_sz.iterrows():
+            code = str(row.get('code', '')).strip()
+            name = str(row.get('name', '')).strip()
+            if _is_a_stock(code, name) and code not in seen:
+                seen.add(code)
+                stocks.append({'symbol': code, 'name': name})
+
+        _full_stock_cache = stocks
+        logger.info("全量 A 股列表加载完成，共 %d 只", len(stocks))
+        return stocks
+    except Exception as e:
+        logger.warning("mootdx 获取全量股票列表失败: %s", e)
+        return []
+
+
+def _is_a_stock(code: str, name: str = "", strict: bool = True) -> bool:
+    """判断是否为 A 股股票。
+
+    Args:
+        code: 6位数字股票代码
+        name: 股票名称（可选，strict=True时用于过滤ETF/基金）
+        strict: 是否严格模式（过滤ETF/基金/可转债等）
+    """
+    if not re.fullmatch(r"\d{6}", code):
+        return False
+
+    # 非严格模式（仅用于代码判断）：排除明显非股票的代码
+    if not strict:
+        # 5xxxxx: ETF/基金
+        if code.startswith("5"):
+            return False
+        # 1xxxxx: 可转债/国债
+        if code.startswith("1"):
+            return False
+        # 399xxx: 深证指数
+        if code.startswith("399"):
+            return False
+        # 0xxxxx: 深市股票是 000/001/002/003 开头，其他是指数
+        if code.startswith("0") and code[:3] not in ("000", "001", "002", "003"):
+            return False
+        return True
+
+    # 严格模式：额外过滤名称中的ETF/基金
+    if name and ('指数' in name or 'ETF' in name or '基金' in name):
+        return False
+
+    # 沪市主板: 600/601/603/605
+    if code.startswith(('600', '601', '603', '605')):
+        return True
+    # 科创板: 688/689
+    if code.startswith(('688', '689')):
+        return True
+    # 深市主板: 001（排除 000 开头的指数）
+    if code.startswith('001'):
+        return True
+    # 中小板: 002/003
+    if code.startswith(('002', '003')):
+        return True
+    # 创业板: 300/301
+    if code.startswith(('300', '301')):
+        return True
+    return False
+
+
+# 热门股票代码列表（作为 fallback，当 mootdx 不可用时使用）
 HOT_SYMBOLS = [
-    "600519",  # 贵州茅台
-    "000001",  # 平安银行
-    "300750",  # 宁德时代
-    "601318",  # 中国平安
-    "600036",  # 招商银行
-    "601688",  # 华泰证券
-    "002594",  # 比亚迪
-    "000858",  # 五粮液
-    "600900",  # 长江电力
-    "601398",  # 工商银行
-    "601288",  # 农业银行
-    "601166",  # 兴业银行
-    "600030",  # 中信证券
-    "601012",  # 隆基绿能
-    "600809",  # 山西汾酒
-    "002415",  # 海康威视
-    "300059",  # 东方财富
-    "601899",  # 紫金矿业
-    "000333",  # 美的集团
-    "601888",  # 中国中免
-    "600276",  # 恒瑞医药
-    "688981",  # 中芯国际
-    "603259",  # 药明康德
-    "600887",  # 伊利股份
+    "600519", "000001", "300750", "601318", "600036",
+    "601688", "002594", "000858", "600900", "601398",
+    "601288", "601166", "600030", "601012", "600809",
+    "002415", "300059", "601899", "000333", "601888",
+    "600276", "688981", "603259", "600887",
 ]
 
 # 创建 requests 会话对象，复用 TCP 连接提升性能
@@ -241,6 +317,70 @@ def _request_tencent_suggest(keyword: str) -> list[dict[str, str]]:
     return _parse_tencent_suggestions(text)
 
 
+def _request_eastmoney_suggest(keyword: str) -> list[dict[str, str]]:
+    """请求东方财富联想接口 — 覆盖面更广，支持拼音/代码/中文名。
+
+    只返回 A 股股票（沪深主板+创业板+科创板+北交所），过滤掉指数、ETF、基金等。
+    """
+    params = {
+        "input": keyword,
+        "type": "14",  # 14 = 全部（股票+基金+债券）
+        "token": "D43BF722C8E33BDC906FB84D85E326E8",
+    }
+    try:
+        response = _http.get(
+            EASTMONEY_SUGGEST_URL,
+            params=params,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        data = response.json()
+        table = data.get("QuotationCodeTable", {})
+        rows = table.get("Data") or []
+        result: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for row in rows:
+            # 东方财富返回 JSON 对象格式：{Code, Name, MarketType, Classify, ...}
+            if isinstance(row, dict):
+                symbol = str(row.get("Code", "")).strip()
+                name = str(row.get("Name", "")).strip()
+                classify = str(row.get("Classify", "")).strip()
+            elif isinstance(row, str):
+                # 兼容旧的管道分隔格式
+                parts = row.split("|")
+                if len(parts) < 2:
+                    continue
+                symbol = parts[0].strip()
+                name = parts[1].strip()
+                classify = ""
+            else:
+                continue
+            # 只保留 6 位数字代码
+            if not re.fullmatch(r"\d{6}", symbol) or symbol in seen:
+                continue
+            # 过滤掉非股票类型：
+            # - Index: 指数
+            # - BK: 板块
+            # - ETF/基金: 以 5 开头的代码
+            if classify in ("Index", "BK"):
+                continue
+            if symbol.startswith("5"):
+                continue
+            # 以 0 开头的代码中，000/001/002/003 是深市股票，其他是指数
+            if symbol.startswith("0") and not symbol[:3] in ("000", "001", "002", "003"):
+                continue
+            seen.add(symbol)
+            result.append({"symbol": symbol, "name": name})
+        return result
+    except Exception as e:
+        logger.warning("东方财富搜索接口异常: %s", e)
+        return []
+
+
+# _is_a_stock_code 已合并到 _is_a_stock，使用 _is_a_stock(code, strict=False) 代替
+
+
 def _merge_candidates(*groups: list[dict[str, str]]) -> list[dict[str, str]]:
     """合并并去重候选股票。"""
     result: list[dict[str, str]] = []
@@ -255,17 +395,66 @@ def _merge_candidates(*groups: list[dict[str, str]]) -> list[dict[str, str]]:
     return result
 
 
+def _fetch_eastmoney_detail(symbol: str) -> dict[str, Any] | None:
+    """从东方财富获取单只股票的 PE/PB 等基本面数据。
+
+    使用 datacenter API 获取 EPS 和 BPS，然后计算 PE 和 PB。
+    """
+    params = {
+        "reportName": "RPT_LICO_FN_CPD",
+        "columns": "SECURITY_CODE,BASIC_EPS,BPS",
+        "filter": f'(SECURITY_CODE="{symbol}")',
+        "pageSize": 1,
+        "pageNumber": 1,
+        "source": "WEB",
+        "client": "WEB",
+    }
+    try:
+        resp = _http.get(
+            EASTMONEY_DATACENTER_URL,
+            params=params,
+            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://quote.eastmoney.com/"},
+            timeout=5,
+        )
+        data = resp.json()
+        if not data.get("success") or not data.get("result", {}).get("data"):
+            return None
+        row = data["result"]["data"][0]
+        eps = float(row.get("BASIC_EPS", 0) or 0)
+        bps = float(row.get("BPS", 0) or 0)
+        # PE 和 PB 需要结合实时价格计算，这里返回 EPS/BPS，由调用方计算
+        return {
+            "eps": eps if eps > 0 else None,
+            "bps": bps if bps > 0 else None,
+        }
+    except Exception as e:
+        logger.debug("东方财富财务数据获取失败 %s: %s", symbol, e)
+        return None
+
+
 def _build_stock_items(candidates: list[dict[str, str]]) -> list[dict[str, Any]]:
-    """给股票候选补齐实时行情字段。"""
+    """给股票候选补齐实时行情字段 + PE/PB（从 EPS/BPS 计算）。"""
     quote_map = _fetch_batch_quotes([item["symbol"] for item in candidates])
     result: list[dict[str, Any]] = []
     for item in candidates:
         quote = quote_map.get(item["symbol"], {})
+        # 尝试获取 EPS/BPS 并计算 PE/PB（失败不影响主流程）
+        detail = _fetch_eastmoney_detail(item["symbol"])
+        price = quote.get("lastPrice")
+        pe = None
+        pb = None
+        if detail and price:
+            eps = detail.get("eps")
+            bps = detail.get("bps")
+            if eps and eps > 0:
+                pe = round(price / eps, 2)
+            if bps and bps > 0:
+                pb = round(price / bps, 2)
         result.append(
             {
                 "symbol": item["symbol"],
                 "name": quote.get("name") or item["name"],
-                "lastPrice": quote.get("lastPrice"),
+                "lastPrice": price,
                 "changePercent": quote.get("changePercent"),
                 "changeAmount": quote.get("changeAmount"),
                 "volume": quote.get("volume"),
@@ -274,8 +463,10 @@ def _build_stock_items(candidates: list[dict[str, str]]) -> list[dict[str, Any]]
                 "highPrice": quote.get("highPrice"),
                 "lowPrice": quote.get("lowPrice"),
                 "openPrice": quote.get("openPrice"),
-                "totalMarketValue": None,
+                "totalMarketValue": None,  # 需要总股本数据，暂不支持
                 "circulatingMarketValue": None,
+                "pe": pe,
+                "pb": pb,
                 "sixtyDayChangePercent": None,
                 "yearToDateChangePercent": None,
             }
@@ -284,38 +475,71 @@ def _build_stock_items(candidates: list[dict[str, str]]) -> list[dict[str, Any]]
 
 
 def load_market_page(page: int = 1, page_size: int = 40) -> dict[str, Any]:
-    """获取默认主流股票池列表
-    
+    """获取股票池列表（全量 A 股，按代码排序）。
+
     参数：page-页码(从1开始), page_size-每页数量(默认40)
     返回：分页格式的股票列表
     """
+    all_stocks = _load_full_stock_list()
+    if not all_stocks:
+        # fallback 到硬编码列表
+        start = max(page - 1, 0) * page_size
+        end = start + page_size
+        sliced = HOT_SYMBOLS[start:end]
+        if not sliced:
+            return _empty_market_page(page, page_size)
+        try:
+            return {
+                "page": page,
+                "pageSize": page_size,
+                "total": len(HOT_SYMBOLS),
+                "items": _build_stock_items([{"symbol": s, "name": s} for s in sliced]),
+            }
+        except Exception as e:
+            logger.warning("构建热门股票列表失败: %s", e)
+            return _empty_market_page(page, page_size)
+
+    # 按代码排序
+    all_stocks.sort(key=lambda x: x["symbol"])
+    total = len(all_stocks)
     start = max(page - 1, 0) * page_size
     end = start + page_size
-    sliced_symbols = HOT_SYMBOLS[start:end]
-    if not sliced_symbols:
-        return _empty_market_page(page, page_size)
+    sliced = all_stocks[start:end]
     try:
         return {
             "page": page,
             "pageSize": page_size,
-            "total": len(HOT_SYMBOLS),
-            "items": _build_stock_items([{"symbol": symbol, "name": symbol} for symbol in sliced_symbols]),
+            "total": total,
+            "items": _build_stock_items(sliced) if sliced else [],
         }
     except Exception as e:
-        logger.warning("构建热门股票列表失败: %s", e)
+        logger.warning("构建股票列表失败: %s", e)
         return _empty_market_page(page, page_size)
 
 
 def search_market_stocks(keyword: str, page: int = 1, page_size: int = 40) -> dict[str, Any]:
     """按关键字搜索股票
-    
-    搜索策略：同时请求新浪+腾讯联想接口，合并去重后补充实时行情
+
+    搜索策略：
+    1. 从全量 A 股列表（mootdx）中按代码/名称匹配
+    2. 同时请求新浪+腾讯+东方财富联想接口补充
+    3. 合并去重后补充实时行情+基本面
     参数：keyword-搜索关键字, page-页码, page_size-每页数量
     """
     normalized_keyword = keyword.strip()
     if not normalized_keyword:
         return load_market_page(page=page, page_size=page_size)
 
+    # 1) 从全量列表中匹配
+    all_stocks = _load_full_stock_list()
+    local_matches: list[dict[str, str]] = []
+    if all_stocks:
+        for stock in all_stocks:
+            if (normalized_keyword in stock["symbol"] or
+                    normalized_keyword in stock["name"]):
+                local_matches.append(stock)
+
+    # 2) 三源联想接口
     try:
         sina_candidates = _request_sina_suggest(normalized_keyword)
     except Exception as e:
@@ -328,18 +552,32 @@ def search_market_stocks(keyword: str, page: int = 1, page_size: int = 40) -> di
         logger.warning("腾讯搜索接口异常: %s", e)
         tencent_candidates = []
 
+    try:
+        eastmoney_candidates = _request_eastmoney_suggest(normalized_keyword)
+    except Exception as e:
+        logger.warning("东方财富搜索接口异常: %s", e)
+        eastmoney_candidates = []
+
+    # 过滤联想结果，只保留 A 股代码
     filtered_sina = [
         item for item in sina_candidates
-        if normalized_keyword in item["symbol"] or normalized_keyword in item["name"]
+        if _is_a_stock(item["symbol"], strict=False)
     ]
-    merged = _merge_candidates(filtered_sina, tencent_candidates)
+    filtered_tencent = [
+        item for item in tencent_candidates
+        if _is_a_stock(item["symbol"], strict=False)
+    ]
+
+    # 合并去重：本地匹配 + 东方财富 + 新浪 + 腾讯
+    merged = _merge_candidates(local_matches, eastmoney_candidates, filtered_sina, filtered_tencent)
+    total = len(merged)
     start = max(page - 1, 0) * page_size
     end = start + page_size
     sliced = merged[start:end]
     return {
         "page": page,
         "pageSize": page_size,
-        "total": len(merged),
+        "total": total,
         "items": _build_stock_items(sliced) if sliced else [],
     }
 
@@ -347,19 +585,32 @@ def search_market_stocks(keyword: str, page: int = 1, page_size: int = 40) -> di
 @tool
 def get_stock_quote_core(symbol: str) -> str:
     """获取单只 A 股实时行情
-    
+
     参数：symbol - 6 位股票代码（如 600519）
-    返回：JSON 格式行情数据（代码、名称、价格、涨跌、成交量等）
+    返回：JSON 格式行情数据（代码、名称、价格、涨跌、成交量、PE、PB等）
     """
     try:
         payload = _fetch_batch_quotes([symbol]).get(symbol)
         if not payload:
             return json.dumps({"error": f"未获取到股票 {symbol} 的行情数据。"}, ensure_ascii=False)
 
+        # 补充 EPS/BPS 并计算 PE/PB
+        detail = _fetch_eastmoney_detail(symbol)
+        price = payload.get("lastPrice")
+        pe = None
+        pb = None
+        if detail and price:
+            eps = detail.get("eps")
+            bps = detail.get("bps")
+            if eps and eps > 0:
+                pe = round(price / eps, 2)
+            if bps and bps > 0:
+                pb = round(price / bps, 2)
+
         result = {
             "代码": payload["symbol"],
             "名称": payload["name"],
-            "最新价": payload["lastPrice"],
+            "最新价": price,
             "最高价": payload["highPrice"],
             "最低价": payload["lowPrice"],
             "今开": payload["openPrice"],
@@ -368,8 +619,8 @@ def get_stock_quote_core(symbol: str) -> str:
             "成交量(手)": payload["volume"],
             "成交额(元)": payload["turnover"],
             "换手率(%)": payload["turnoverRate"],
-            "市盈率(动态)": None,
-            "市净率": None,
+            "市盈率(动态)": pe,
+            "市净率": pb,
             "振幅(%)": payload["amplitude"],
         }
         return json.dumps(result, ensure_ascii=False)

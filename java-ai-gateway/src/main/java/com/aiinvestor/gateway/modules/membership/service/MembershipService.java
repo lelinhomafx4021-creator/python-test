@@ -49,6 +49,12 @@ public class MembershipService {
 
     /**
      * 获取当前会员信息，不存在时自动补默认会员。
+     * <p>
+     * 根据用户角色自动分配默认方案：vip/admin 得 vip 方案，其他得 free 方案。
+     *
+     * @param userId 用户 ID
+     * @param role   用户角色（normal/vip/admin）
+     * @return 会员方案信息视图
      */
     @Transactional
     public MembershipInfoVO getCurrentMembership(Long userId, String role) {
@@ -67,7 +73,11 @@ public class MembershipService {
     }
 
     /**
-     * 获取当前用户全部配额。
+     * 获取当前用户全部功能配额，同时自动刷新过期的每日配额。
+     *
+     * @param userId 用户 ID
+     * @param role   用户角色
+     * @return 各功能编码的配额视图列表
      */
     @Transactional
     public List<FeatureQuotaVO> listQuotas(Long userId, String role) {
@@ -86,7 +96,14 @@ public class MembershipService {
     }
 
     /**
-     * 获取单个配额上限。
+     * 获取单个功能的配额上限。
+     * <p>
+     * 先确保会员和配额记录存在，再刷新过期配额，最后返回指定功能的限额。
+     *
+     * @param userId      用户 ID
+     * @param role        用户角色
+     * @param featureCode 功能编码（如 daily_ai_chat）
+     * @return 该功能的配额上限值，未配置则返回 0
      */
     @Transactional
     public int getQuotaLimit(Long userId, String role, String featureCode) {
@@ -101,7 +118,14 @@ public class MembershipService {
     }
 
     /**
-     * 同步永久型配额已用数量。
+     * 同步永久型配额的已用数量（外部调用）。
+     * <p>
+     * 例如 AI 对话完成后，回调此方法更新已用次数。
+     *
+     * @param userId      用户 ID
+     * @param role        用户角色
+     * @param featureCode 功能编码
+     * @param usedCount   最新的已用数量
      */
     @Transactional
     public void syncPermanentQuota(Long userId, String role, String featureCode, int usedCount) {
@@ -118,6 +142,12 @@ public class MembershipService {
 
     /**
      * 管理员直接切换用户会员方案，同时同步用户角色。
+     * <p>
+     * 仅管理员可调用。将用户现有 active 会员置为 expired 后分配新方案。
+     *
+     * @param userId   目标用户 ID
+     * @param role     管理员角色（校验用）
+     * @param planCode 目标方案编码（如 free / vip）
      */
     @Transactional
     public void assignMembershipPlanByAdmin(Long userId, String role, String planCode) {
@@ -125,6 +155,14 @@ public class MembershipService {
         syncUserRole(userId, planCode);
     }
 
+    /**
+     * 根据方案编码同步用户角色。
+     * <p>
+     * vip 方案对应 vip 角色，其余方案对应 normal 角色。admin 角色用户不被降级。
+     *
+     * @param userId   用户 ID
+     * @param planCode 会员方案编码
+     */
     private void syncUserRole(Long userId, String planCode) {
         UserDO user = userMapper.selectById(userId);
         if (user == null || "admin".equalsIgnoreCase(user.getRole())) {
@@ -137,6 +175,16 @@ public class MembershipService {
         }
     }
 
+    /**
+     * 分配会员方案。
+     * <p>
+     * 将用户现有 active 会员置为 expired，创建新会员记录，
+     * 并删除旧配额后按新方案的 quotaJson 重建配额。
+     *
+     * @param userId   用户 ID
+     * @param planCode 目标方案编码
+     * @param source   来源标识（如 vip_application / admin_console / system）
+     */
     @Transactional
     public void assignMembershipPlan(Long userId, String planCode, String source) {
         MembershipPlanDO targetPlan = getPlanByCode(planCode);
@@ -171,6 +219,14 @@ public class MembershipService {
         }
     }
 
+    /**
+     * 刷新过期的每日配额。
+     * <p>
+     * 对于 periodType=daily 且 resetAt 已过期的配额，将 usedCount 重置为 0
+     * 并将 resetAt 推迟到次日零点。
+     *
+     * @param quotas 待检查的配额列表（会被原地修改并更新到数据库）
+     */
     private void refreshExpiredQuotas(List<UserFeatureQuotaDO> quotas) {
         LocalDateTime now = LocalDateTime.now();
         for (UserFeatureQuotaDO quota : quotas) {
@@ -185,6 +241,15 @@ public class MembershipService {
         }
     }
 
+    /**
+     * 确保用户存在活跃的会员记录。
+     * <p>
+     * 若不存在则根据角色自动创建默认会员：vip/admin → vip 方案，其他 → free 方案。
+     *
+     * @param userId 用户 ID
+     * @param role   用户角色
+     * @return 用户当前的活跃会员记录（已存在或新创建的）
+     */
     private UserMembershipDO ensureMembership(Long userId, String role) {
         UserMembershipDO membership = userMembershipMapper.selectOne(
                 new LambdaQueryWrapper<UserMembershipDO>()
@@ -208,6 +273,15 @@ public class MembershipService {
         return created;
     }
 
+    /**
+     * 确保用户存在配额记录。
+     * <p>
+     * 若配额记录为空，则根据方案配置的 quotaJson 自动初始化。
+     *
+     * @param userId 用户 ID
+     * @param plan   会员方案实体（含配额 JSON 配置）
+     * @return 用户的配额记录列表
+     */
     private List<UserFeatureQuotaDO> ensureQuotaRecords(Long userId, MembershipPlanDO plan) {
         List<UserFeatureQuotaDO> quotas = userFeatureQuotaMapper.selectList(
                 new LambdaQueryWrapper<UserFeatureQuotaDO>()
@@ -224,6 +298,17 @@ public class MembershipService {
         return created;
     }
 
+    /**
+     * 根据方案的 quotaJson 构建配额记录列表。
+     * <p>
+     * 解析 JSON 中的功能编码→限额映射，自动判断周期类型：
+     * 含 daily 关键字的为每日配额，其余为永久配额。
+     *
+     * @param userId 用户 ID
+     * @param plan   会员方案实体（含 quotaJson 字段）
+     * @return 新建的配额实体列表（尚未入库）
+     * @throws BusinessException 当 quotaJson 解析失败时
+     */
     private List<UserFeatureQuotaDO> buildQuotaRows(Long userId, MembershipPlanDO plan) {
         try {
             Map<String, Integer> quotas = objectMapper.readValue(
@@ -250,6 +335,13 @@ public class MembershipService {
         }
     }
 
+    /**
+     * 根据方案编码查询会员方案。
+     *
+     * @param planCode 方案编码（如 free / vip）
+     * @return 方案实体
+     * @throws BusinessException 当方案编码不存在时
+     */
     private MembershipPlanDO getPlanByCode(String planCode) {
         MembershipPlanDO plan = membershipPlanMapper.selectOne(
                 new LambdaQueryWrapper<MembershipPlanDO>()
@@ -262,6 +354,12 @@ public class MembershipService {
         return plan;
     }
 
+    /**
+     * 根据角色推断默认方案编码。
+     *
+     * @param role 用户角色（normal/vip/admin）
+     * @return vip/admin 返回 "vip"，其他返回 "free"
+     */
     private String resolveDefaultPlanCode(String role) {
         if ("vip".equalsIgnoreCase(role) || "admin".equalsIgnoreCase(role)) {
             return "vip";

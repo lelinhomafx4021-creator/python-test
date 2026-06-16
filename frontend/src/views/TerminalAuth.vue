@@ -52,11 +52,13 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-[#fafbfc] px-4">
-    <!-- 微妙背景装饰 -->
+  <div class="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-cyan-50 px-4">
+    <!-- 渐变背景装饰 -->
     <div class="pointer-events-none fixed inset-0">
-      <div class="absolute right-[-10%] top-[-15%] h-[400px] w-[400px] rounded-full bg-slate-100 blur-[80px]" />
-      <div class="absolute bottom-[-10%] left-[-5%] h-[300px] w-[300px] rounded-full bg-slate-50 blur-[60px]" />
+      <div class="absolute right-[-10%] top-[-15%] h-[500px] w-[500px] rounded-full bg-gradient-to-br from-indigo-100 to-blue-50 blur-[100px] opacity-60" />
+      <div class="absolute bottom-[-10%] left-[-5%] h-[400px] w-[400px] rounded-full bg-gradient-to-tr from-cyan-50 to-emerald-50 blur-[80px] opacity-50" />
+      <!-- 网格装饰 -->
+      <div class="absolute inset-0 opacity-[0.02]" style="background-image: linear-gradient(rgba(15,23,42,1) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,1) 1px, transparent 1px); background-size: 40px 40px;" />
     </div>
 
     <div
@@ -66,11 +68,13 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
     >
       <!-- Logo -->
       <div class="mb-8 text-center">
-        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 shadow-lg shadow-slate-900/10">
-          <ShieldCheck class="h-6 w-6 text-white" />
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/30">
+          <ShieldCheck class="h-7 w-7 text-white" />
         </div>
-        <h1 class="text-[22px] font-semibold text-slate-900">智投终端</h1>
-        <p class="mt-1 text-[13px] text-slate-400">
+        <h1 class="text-[24px] font-bold tracking-tight text-slate-900">
+          星策智投
+        </h1>
+        <p class="mt-1.5 text-[13px] text-slate-500">
           {{ mode === 'login' ? '登录你的账户' : '创建新账户' }}
         </p>
       </div>
@@ -104,7 +108,10 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
         </div>
 
         <!-- 表单 -->
-        <form class="space-y-4" @submit.prevent="emit('submit')">
+        <form
+          class="space-y-4"
+          @submit.prevent="emit('submit')"
+        >
           <template v-if="mode === 'register'">
             <div class="grid grid-cols-2 gap-3">
               <div>
@@ -115,7 +122,7 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   placeholder="你的昵称"
                   @input="updateValue('nickname', $event)"
-                />
+                >
               </div>
               <div>
                 <label class="mb-1.5 block text-[12px] text-slate-500">手机号</label>
@@ -125,7 +132,7 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   placeholder="选填"
                   @input="updateValue('phone', $event)"
-                />
+                >
               </div>
             </div>
 
@@ -139,7 +146,7 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
                   class="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   placeholder="接收验证码"
                   @input="updateValue('email', $event)"
-                />
+                >
               </div>
             </div>
 
@@ -153,7 +160,7 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   placeholder="请输入验证码"
                   @input="updateValue('emailCode', $event)"
-                />
+                >
                 <button
                   type="button"
                   class="shrink-0 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -174,7 +181,7 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
               class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
               placeholder="请输入用户名"
               @input="updateValue('username', $event)"
-            />
+            >
           </div>
 
           <div>
@@ -185,7 +192,7 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
               class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
               placeholder="请输入密码"
               @input="updateValue('password', $event)"
-            />
+            >
           </div>
 
           <div
@@ -197,7 +204,7 @@ onMounted(() => { setTimeout(() => show.value = true, 30) })
 
           <button
             type="submit"
-            class="w-full rounded-lg bg-slate-900 py-2.5 text-[14px] font-medium text-white transition-all hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            class="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 py-2.5 text-[14px] font-medium text-white shadow-md shadow-indigo-500/20 transition-all hover:shadow-lg hover:shadow-indigo-500/30 hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="loading"
           >
             {{ loading ? '提交中...' : mode === 'login' ? '登录' : '注册' }}

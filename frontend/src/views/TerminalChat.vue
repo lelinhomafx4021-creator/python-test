@@ -12,8 +12,10 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import {
   Bot,
+  Check,
   ChevronDown,
   ChevronUp,
+  Copy,
   MessageSquare,
   Plus,
   SendHorizontal,
@@ -96,6 +98,26 @@ const useSuggestion = (text: string) => {
   emit('update:draft', text)
 }
 
+// 复制消息内容
+const copiedIndex = ref(-1)
+const copyMessage = async (content: string, index: number) => {
+  try {
+    await navigator.clipboard.writeText(content)
+    copiedIndex.value = index
+    setTimeout(() => { copiedIndex.value = -1 }, 2000)
+  } catch {
+    // fallback: 创建临时 textarea
+    const ta = document.createElement('textarea')
+    ta.value = content
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    copiedIndex.value = index
+    setTimeout(() => { copiedIndex.value = -1 }, 2000)
+  }
+}
+
 </script>
 
 <template>
@@ -130,15 +152,24 @@ const useSuggestion = (text: string) => {
               :class="currentSessionId === session.sessionId ? 'text-indigo-400' : 'text-slate-300 group-hover:text-slate-400'"
             />
             <div class="min-w-0 flex-1">
-              <div class="truncate text-[12px] font-medium leading-tight">{{ session.title || '新会话' }}</div>
-              <div class="mt-1 text-[11px] text-slate-400">{{ formatTime(session.lastAt) }}</div>
+              <div class="truncate text-[12px] font-medium leading-tight">
+                {{ session.title || '新会话' }}
+              </div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ formatTime(session.lastAt) }}
+              </div>
             </div>
           </div>
         </button>
 
-        <div v-if="!sessions.length" class="px-2 py-6 text-center">
+        <div
+          v-if="!sessions.length"
+          class="px-2 py-6 text-center"
+        >
           <MessageSquare class="mx-auto mb-2 h-8 w-8 text-slate-200" />
-          <p class="text-[12px] leading-5 text-slate-400">还没有历史会话</p>
+          <p class="text-[12px] leading-5 text-slate-400">
+            还没有历史会话
+          </p>
         </div>
       </div>
 
@@ -161,8 +192,12 @@ const useSuggestion = (text: string) => {
             <Sparkles class="h-4 w-4" />
           </div>
           <div>
-            <h3 class="text-[14px] font-semibold text-slate-800">AI 投研助手</h3>
-            <p class="text-[11px] text-slate-400">支持个股分析、板块对比、策略建议</p>
+            <h3 class="text-[14px] font-semibold text-slate-800">
+              AI 投研助手
+            </h3>
+            <p class="text-[11px] text-slate-400">
+              支持个股分析、板块对比、策略建议
+            </p>
           </div>
         </div>
         <button
@@ -185,7 +220,10 @@ const useSuggestion = (text: string) => {
         :class="messages.length ? 'px-5 py-5' : 'flex items-center justify-center'"
       >
         <!-- 空状态：欢迎页 -->
-        <div v-if="!messages.length" class="mx-auto flex w-full max-w-[520px] flex-col items-center px-4 text-center">
+        <div
+          v-if="!messages.length"
+          class="mx-auto flex w-full max-w-[520px] flex-col items-center px-4 text-center"
+        >
           <div class="relative mb-4">
             <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
               <Bot class="h-8 w-8" />
@@ -195,26 +233,31 @@ const useSuggestion = (text: string) => {
             </div>
           </div>
 
-          <h4 class="text-[22px] font-bold tracking-tight text-slate-800">你好，今天想研究什么？</h4>
+          <h4 class="text-[22px] font-bold tracking-tight text-slate-800">
+            你好，今天想研究什么？
+          </h4>
           <p class="mt-2 max-w-[400px] text-[13px] leading-6 text-slate-400">
-            我可以帮你分析个股、对比板块、制定投资策略。遇到复杂问题也可以转人工。
+            我可以帮你分析个股、对比板块、制定投资策略。<br>遇到复杂问题也可以转人工。
           </p>
 
           <div class="mt-6 flex w-full flex-col gap-2">
             <button
               v-for="item in suggestions"
               :key="item.text"
-              class="group flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-all duration-200 hover:border-indigo-200 hover:bg-indigo-50/50 hover:shadow-sm active:scale-[0.99]"
+              class="group flex w-full items-center gap-3 rounded-xl border border-slate-200/80 bg-white/80 px-4 py-3 text-left backdrop-blur-sm transition-all duration-200 hover:border-indigo-200 hover:bg-white hover:shadow-md hover:shadow-indigo-50 hover:-translate-y-0.5 active:scale-[0.99]"
               @click="useSuggestion(item.text)"
             >
-              <span class="text-[18px]">{{ item.icon }}</span>
+              <span class="text-[18px] transition-transform duration-200 group-hover:scale-110">{{ item.icon }}</span>
               <span class="text-[13px] text-slate-600 group-hover:text-indigo-700">{{ item.text }}</span>
             </button>
           </div>
         </div>
 
         <!-- 消息列表 -->
-        <div v-else class="mx-auto max-w-[860px] space-y-5">
+        <div
+          v-else
+          class="mx-auto max-w-[860px] space-y-5"
+        >
           <div
             v-for="(message, index) in messages"
             :key="index"
@@ -222,7 +265,10 @@ const useSuggestion = (text: string) => {
             :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
           >
             <!-- 用户消息 -->
-            <div v-if="message.role === 'user'" class="flex max-w-[70%] flex-row-reverse items-end gap-2.5">
+            <div
+              v-if="message.role === 'user'"
+              class="flex max-w-[70%] flex-row-reverse items-end gap-2.5"
+            >
               <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-white shadow-sm">
                 <UserRound class="h-3.5 w-3.5" />
               </div>
@@ -232,7 +278,10 @@ const useSuggestion = (text: string) => {
             </div>
 
             <!-- AI 消息 -->
-            <div v-else class="flex w-full max-w-[85%] items-start gap-2.5">
+            <div
+              v-else
+              class="flex w-full max-w-[85%] items-start gap-2.5"
+            >
               <div class="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm shadow-indigo-200">
                 <Bot class="h-3.5 w-3.5" />
               </div>
@@ -251,17 +300,23 @@ const useSuggestion = (text: string) => {
                       <Sparkles class="h-3 w-3 text-indigo-400" />
                       思考过程（{{ message.thoughts.length }} 步）
                     </span>
-                    <component :is="message.showThoughts ? ChevronUp : ChevronDown" class="h-3.5 w-3.5" />
+                    <component
+                      :is="message.showThoughts ? ChevronUp : ChevronDown"
+                      class="h-3.5 w-3.5"
+                    />
                   </button>
 
-                  <div v-if="message.showThoughts" class="border-t border-slate-100 px-3.5 py-2.5">
+                  <div
+                    v-if="message.showThoughts"
+                    class="border-t border-slate-100 px-3.5 py-2.5"
+                  >
                     <div class="space-y-1.5">
                       <div
                         v-for="(thought, ti) in message.thoughts"
                         :key="ti"
                         class="flex items-start gap-2 rounded-lg px-2 py-1.5 text-[12px] leading-5 text-slate-500"
                       >
-                        <span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-300"></span>
+                        <span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-300" />
                         <span class="shrink-0 text-[10px] text-slate-400 tabular-nums">{{ thought.time }}</span>
                         <span>{{ thought.text }}</span>
                       </div>
@@ -270,10 +325,22 @@ const useSuggestion = (text: string) => {
                 </div>
 
                 <!-- 回答内容 -->
-                <div
-                  class="markdown-body rounded-2xl rounded-tl-md border border-slate-100 bg-white px-4 py-3 text-[13px] leading-7 shadow-sm"
-                  v-html="renderMarkdown(message.content || (isStreaming && index === messages.length - 1 ? '正在生成回答...' : ''))"
-                ></div>
+                <div class="group relative">
+                  <div
+                    class="markdown-body rounded-2xl rounded-tl-md border border-slate-100 bg-white px-4 py-3 text-[13px] leading-7 shadow-sm"
+                    v-html="renderMarkdown(message.content || (isStreaming && index === messages.length - 1 ? '正在生成回答...' : ''))"
+                  />
+                  <!-- 复制按钮 -->
+                  <button
+                    v-if="message.content && !isStreaming"
+                    class="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 opacity-0 shadow-sm transition-all duration-200 hover:border-slate-300 hover:text-slate-600 group-hover:opacity-100"
+                    :class="copiedIndex === index ? 'border-emerald-300 text-emerald-500' : ''"
+                    @click="copyMessage(message.content, index)"
+                  >
+                    <Check v-if="copiedIndex === index" class="h-3.5 w-3.5" />
+                    <Copy v-else class="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -295,7 +362,7 @@ const useSuggestion = (text: string) => {
               style="max-height: 180px"
               @input="updateDraft"
               @keydown.enter.exact.prevent="emit('send')"
-            ></textarea>
+            />
             <button
               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
               :class="
@@ -312,9 +379,13 @@ const useSuggestion = (text: string) => {
           <div class="mt-2 flex items-center justify-between px-1">
             <span class="text-[11px] text-slate-400">
               {{ isStreaming ? '⚡ 正在生成回答...' : 'Enter 发送 · Shift + Enter 换行' }}
+              <span v-if="draft.length > 0" class="ml-2 text-slate-300">{{ draft.length }} 字</span>
             </span>
-            <span v-if="isStreaming" class="flex items-center gap-1.5 text-[11px] text-indigo-500">
-              <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400"></span>
+            <span
+              v-if="isStreaming"
+              class="flex items-center gap-1.5 text-[11px] text-indigo-500"
+            >
+              <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
               实时生成中
             </span>
           </div>

@@ -146,6 +146,8 @@ export type WatchlistItem = {
   sortOrder?: number
   lastPrice?: number
   changePercent?: number
+  changeAmount?: number
+  volume?: number
 }
 
 export type Watchlist = {
@@ -196,6 +198,20 @@ export type PaperOrder = {
   orderQty: number
   filledQty: number
   orderStatus: string
+  createdAt?: string
+}
+
+export type TransactionItem = {
+  id: number
+  accountId: number
+  transactionType: string // BUY / SELL / DEPOSIT / WITHDRAW
+  symbol?: string
+  side?: string
+  quantity?: number
+  price?: number
+  amount: number
+  balanceAfter?: number
+  description?: string
   createdAt?: string
 }
 

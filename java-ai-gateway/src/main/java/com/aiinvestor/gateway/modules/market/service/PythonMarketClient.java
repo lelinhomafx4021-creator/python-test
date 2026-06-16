@@ -8,6 +8,8 @@ import com.aiinvestor.gateway.modules.market.dao.entity.StockDO;
 import com.aiinvestor.gateway.modules.market.dao.mapper.StockMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -18,28 +20,24 @@ import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Python 行情客户端。
  * 统一通过 Python 侧车查询实时行情和市场列表。
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class PythonMarketClient {
-
-    private static final Logger log = LoggerFactory.getLogger(PythonMarketClient.class);
 
     private final WebClient pythonAiWebClient;
     private final StockMapper stockMapper;
 
-    public PythonMarketClient(WebClient pythonAiWebClient, StockMapper stockMapper) {
-        this.pythonAiWebClient = pythonAiWebClient;
-        this.stockMapper = stockMapper;
-    }
-
     /**
      * 批量获取行情。
+     *
+     * @param symbols 股票代码列表
+     * @return 对应股票的最新行情视图对象列表，未查到或状态异常的股票会被过滤
      */
     public List<MarketQuoteVO> fetchQuotes(List<String> symbols) {
         if (symbols.isEmpty()) {
@@ -85,6 +83,14 @@ public class PythonMarketClient {
 
     /**
      * 获取股票分页列表。
+     * <p>
+     * 从 Python 行情服务拉取分页数据，并补充数据库中的拼音首字母信息，
+     * 用于支持前端的拼音搜索功能。
+     *
+     * @param page     页码（从1开始）
+     * @param pageSize 每页条数
+     * @param keyword  搜索关键词（代码/名称/拼音），为空则返回全量
+     * @return 分页股票列表，含行情摘要和拼音首字母
      */
     public MarketStockPageVO fetchStocks(int page, int pageSize, String keyword) {
         JsonNode response = pythonAiWebClient.get()
@@ -133,6 +139,8 @@ public class PythonMarketClient {
             stockItem.setCirculatingMarketValue(decimalOf(item.path("circulatingMarketValue")));
             stockItem.setSixtyDayChangePercent(decimalOf(item.path("sixtyDayChangePercent")));
             stockItem.setYearToDateChangePercent(decimalOf(item.path("yearToDateChangePercent")));
+            stockItem.setPe(decimalOf(item.path("pe")));
+            stockItem.setPb(decimalOf(item.path("pb")));
             items.add(stockItem);
         }
 
@@ -146,6 +154,9 @@ public class PythonMarketClient {
 
     /**
      * 获取热点新闻。
+     *
+     * @param limit 返回条数上限
+     * @return 热点财经新闻条目列表，包含标题、摘要、来源、链接等
      */
     public List<HotNewsItemVO> fetchHotNews(int limit) {
         JsonNode response = pythonAiWebClient.get()
@@ -179,6 +190,11 @@ public class PythonMarketClient {
 
     /**
      * 获取 K 线/分时数据。
+     *
+     * @param symbol 6位股票代码
+     * @param period 周期类型：daily / intraday_1d / intraday_5d
+     * @param days   数据窗口大小
+     * @return K 线数据点列表，每项为 date/open/close/high/low/volume 组成的 Map
      */
     public List<Map<String, Object>> fetchKline(String symbol, String period, int days) {
         JsonNode response = pythonAiWebClient.get()
@@ -217,7 +233,11 @@ public class PythonMarketClient {
     }
 
     /**
-     * 从数据库加载拼音映射表。
+     * 从数据库加载拼音映射表，用于生成股票名称拼音首字母。
+     * <p>
+     * 仅加载已存储了拼音的股票记录，最多 5000 条。
+     *
+     * @return 股票代码 → 拼音首字母的映射
      */
     private Map<String, String> loadPinyinMap() {
         Map<String, String> pinyinMap = new HashMap<>();

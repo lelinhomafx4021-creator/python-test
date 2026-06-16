@@ -32,12 +32,23 @@ let manualClose = false
 /**
  * 获取 WebSocket URL。
  * 根据当前页面地址自动选择 ws:// 或 wss://。
+ * 优先使用 VITE_API_BASE_URL 配置，回退到当前页面同源。
  */
 function getWsUrl(): string {
   const loc = window.location
   const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:'
-  // 开发环境下直接连 8080
-  return `${protocol}//${loc.hostname}:8080/ws/market`
+  const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined
+  if (apiBase && apiBase.trim()) {
+    // 从 API base URL 推断 WebSocket 地址
+    try {
+      const url = new URL(apiBase)
+      return `${protocol}//${url.host}/ws/market`
+    } catch { /* fallback below */ }
+  }
+  // 开发环境：直接连 8080；生产环境：同源
+  const isDev = loc.hostname === 'localhost' || loc.hostname === '127.0.0.1'
+  const host = isDev ? `${loc.hostname}:8080` : loc.host
+  return `${protocol}//${host}/ws/market`
 }
 
 /**
@@ -74,8 +85,8 @@ function handleMessage(msg: MessageEvent) {
         }
       }
     }
-  } catch (e) {
-    console.error('[WS] 行情消息解析失败', e)
+  } catch {
+    // 行情消息解析失败，静默忽略
   }
 }
 
@@ -92,7 +103,6 @@ function connect() {
   ws = new WebSocket(url)
 
   ws.onopen = () => {
-    console.log('[WS] 行情连接成功')
     connected.value = true
     reconnectDelay = INITIAL_RECONNECT_DELAY
 
@@ -105,14 +115,12 @@ function connect() {
   ws.onmessage = handleMessage
 
   ws.onclose = () => {
-    console.log('[WS] 行情连接断开')
     connected.value = false
     ws = null
     scheduleReconnect()
   }
 
-  ws.onerror = (err) => {
-    console.error('[WS] 行情连接错误', err)
+  ws.onerror = () => {
     // onclose 会紧随触发，不需要额外处理
   }
 }
@@ -124,7 +132,6 @@ function scheduleReconnect() {
   if (manualClose) return
   if (reconnectTimer) return
 
-  console.log(`[WS] ${reconnectDelay / 1000}s 后重连...`)
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
     connect()

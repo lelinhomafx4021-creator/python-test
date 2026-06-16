@@ -104,10 +104,6 @@ public class SecurityConfig {
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         // 允许携带的请求头：Authorization（标准）、Content-Type（JSON）、自定义头
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-User-Id", "X-Trace-Id", "satoken"));
-        // 让前端 JS 能通过响应头拿到 Sa-Token 的 token 值
-        configuration.setExposedHeaders(Arrays.asList("satoken"));
-        // 允许携带 Cookie（Sa-Token 默认用 Cookie 存 token，也可改为 Header 模式）
-        configuration.setAllowCredentials(true);
         // 预检请求缓存 1 小时，减少 OPTIONS 请求次数
         configuration.setMaxAge(3600L);
 

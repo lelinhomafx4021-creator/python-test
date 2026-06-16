@@ -11,7 +11,7 @@
   body {
     @apply antialiased;
     color: #0f172a;
-    background: #f3f4f6;
+    background: #f8fafc;
     overflow-x: hidden;
     overflow-y: auto;
   }
@@ -32,10 +32,16 @@
   a:active {
     opacity: 0.7;
   }
+
+  /* 选中文本样式 */
+  ::selection {
+    background: rgba(99, 102, 241, 0.15);
+    color: #312e81;
+  }
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -43,8 +49,13 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.18);
+  background: rgba(100, 116, 139, 0.15);
   border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.3);
 }
 
 .markdown-body {
@@ -72,3 +83,15 @@
 .markdown-body strong { @apply font-semibold text-slate-800; }
 .markdown-body a { @apply text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-700; }
 .markdown-body hr { @apply my-4 border-slate-200; }
+
+/* 公告横幅滚动动画 */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "D:\\AppData\\npx",
+      "args": ["-y", "mcp-fetch-server"]
+    },
+    "tavily": {
+      "command": "D:\\AppData\\npx",
+      "args": ["-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "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"
+      }
+    },
+    "playwright": {
+      "command": "D:\\AppData\\npx",
+      "args": ["-y", "@executeautomation/playwright-mcp-server"]
+    }
+  }
+}

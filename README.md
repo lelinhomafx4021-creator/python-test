@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Java 17" src="https://img.shields.io/badge/Java-17-orange" />
+  <img alt="Java 21" src="https://img.shields.io/badge/Java-21-orange" />
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.x-6DB33F" />
   <img alt="Python" src="https://img.shields.io/badge/Python-FastAPI-3776AB" />
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Vue_3-42B883" />

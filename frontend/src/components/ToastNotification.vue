@@ -55,7 +55,9 @@ const iconColorMap = {
             class="mt-0.5 h-4 w-4 shrink-0"
             :class="iconColorMap[toast.type]"
           />
-          <div class="flex-1 text-[13px] leading-5">{{ toast.message }}</div>
+          <div class="flex-1 text-[13px] leading-5">
+            {{ toast.message }}
+          </div>
           <!-- 关闭按钮 -->
           <button
             class="shrink-0 rounded-lg p-0.5 transition hover:bg-black/5"

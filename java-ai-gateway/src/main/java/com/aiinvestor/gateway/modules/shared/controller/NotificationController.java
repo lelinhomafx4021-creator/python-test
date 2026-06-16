@@ -18,6 +18,9 @@ import java.util.List;
 
 /**
  * 用户通知控制器。
+ * <p>
+ * 提供当前登录用户的通知查询和已读标记功能。
+ * 所有接口均需要登录（通过 {@link com.aiinvestor.gateway.modules.shared.annotation.LoginRequired} 标注）。
  */
 @RestController
 @RequestMapping("/api/v1/notifications")
@@ -27,18 +30,34 @@ public class NotificationController {
 
     private final UserNotificationService userNotificationService;
 
+    /**
+     * 构造函数注入通知服务。
+     *
+     * @param userNotificationService 用户通知业务服务
+     */
     public NotificationController(UserNotificationService userNotificationService) {
         this.userNotificationService = userNotificationService;
     }
 
-    /** 查询当前用户通知。 */
+    /**
+     * 查询当前登录用户的通知列表（最近 20 条，按 ID 倒序）。
+     *
+     * @return 通知列表
+     */
     @Operation(summary = "查询通知列表", description = "获取当前用户的所有通知消息")
     @GetMapping
     public ApiResult<List<UserNotificationVO>> list() {
         return ApiResult.ok(userNotificationService.listMyNotifications(UserContext.getUserId()));
     }
 
-    /** 标记通知已读。 */
+    /**
+     * 将指定通知标记为已读。
+     * <p>
+     * 会校验通知归属，只能标记自己的通知。
+     *
+     * @param notificationId 通知 ID
+     * @return 空响应（操作成功）
+     */
     @Operation(summary = "标记通知已读", description = "将指定通知标记为已读状态")
     @PostMapping("/{id}/read")
     public ApiResult<Void> read(

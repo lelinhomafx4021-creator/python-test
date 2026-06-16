@@ -1,11 +1,13 @@
 import axios, { type AxiosError } from 'axios'
 import { reactive } from 'vue'
 import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
 import type {
   AdminDashboard,
   AdminTicket,
   AdminUser,
   AdminUserPortfolio,
+  Announcement,
   AuthUser,
   ChatMessage,
   FeatureQuota,
@@ -22,11 +24,11 @@ import type {
   PaperPortfolioSnapshot,
   Sector,
   SessionSummary,
+  TransactionItem,
   UserNotification,
   UserProfile,
   VipApplication,
   Watchlist,
-  Announcement,
 } from '../types/terminal'
 
 // 本地开发直连 Java，隧道/部署时用空字符串走 Vite 代理
@@ -122,7 +124,7 @@ export const store = reactive({
   positions: [] as PaperPosition[],
   orders: [] as PaperOrder[],
   transfers: [] as PaperCashTransfer[],
-  transactions: [] as PaperOrder[],
+  transactions: [] as TransactionItem[],
   transactionTotal: 0,
   transactionPage: 1,
   orderSymbol: '',
@@ -162,7 +164,7 @@ const asArray = <T>(value: unknown): T[] => {
 
 const get = async (url: string, key: keyof typeof store, fallback: unknown = []) => {
   const res = await axios.get(url, { headers: headers() })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   ;(store as any)[key] = res.data.data ?? fallback
 }
 
@@ -182,8 +184,8 @@ const err = (e: unknown, msg: string) => {
   return data?.message || data?.msg || data?.error || (e as Error)?.message || msg
 }
 
-const reportOptionalError = (label: string, e: unknown) => {
-  console.warn(`[api] ${label} failed: ${err(e, label)}`)
+const reportOptionalError = (_label: string, _e: unknown) => {
+  // 静默处理可选任务失败，避免污染控制台
 }
 
 const optionalTask = async (label: string, task: () => Promise<void>) => {
@@ -239,8 +241,11 @@ const reset = () => {
 const md = new MarkdownIt({ breaks: true, linkify: false })
 export const renderMd = (s: string) => {
   const html = md.render(s || '')
-  // 过滤 javascript: 协议链接，防止 XSS
-  return html.replace(/href="javascript:[^"]*"/gi, 'href="#"')
+  // 使用 DOMPurify 过滤 HTML，防止 XSS 攻击
+  return DOMPurify.sanitize(html, {
+    ADD_TAGS: ['img'],
+    ADD_ATTR: ['target', 'rel'],
+  })
 }
 
 export const fetchMe = async () => {
@@ -365,6 +370,14 @@ export const saveProfile = async () => {
     await safe(async () => {
       const res = await axios.put(`${API}/users/me`, store.profileForm, { headers: headers() })
       store.profile = res.data.data
+      // 同步更新 store.user，让侧边栏和顶栏的昵称/头像实时生效
+      if (store.user && store.profile) {
+        store.user = {
+          ...store.user,
+          nickname: store.profile.nickname || store.user.nickname,
+          avatarUrl: store.profile.avatarUrl || store.user.avatarUrl,
+        }
+      }
     })
   } finally {
     store.saving = false
@@ -381,6 +394,10 @@ export const uploadAvatar = async (file: File) => {
         headers: { ...headers(), 'Content-Type': 'multipart/form-data' },
       })
       store.profile = res.data.data
+      // 同步更新 store.user 的头像
+      if (store.user && store.profile?.avatarUrl) {
+        store.user = { ...store.user, avatarUrl: store.profile.avatarUrl }
+      }
     })
   } finally {
     store.uploading = false
@@ -821,13 +838,13 @@ export const applyVipWithProof = async (note: string = '', paymentProofUrl: stri
   return res.data
 }
 
-export const fetchVipApplications = async (status?: string) => {
+export const fetchVipApplications = async (status?: string): Promise<VipApplication[]> => {
   const url = status
     ? `${GW}/gateway/vip/applications?status=${status}`
     : `${GW}/gateway/vip/applications`
   try {
     const res = await axios.get(url, { headers: headers() })
-    return asArray(res.data?.data)
+    return asArray<VipApplication>(res.data?.data)
   } catch (e) {
     if (isUnauthorized(e)) throw e
     reportOptionalError('vip applications', e)

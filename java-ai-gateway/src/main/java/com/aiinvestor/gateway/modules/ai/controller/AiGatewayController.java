@@ -2,6 +2,7 @@ package com.aiinvestor.gateway.modules.ai.controller;
 
 import com.aiinvestor.gateway.modules.shared.annotation.LoginRequired;
 import com.aiinvestor.gateway.modules.shared.context.UserContext;
+import com.aiinvestor.gateway.modules.shared.util.AiUtils;
 import com.aiinvestor.gateway.modules.ai.vo.HandoffTicketVO;
 import com.aiinvestor.gateway.modules.shared.vo.ApiResult;
 import com.aiinvestor.gateway.modules.ai.vo.ChatSessionSummaryVO;
@@ -27,8 +28,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +54,8 @@ import java.util.UUID;
  *
  * @author AI Investor Team
  */
+@Slf4j
+@RequiredArgsConstructor
 @CrossOrigin                                       // 允许前端跨域
 @Validated                                         // 启用参数校验
 @RestController                                    // REST 控制器
@@ -61,7 +64,6 @@ import java.util.UUID;
 @Tag(name = "AI对话", description = "AI 智能对话、会话管理、聊天历史查询")
 public class AiGatewayController {
 
-    private static final Logger log = LoggerFactory.getLogger(AiGatewayController.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /** Python AI 通信服务 */
@@ -72,15 +74,6 @@ public class AiGatewayController {
 
     /** 人工兜底工单服务 */
     private final HumanHandoffService humanHandoffService;
-
-    /** 构造函数注入 */
-    public AiGatewayController(PythonAiClientService pythonAiClientService,
-                               ChatHistoryService chatHistoryService,
-                               HumanHandoffService humanHandoffService) {
-        this.pythonAiClientService = pythonAiClientService;
-        this.chatHistoryService = chatHistoryService;
-        this.humanHandoffService = humanHandoffService;
-    }
 
     /**
      * =====================================================
@@ -129,13 +122,7 @@ public class AiGatewayController {
             @RequestParam(value = "sessionId", required = false) String sessionId) {
 
         // ---------- 步骤 1：处理 sessionId ----------
-        // 前端可能传 null、"null"、"undefined" 等脏值，统一归一化
-        String normalized = sessionId == null ? "" : sessionId.trim();
-        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized) || "undefined".equalsIgnoreCase(normalized)) {
-            // 生成新会话 ID（去掉连字符，方便阅读和 URL 传输）
-            normalized = "sess_" + UUID.randomUUID().toString().replace("-", "");
-        }
-        final String finalSessionId = normalized;
+        final String finalSessionId = AiUtils.normalizeSessionId(sessionId);
 
         // ---------- 步骤 2：获取当前用户 ----------
         // 此时已通过 @LoginRequired → LoginInterceptor 的校验，

@@ -23,9 +23,16 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * VIP 申请服务。
+ * <p>
+ * 负责 VIP 申请的完整生命周期：提交申请、管理员查看申请列表、审核（通过/驳回）。
+ * 审核通过后自动分配 VIP 会员方案并升级用户角色。
+ */
 @Service
 public class VipApplicationService {
 
+    /** 合法的审核动作集合 */
     private static final Set<String> REVIEW_ACTIONS = Set.of("approve", "reject");
 
     private final VipApplicationMapper vipApplicationMapper;
@@ -40,6 +47,19 @@ public class VipApplicationService {
         this.userMapper = userMapper;
     }
 
+    /**
+     * 提交 VIP 申请。
+     * <p>
+     * 校验用户是否已有待审核的申请，避免重复提交。
+     *
+     * @param userId          申请人用户 ID
+     * @param username        申请人用户名
+     * @param paymentAmount   付款金额
+     * @param paymentNote     付款备注
+     * @param paymentProofUrl 付款凭证 URL
+     * @return 提交成功的申请摘要
+     * @throws BusinessException 当用户未登录、未上传凭证或已有待审核申请时
+     */
     @Transactional
     public VipApplicationSubmitVO submit(Long userId,
                                          String username,
@@ -79,6 +99,15 @@ public class VipApplicationService {
         );
     }
 
+    /**
+     * 查看 VIP 申请列表（仅管理员）。
+     * <p>
+     * 同时加载审核人的用户名，避免 N+1 查询。
+     *
+     * @param status 可选的状态筛选，为空则返回全部
+     * @return 申请详情列表，按创建时间倒序
+     * @throws BusinessException 当非管理员调用时
+     */
     public List<VipApplicationVO> listApplications(String status) {
         assertAdmin();
 
@@ -107,6 +136,17 @@ public class VipApplicationService {
                 .toList();
     }
 
+    /**
+     * 审核 VIP 申请（仅管理员）。
+     * <p>
+     * 通过时自动分配 VIP 会员方案并升级用户角色；
+     * 驳回时必须填写原因。已处理（非 pending）的申请不可重复审核。
+     *
+     * @param appId   申请 ID
+     * @param request 审核请求，含 action（approve/reject）和可选的 rejectReason
+     * @return 审核后的申请详情
+     * @throws BusinessException 当非管理员调用、申请不存在、申请已处理或驳回时未填写原因
+     */
     @Transactional
     public VipApplicationVO review(Long appId, VipApplicationReviewRequest request) {
         assertAdmin();
@@ -146,6 +186,14 @@ public class VipApplicationService {
         return toVO(application, reviewedByUser);
     }
 
+    /**
+     * 将用户角色升级为 vip。
+     * <p>
+     * admin 角色用户不会被降级，已是 vip 的用户跳过。
+     *
+     * @param userId 用户 ID
+     * @throws BusinessException 当用户不存在时
+     */
     private void upgradeUserRoleToVip(Long userId) {
         UserDO user = userMapper.selectById(userId);
         if (user == null) {
@@ -158,6 +206,13 @@ public class VipApplicationService {
         userMapper.updateById(user);
     }
 
+    /**
+     * 将数据库实体转换为视图对象。
+     *
+     * @param item     数据库实体
+     * @param reviewer 审核人用户实体（可能为 null）
+     * @return 视图对象，含审核人用户名
+     */
     private VipApplicationVO toVO(VipApplicationDO item, UserDO reviewer) {
         return new VipApplicationVO(
                 item.getId(),
@@ -176,6 +231,11 @@ public class VipApplicationService {
         );
     }
 
+    /**
+     * 断言当前用户为管理员，否则抛出业务异常。
+     *
+     * @throws BusinessException 当用户未登录或非管理员角色时
+     */
     private void assertAdmin() {
         UserDO currentUser = UserContext.get();
         if (currentUser == null || !"admin".equalsIgnoreCase(currentUser.getRole())) {
@@ -183,6 +243,13 @@ public class VipApplicationService {
         }
     }
 
+    /**
+     * 规范化并校验审核动作。
+     *
+     * @param action 原始审核动作字符串
+     * @return 小写规范化的动作值（approve 或 reject）
+     * @throws BusinessException 当动作不是 approve 或 reject 时
+     */
     private String normalizeAction(String action) {
         String normalized = action == null ? "" : action.trim().toLowerCase();
         if (!REVIEW_ACTIONS.contains(normalized)) {
@@ -191,6 +258,12 @@ public class VipApplicationService {
         return normalized;
     }
 
+    /**
+     * 安全地将字符串 trim，null 返回空串。
+     *
+     * @param value 原始字符串
+     * @return trim 后的字符串（null 时返回 ""）
+     */
     private String trimToEmpty(String value) {
         return value == null ? "" : value.trim();
     }

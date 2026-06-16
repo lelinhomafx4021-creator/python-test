@@ -697,14 +697,30 @@ const indicatorButtons: { key: IndicatorType; label: string; color: string }[] =
     <div class="border-b border-slate-100 px-5 py-4">
       <div class="flex items-center justify-between">
         <div>
-          <div class="text-[16px] font-semibold text-slate-950">趋势 K 线</div>
-          <div v-if="symbol" class="mt-0.5 text-[12px] text-slate-400">{{ symbol }}</div>
+          <div class="text-[16px] font-semibold text-slate-950">
+            趋势 K 线
+          </div>
+          <div
+            v-if="symbol"
+            class="mt-0.5 text-[12px] text-slate-400"
+          >
+            {{ symbol }}
+          </div>
         </div>
-        <div v-if="latestData" class="text-right">
-          <div class="text-[22px] font-bold tabular-nums tracking-tight" :class="dayChange >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+        <div
+          v-if="latestData"
+          class="text-right"
+        >
+          <div
+            class="text-[22px] font-bold tabular-nums tracking-tight"
+            :class="dayChange >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+          >
             {{ latestData.close.toFixed(2) }}
           </div>
-          <div class="mt-0.5 text-[12px] tabular-nums" :class="dayChange >= 0 ? 'text-rose-500' : 'text-emerald-500'">
+          <div
+            class="mt-0.5 text-[12px] tabular-nums"
+            :class="dayChange >= 0 ? 'text-rose-500' : 'text-emerald-500'"
+          >
             {{ dayChange >= 0 ? '+' : '' }}{{ dayChange.toFixed(2) }}
             ({{ dayChangePercent >= 0 ? '+' : '' }}{{ dayChangePercent.toFixed(2) }}%)
           </div>
@@ -744,7 +760,10 @@ const indicatorButtons: { key: IndicatorType; label: string; color: string }[] =
       </div>
 
       <!-- 指标图例 -->
-      <div v-if="activeIndicators.has('boll')" class="mt-2 flex items-center gap-3 text-[11px]">
+      <div
+        v-if="activeIndicators.has('boll')"
+        class="mt-2 flex items-center gap-3 text-[11px]"
+      >
         <span class="flex items-center gap-1.5">
           <span class="inline-block h-[2px] w-4 rounded-full bg-orange-500" />
           <span class="text-slate-400">BOLL</span>
@@ -753,8 +772,16 @@ const indicatorButtons: { key: IndicatorType; label: string; color: string }[] =
     </div>
 
     <!-- 图表容器 -->
-    <div v-if="data.length" ref="chartRef" class="w-full px-2 pt-2" :class="activeIndicators.size > 2 ? 'h-[620px]' : activeIndicators.size > 0 ? 'h-[520px]' : 'h-[420px]'" />
-    <div v-else class="flex h-[420px] flex-col items-center justify-center gap-3 text-[13px] text-slate-400">
+    <div
+      v-if="data.length"
+      ref="chartRef"
+      class="w-full px-2 pt-2"
+      :class="activeIndicators.size > 2 ? 'h-[620px]' : activeIndicators.size > 0 ? 'h-[520px]' : 'h-[420px]'"
+    />
+    <div
+      v-else
+      class="flex h-[420px] flex-col items-center justify-center gap-3 text-[13px] text-slate-400"
+    >
       <BarChart3 class="h-10 w-10 text-slate-300" />
       <span>暂无K线数据</span>
     </div>

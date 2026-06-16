@@ -93,4 +93,14 @@ public class MarketStockListItemVO {
      * 年初至今涨跌幅。
      */
     private BigDecimal yearToDateChangePercent;
+
+    /**
+     * 市盈率（动态）。
+     */
+    private BigDecimal pe;
+
+    /**
+     * 市净率。
+     */
+    private BigDecimal pb;
 }

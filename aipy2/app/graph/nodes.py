@@ -2,6 +2,11 @@
 LangGraph 节点函数。
 
 每个节点就是一个 Python 函数，执行完后返回更新后的状态（往公文包里塞东西）。
+
+结构化输出策略：
+  使用 llm.with_structured_output(Model) 走原生 function calling，
+  替代旧的 PydanticOutputParser（基于 prompt 指令让 LLM 输出 JSON）。
+  原生方式更可靠——不依赖 LLM 遵循 prompt 里的格式指令。
 """
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -13,12 +18,12 @@ from app.prompts.investor_prompts import (
     ANSWER_PROMPT,
     ANSWER_PROMPT_LITE,
     CRITIC_PROMPT,
-    CRITIC_REVIEW_PARSER,
+    CriticReviewResult,
     DIRECT_ANSWER_PROMPT,
-    INTENT_ROUTE_PARSER,
+    IntentRouteResult,
     INTENT_ROUTE_PROMPT,
     REWRITE_INITIAL_PROMPT,
-    REWRITE_QUERIES_PARSER,
+    RewriteQueriesResult,
     REWRITE_RETRY_PROMPT,
 )
 from app.skills.stock_analysis_skill import StockAnalysisSkillInput, stock_analysis_skill
@@ -41,7 +46,11 @@ from app.graph.state import (
 # ============================================================
 
 async def route_intent_node(state: AgentState):
-    """【意图识别】判断用户是在闲聊还是在问正经的投研问题"""
+    """【意图识别】判断用户是在闲聊还是在问正经的投研问题。
+
+    使用 llm.with_structured_output(IntentRouteResult) 走原生 function calling，
+    比旧的 PydanticOutputParser 更可靠。
+    """
     user_msg = _latest_user_query(state)
 
     if _wants_human_handoff(user_msg):
@@ -49,31 +58,26 @@ async def route_intent_node(state: AgentState):
             "handoff_to_human": True,
             "handoff_reason": "user_requested_human",
             "handoff_summary": _build_handoff_summary(state, "user_requested_human"),
-            "step": "🤝 用户明确要求人工客服，正在准备转接..."
+            "step": "🤝 用户明确要求人工客服，正在准备转接...",
         }
 
-    llm = llm_core.get_llm(temperature=0)  # temperature=0 让 AI 的判断更稳定，不乱猜
+    llm = llm_core.get_llm(temperature=0)  # temperature=0 让 AI 的判断更稳定
+    messages = INTENT_ROUTE_PROMPT.format_messages(user_msg=user_msg)
+    structured_llm = llm.with_structured_output(IntentRouteResult)
 
-    # ainvoke 是"异步调用"，程序发出请求后可以去处理别的任务，等 AI 返回了再回来继续
-    res = await llm.ainvoke(
-        INTENT_ROUTE_PROMPT.format_messages(
-            user_msg=user_msg,
-            format_instructions=INTENT_ROUTE_PARSER.get_format_instructions(),
-        )
-    )
-    decision_text = _message_text(res)
     try:
-        route_result = INTENT_ROUTE_PARSER.parse(decision_text)
+        route_result = await structured_llm.ainvoke(messages)
         use_kb = route_result.route == "use_kb"
     except Exception:
-        decision = decision_text.strip().lower()
+        # 降级：structured output 失败时用原始 LLM + 关键词兜底
+        res = await llm.ainvoke(messages)
+        decision = _message_text(res).strip().lower()
         use_kb = "use_kb" in decision and "no_kb" not in decision
 
     # 返回的值会自动合并到 AgentState 这个大公文包里
     return {
         "use_kb": use_kb,
-        "total_tokens": _state_total_tokens(state, res),
-        "step": "🧭 正在判断是否需要知识库检索..."
+        "step": "🧭 正在判断是否需要知识库检索...",
     }
 
 
@@ -116,39 +120,42 @@ async def direct_answer_node(state: AgentState):
 
 
 async def rewrite_node(state: AgentState):
-    """【重写节点】把用户的大白话转成搜素引擎喜欢的关键词"""
+    """【重写节点】把用户的大白话转成搜索引擎喜欢的关键词。
+
+    使用 llm.with_structured_output(RewriteQueriesResult) 走原生 function calling。
+    """
     user_msg = _latest_user_query(state)
     llm = llm_core.get_llm(temperature=0.3)
+    structured_llm = llm.with_structured_output(RewriteQueriesResult)
 
     # 核心面试点：Self-RAG 的体现。如果之前的尝试被评审员打回来了，该怎么办？
     # 答：利用上一次的反馈信息，重新校准搜索方向。
     if state.get("retry_count", 0) > 0:
         feedback = state.get("critic_feedback", "信息不足")
-        prompt_messages = REWRITE_RETRY_PROMPT.format_messages(
+        messages = REWRITE_RETRY_PROMPT.format_messages(
             feedback=feedback,
             user_msg=user_msg,
-            format_instructions=REWRITE_QUERIES_PARSER.get_format_instructions(),
         )
     else:
-        prompt_messages = REWRITE_INITIAL_PROMPT.format_messages(
+        messages = REWRITE_INITIAL_PROMPT.format_messages(
             user_msg=user_msg,
-            format_instructions=REWRITE_QUERIES_PARSER.get_format_instructions(),
         )
 
-    response = await llm.ainvoke(prompt_messages)
-    response_text = _message_text(response)
     try:
-        parsed = REWRITE_QUERIES_PARSER.parse(response_text)
+        parsed = await structured_llm.ainvoke(messages)
         queries = _normalize_query_items(parsed.queries)
     except Exception:
+        # 降级：structured output 失败时用原始 LLM + 文本解析兜底
+        res = await llm.ainvoke(messages)
+        response_text = _message_text(res)
         queries = _normalize_query_items(response_text.split("\n"))
+
     if not queries:
         queries = [user_msg]
 
     return {
         "queries": queries,
-        "total_tokens": _state_total_tokens(state, response),
-        "step": f"🧠 正在重新校准搜索意图 (消耗: {_token_count(response)} tokens)..."
+        "step": f"🧠 正在重新校准搜索意图...",
     }
 
 
@@ -327,28 +334,29 @@ async def answer_node(state: AgentState):
 
 async def critic_node(state: AgentState):
     """
-    【评审节点】Agent 的"质检员"
+    【评审节点】Agent 的"质检员"。
+
+    使用 llm.with_structured_output(CriticReviewResult) 走原生 function calling。
     知识点：Self-Correction (自纠错) 架构。模拟了人类社会中的"一人做，一人审"的模型。
     """
     llm = llm_core.get_llm(temperature=0)  # 评审需要极度客观，锁定 0 温度
+    structured_llm = llm.with_structured_output(CriticReviewResult)
     last_answer = _message_text(state["messages"][-1])
     knowledge = state["knowledge"]
-    res = await llm.ainvoke(
-        CRITIC_PROMPT.format_messages(
-            user_msg=_latest_user_query(state),
-            knowledge=knowledge or "无",
-            answer=last_answer,
-            format_instructions=CRITIC_REVIEW_PARSER.get_format_instructions(),
-        )
+    messages = CRITIC_PROMPT.format_messages(
+        user_msg=_latest_user_query(state),
+        knowledge=knowledge or "无",
+        answer=last_answer,
     )
-    content = _message_text(res)
 
-    # 后处理 AI 的返回，提取出 pass 还是 fail
     try:
-        review = CRITIC_REVIEW_PARSER.parse(content)
+        review = await structured_llm.ainvoke(messages)
         status = review.verdict
         reason = review.reason.strip()
     except Exception:
+        # 降级：structured output 失败时用原始 LLM + 文本解析兜底
+        res = await llm.ainvoke(messages)
+        content = _message_text(res)
         lowered = content.lower()
         status = "pass" if "结论: pass" in lowered or "status: pass" in lowered else "fail"
         reason = content.split("理由:")[-1].strip() if "理由:" in content else "内容不够详实"
@@ -366,7 +374,6 @@ async def critic_node(state: AgentState):
             "handoff_to_human": True,
             "handoff_reason": handoff_reason,
             "handoff_summary": _build_handoff_summary(state, handoff_reason),
-            "total_tokens": _state_total_tokens(state, res),
             "step": "🤝 多次修正后仍不稳定，正在转人工客服..."
         }
     else:
@@ -376,7 +383,6 @@ async def critic_node(state: AgentState):
         "review_status": status,
         "critic_feedback": reason,
         "retry_count": new_retry,
-        "total_tokens": _state_total_tokens(state, res),
         "step": step
     }
 

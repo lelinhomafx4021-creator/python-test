@@ -245,16 +245,24 @@ watch(
           <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
             <TrendingUp class="h-4 w-4 text-blue-500" />
           </div>
-          <div class="text-[15px] font-semibold text-slate-950">{{ title || '策略净值曲线' }}</div>
+          <div class="text-[15px] font-semibold text-slate-950">
+            {{ title || '策略净值曲线' }}
+          </div>
         </div>
       </div>
 
       <!-- 汇总统计 -->
-      <div v-if="data.length >= 2" class="mt-3 grid grid-cols-3 gap-4">
+      <div
+        v-if="data.length >= 2"
+        class="mt-3 grid grid-cols-3 gap-4"
+      >
         <!-- 总收益率 -->
         <div class="flex flex-col">
           <span class="text-[11px] text-slate-400">总收益率</span>
-          <span class="text-[18px] font-bold tabular-nums" :class="stats.totalReturn >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+          <span
+            class="text-[18px] font-bold tabular-nums"
+            :class="stats.totalReturn >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+          >
             {{ stats.totalReturn >= 0 ? '+' : '' }}{{ stats.totalReturn }}%
           </span>
         </div>
@@ -268,7 +276,10 @@ watch(
         <!-- 夏普比率 -->
         <div class="flex flex-col">
           <span class="text-[11px] text-slate-400">夏普比率</span>
-          <span class="text-[18px] font-bold tabular-nums" :class="stats.sharpeRatio >= 1 ? 'text-blue-600' : stats.sharpeRatio >= 0 ? 'text-slate-700' : 'text-rose-600'">
+          <span
+            class="text-[18px] font-bold tabular-nums"
+            :class="stats.sharpeRatio >= 1 ? 'text-blue-600' : stats.sharpeRatio >= 0 ? 'text-slate-700' : 'text-rose-600'"
+          >
             {{ stats.sharpeRatio }}
           </span>
         </div>
@@ -276,8 +287,15 @@ watch(
     </div>
 
     <!-- 图表 -->
-    <div v-if="data.length" ref="chartRef" class="h-[280px] w-full px-2 pt-2" />
-    <div v-else class="flex h-[280px] flex-col items-center justify-center gap-3 text-[13px] text-slate-400">
+    <div
+      v-if="data.length"
+      ref="chartRef"
+      class="h-[280px] w-full px-2 pt-2"
+    />
+    <div
+      v-else
+      class="flex h-[280px] flex-col items-center justify-center gap-3 text-[13px] text-slate-400"
+    >
       <TrendingUp class="h-10 w-10 text-slate-300" />
       <span>暂无权益数据</span>
     </div>

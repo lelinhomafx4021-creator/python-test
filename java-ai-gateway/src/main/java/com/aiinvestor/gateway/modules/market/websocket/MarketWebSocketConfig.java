@@ -21,6 +21,11 @@ public class MarketWebSocketConfig implements WebSocketConfigurer {
         this.marketWebSocketHandler = marketWebSocketHandler;
     }
 
+    /**
+     * 注册 WebSocket 处理器。
+     *
+     * @param registry WebSocket 处理器注册中心
+     */
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(marketWebSocketHandler, "/ws/market")

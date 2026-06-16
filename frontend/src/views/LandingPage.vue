@@ -16,10 +16,7 @@ const router = useRouter()
 const goToVip = () => router.push('/vip-apply')
 const goToApp = () => router.push('/overview')
 
-// 如果已登录，直接跳主页
-if (localStorage.getItem('ai-investor-token')) {
-  router.replace('/overview')
-}
+// 登录状态由路由守卫统一处理，不在组件内重复跳转
 
 const show = ref(false)
 onMounted(() => { setTimeout(() => show.value = true, 50) })
@@ -32,10 +29,10 @@ const quoteRows = [
 ]
 
 const features = [
-  { icon: LineChart, title: '行情看板', desc: '实时行情、板块热力、资金流向一屏掌握' },
-  { icon: Bot, title: '智能研究', desc: '基于真实数据的深度投研问答' },
-  { icon: WalletCards, title: '模拟交易', desc: '下单、持仓、资金流水、盈亏统计全链路' },
-  { icon: Newspaper, title: '热点追踪', desc: '多源财经新闻聚合，利好利空一目了然' },
+  { icon: LineChart, title: '行情看板', desc: '实时行情、板块热力、资金流向一屏掌握', color: 'from-blue-500 to-cyan-500', bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
+  { icon: Bot, title: '智能研究', desc: '基于真实数据的深度投研问答', color: 'from-indigo-500 to-purple-500', bgColor: 'bg-indigo-50', iconColor: 'text-indigo-600' },
+  { icon: WalletCards, title: '模拟交易', desc: '下单、持仓、资金流水、盈亏统计全链路', color: 'from-emerald-500 to-teal-500', bgColor: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+  { icon: Newspaper, title: '热点追踪', desc: '多源财经新闻聚合，利好利空一目了然', color: 'from-amber-500 to-orange-500', bgColor: 'bg-amber-50', iconColor: 'text-amber-600' },
 ]
 
 const plans = [
@@ -67,9 +64,18 @@ const plans = [
         </div>
 
         <nav class="hidden items-center gap-6 text-[13px] text-slate-500 md:flex">
-          <a href="#preview" class="transition hover:text-slate-900">产品</a>
-          <a href="#features" class="transition hover:text-slate-900">功能</a>
-          <a href="#pricing" class="transition hover:text-slate-900">价格</a>
+          <a
+            href="#preview"
+            class="transition hover:text-slate-900"
+          >产品</a>
+          <a
+            href="#features"
+            class="transition hover:text-slate-900"
+          >功能</a>
+          <a
+            href="#pricing"
+            class="transition hover:text-slate-900"
+          >价格</a>
         </nav>
 
         <button
@@ -83,27 +89,29 @@ const plans = [
 
     <main
       :class="show ? 'opacity-100' : 'opacity-0'"
-      style="transition: opacity 0.5s ease"
+      style="transition: opacity 0.6s ease"
     >
       <!-- Hero -->
       <section class="relative overflow-hidden">
-        <!-- 微妙背景装饰 -->
+        <!-- 渐变网格背景装饰 -->
         <div class="pointer-events-none absolute inset-0">
-          <div class="absolute right-[-10%] top-[-20%] h-[400px] w-[400px] rounded-full bg-slate-100 blur-[80px]" />
-          <div class="absolute bottom-[-10%] left-[-5%] h-[300px] w-[300px] rounded-full bg-slate-50 blur-[60px]" />
+          <div class="absolute right-[-10%] top-[-20%] h-[500px] w-[500px] rounded-full bg-gradient-to-br from-indigo-100 to-blue-50 blur-[100px] opacity-60" />
+          <div class="absolute bottom-[-10%] left-[-5%] h-[400px] w-[400px] rounded-full bg-gradient-to-tr from-emerald-50 to-teal-50 blur-[80px] opacity-50" />
+          <!-- 网格线条 -->
+          <div class="absolute inset-0 opacity-[0.03]" style="background-image: linear-gradient(rgba(15,23,42,1) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,1) 1px, transparent 1px); background-size: 60px 60px;" />
         </div>
 
         <div class="relative mx-auto max-w-[1100px] px-6 pb-20 pt-24 text-center">
           <div class="mx-auto max-w-[640px]">
-            <div class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[12px] text-slate-500 shadow-sm">
-              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <div class="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-3.5 py-1.5 text-[12px] text-slate-500 shadow-sm backdrop-blur-sm">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               行情 · 研究 · 交易 · 新闻
             </div>
             <h1 class="mt-6 text-[48px] font-bold leading-[1.15] tracking-tight text-slate-950">
-              一个终端，搞定投研
+              一个终端，<span class="bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">搞定投研</span>
             </h1>
             <p class="mt-5 text-[16px] leading-[1.8] text-slate-500">
-              行情、自选、研究、模拟交易、新闻追踪——<br class="hidden sm:block" />
+              行情、自选、研究、模拟交易、新闻追踪——<br class="hidden sm:block">
               不在多个工具之间反复切换。
             </p>
             <div class="mt-8 flex items-center justify-center gap-3">
@@ -125,18 +133,27 @@ const plans = [
 
           <!-- 数据亮点 -->
           <div class="mx-auto mt-14 grid max-w-[480px] grid-cols-3 gap-4">
-            <div v-for="stat in [{ n: '8+', l: '核心模块' }, { n: '40+', l: '测试用例' }, { n: '2 端', l: '用户+管理' }]" :key="stat.l"
+            <div
+              v-for="stat in [{ n: '8+', l: '核心模块' }, { n: '40+', l: '测试用例' }, { n: '2 端', l: '用户+管理' }]"
+              :key="stat.l"
               class="rounded-xl border border-slate-200 bg-white/60 px-3 py-3 backdrop-blur-sm"
             >
-              <div class="text-[18px] font-bold text-slate-900">{{ stat.n }}</div>
-              <div class="mt-0.5 text-[11px] text-slate-400">{{ stat.l }}</div>
+              <div class="text-[18px] font-bold text-slate-900">
+                {{ stat.n }}
+              </div>
+              <div class="mt-0.5 text-[11px] text-slate-400">
+                {{ stat.l }}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       <!-- Preview -->
-      <section id="preview" class="mx-auto max-w-[1100px] px-6 pb-24">
+      <section
+        id="preview"
+        class="mx-auto max-w-[1100px] px-6 pb-24"
+      >
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <!-- 顶栏 -->
           <div class="flex items-center gap-2 border-b border-slate-100 px-5 py-3">
@@ -155,7 +172,9 @@ const plans = [
             <!-- 行情表 -->
             <div>
               <div class="mb-3 flex items-center justify-between">
-                <div class="text-[14px] font-semibold text-slate-900">盘中观察</div>
+                <div class="text-[14px] font-semibold text-slate-900">
+                  盘中观察
+                </div>
                 <div class="flex items-center gap-1.5 text-[11px] text-emerald-600">
                   <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   实时
@@ -165,18 +184,31 @@ const plans = [
                 <div class="grid grid-cols-[72px_1fr_80px_68px] bg-slate-50 px-4 py-2 text-[11px] text-slate-400">
                   <div>代码</div>
                   <div>名称</div>
-                  <div class="text-right">现价</div>
-                  <div class="text-right">涨跌</div>
+                  <div class="text-right">
+                    现价
+                  </div>
+                  <div class="text-right">
+                    涨跌
+                  </div>
                 </div>
                 <div
                   v-for="row in quoteRows"
                   :key="row.code"
                   class="grid grid-cols-[72px_1fr_80px_68px] items-center border-t border-slate-50 px-4 py-2.5 text-[12px] transition hover:bg-slate-50"
                 >
-                  <div class="font-mono text-slate-500">{{ row.code }}</div>
-                  <div class="text-slate-700">{{ row.name }}</div>
-                  <div class="text-right font-mono text-slate-900">{{ row.price }}</div>
-                  <div class="text-right font-mono" :class="row.up ? 'text-emerald-600' : 'text-rose-500'">
+                  <div class="font-mono text-slate-500">
+                    {{ row.code }}
+                  </div>
+                  <div class="text-slate-700">
+                    {{ row.name }}
+                  </div>
+                  <div class="text-right font-mono text-slate-900">
+                    {{ row.price }}
+                  </div>
+                  <div
+                    class="text-right font-mono"
+                    :class="row.up ? 'text-emerald-600' : 'text-rose-500'"
+                  >
                     {{ row.change }}
                   </div>
                 </div>
@@ -208,13 +240,21 @@ const plans = [
               <div class="grid grid-cols-2 gap-3">
                 <div class="rounded-xl border border-slate-100 p-3 text-center transition hover:bg-slate-50">
                   <WalletCards class="mx-auto mb-1.5 h-4 w-4 text-slate-400" />
-                  <div class="text-[12px] font-medium text-slate-700">模拟交易</div>
-                  <div class="text-[10px] text-slate-400">持仓+委托</div>
+                  <div class="text-[12px] font-medium text-slate-700">
+                    模拟交易
+                  </div>
+                  <div class="text-[10px] text-slate-400">
+                    持仓+委托
+                  </div>
                 </div>
                 <div class="rounded-xl border border-slate-100 p-3 text-center transition hover:bg-slate-50">
                   <Newspaper class="mx-auto mb-1.5 h-4 w-4 text-slate-400" />
-                  <div class="text-[12px] font-medium text-slate-700">财经热点</div>
-                  <div class="text-[10px] text-slate-400">多源聚合</div>
+                  <div class="text-[12px] font-medium text-slate-700">
+                    财经热点
+                  </div>
+                  <div class="text-[10px] text-slate-400">
+                    多源聚合
+                  </div>
                 </div>
               </div>
             </div>
@@ -223,9 +263,14 @@ const plans = [
       </section>
 
       <!-- Features -->
-      <section id="features" class="relative mx-auto max-w-[1100px] px-6 pb-24">
+      <section
+        id="features"
+        class="relative mx-auto max-w-[1100px] px-6 pb-24"
+      >
         <div class="mx-auto max-w-[500px] text-center">
-          <div class="text-[12px] font-medium uppercase tracking-widest text-slate-400">功能</div>
+          <div class="text-[12px] font-medium uppercase tracking-widest text-slate-400">
+            功能
+          </div>
           <h2 class="mt-3 text-[32px] font-bold tracking-tight text-slate-950">
             该有的，都有
           </h2>
@@ -238,37 +283,61 @@ const plans = [
           <div
             v-for="f in features"
             :key="f.title"
-            class="group rounded-2xl border border-slate-200 p-6 transition-all hover:border-slate-300 hover:shadow-sm"
+            class="group rounded-2xl border border-slate-200/80 bg-white/50 p-6 backdrop-blur-sm transition-all duration-300 hover:border-transparent hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 hover:-translate-y-0.5"
           >
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 transition group-hover:bg-slate-900 group-hover:text-white">
-              <component :is="f.icon" class="h-5 w-5 text-slate-600 transition group-hover:text-white" />
+            <div :class="`flex h-11 w-11 items-center justify-center rounded-xl ${f.bgColor} transition-all duration-300 group-hover:scale-110`">
+              <component
+                :is="f.icon"
+                :class="`h-5 w-5 ${f.iconColor}`"
+              />
             </div>
-            <div class="mt-4 text-[15px] font-semibold text-slate-900">{{ f.title }}</div>
-            <div class="mt-1.5 text-[13px] leading-6 text-slate-500">{{ f.desc }}</div>
+            <div class="mt-4 text-[15px] font-semibold text-slate-900">
+              {{ f.title }}
+            </div>
+            <div class="mt-1.5 text-[13px] leading-6 text-slate-500">
+              {{ f.desc }}
+            </div>
           </div>
         </div>
       </section>
 
       <!-- Pricing -->
-      <section id="pricing" class="mx-auto max-w-[1100px] px-6 pb-24">
+      <section
+        id="pricing"
+        class="mx-auto max-w-[1100px] px-6 pb-24"
+      >
         <div class="mx-auto max-w-[500px] text-center">
-          <div class="text-[12px] font-medium uppercase tracking-widest text-slate-400">价格</div>
+          <div class="text-[12px] font-medium uppercase tracking-widest text-slate-400">
+            价格
+          </div>
           <h2 class="mt-3 text-[32px] font-bold tracking-tight text-slate-950">
             先体验，再决定
           </h2>
         </div>
 
-        <div class="mx-auto mt-10 grid max-w-[700px] gap-4 sm:grid-cols-2">
+        <div class="mx-auto mt-10 grid max-w-[700px] gap-5 sm:grid-cols-2">
           <div
             v-for="plan in plans"
             :key="plan.name"
-            class="rounded-2xl border p-6 transition-all"
-            :class="plan.featured ? 'border-slate-900 bg-slate-950 text-white shadow-lg shadow-slate-900/10' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'"
+            class="relative rounded-2xl border p-6 transition-all duration-300"
+            :class="plan.featured ? 'border-indigo-500 bg-gradient-to-br from-slate-900 to-slate-950 text-white shadow-xl shadow-indigo-500/10 scale-[1.02]' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5'"
           >
-            <div class="text-[16px] font-semibold" :class="plan.featured ? 'text-white' : 'text-slate-900'">
+            <div
+              v-if="plan.featured"
+              class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-3 py-0.5 text-[11px] font-medium text-white shadow-sm"
+            >
+              推荐
+            </div>
+            <div
+              class="text-[16px] font-semibold"
+              :class="plan.featured ? 'text-white' : 'text-slate-900'"
+            >
               {{ plan.name }}
             </div>
-            <div class="mt-3 text-[28px] font-bold" :class="plan.featured ? 'text-white' : 'text-slate-950'">
+            <div
+              class="mt-3 text-[28px] font-bold"
+              :class="plan.featured ? 'text-white' : 'text-slate-950'"
+            >
               {{ plan.price }}
             </div>
             <div class="mt-4 space-y-2">
@@ -278,13 +347,16 @@ const plans = [
                 class="flex items-center gap-2 text-[13px]"
                 :class="plan.featured ? 'text-slate-300' : 'text-slate-500'"
               >
-                <span class="h-1 w-1 rounded-full" :class="plan.featured ? 'bg-emerald-400' : 'bg-slate-400'" />
+                <span
+                  class="h-1 w-1 rounded-full"
+                  :class="plan.featured ? 'bg-emerald-400' : 'bg-slate-400'"
+                />
                 {{ item }}
               </div>
             </div>
             <button
-              class="mt-6 w-full rounded-lg py-2.5 text-[13px] font-medium transition-all active:scale-[0.98]"
-              :class="plan.featured ? 'bg-white text-slate-900 hover:bg-slate-100' : 'border border-slate-200 text-slate-700 hover:bg-slate-50'"
+              class="mt-6 w-full rounded-xl py-2.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98]"
+              :class="plan.featured ? 'bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30' : 'border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'"
               @click="plan.featured ? goToVip() : goToApp()"
             >
               {{ plan.featured ? '升级专业版' : '免费开始' }}
@@ -308,7 +380,6 @@ const plans = [
         </div>
       </footer>
     </main>
-
   </div>
 </template>
 

@@ -33,6 +33,20 @@ import TerminalWatchlists from './views/TerminalWatchlists.vue'
 const router = useRouter()
 const toast = useToast()
 
+// 通用的异步操作包装器，消除重复的 try/catch/toast 模式
+const withToast = async (
+  fn: () => Promise<any>,
+  successMsg: string,
+  errorMsg: string = '操作失败'
+) => {
+  try {
+    await fn()
+    toast.success(successMsg)
+  } catch {
+    toast.error(errorMsg)
+  }
+}
+
 const vipLabel = computed(() => store.membership?.planCode === 'vip' ? '会员版' : '普通版')
 const margin = computed(() => store.sidebarCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[260px]')
 
@@ -93,58 +107,23 @@ const handleSendRegisterEmailCode = async () => {
   }
 }
 
-const handleRefresh = async () => {
-  try {
-    await refreshTerminal()
-    toast.success('数据已刷新')
-  } catch {
-    toast.error('刷新失败')
-  }
-}
+const handleRefresh = () => withToast(refreshTerminal, '数据已刷新', '刷新失败')
 
 const handleLogout = async () => {
-  try {
-    await logout()
-    router.replace('/overview')
-    toast.info('已退出登录')
-  } catch { /* logout 内部已处理错误 */ }
+  await logout()
+  router.replace('/overview')
+  toast.info('已退出登录')
 }
 
-const handleCreateWatchlist = async () => {
-  try {
-    await createWatchlist()
-    toast.success('自选分组创建成功')
-  } catch {
-    toast.error('创建失败')
-  }
-}
+const handleCreateWatchlist = () => withToast(createWatchlist, '自选分组创建成功', '创建失败')
 
-const handleAddWatchlistItem = async () => {
-  try {
-    await addWatchlistItem()
-    toast.success('已添加到自选')
-  } catch {
-    toast.error('添加失败')
-  }
-}
+const handleAddWatchlistItem = () => withToast(addWatchlistItem, '已添加到自选', '添加失败')
 
-const handleRemoveWatchlistItem = async (wlId: number, itemId: number) => {
-  try {
-    await removeWatchlistItem(wlId, itemId)
-    toast.success('已从自选中移除')
-  } catch {
-    toast.error('移除失败')
-  }
-}
+const handleRemoveWatchlistItem = (wlId: number, itemId: number) =>
+  withToast(() => removeWatchlistItem(wlId, itemId), '已从自选中移除', '移除失败')
 
-const handleQuickAdd = async (symbol: string, name?: string) => {
-  try {
-    await quickAddToWatchlist(symbol, name)
-    toast.success(`已添加 ${symbol} 到自选`)
-  } catch {
-    toast.error('添加失败')
-  }
-}
+const handleQuickAdd = (symbol: string, name?: string) =>
+  withToast(() => quickAddToWatchlist(symbol, name), `已添加 ${symbol} 到自选`, '添加失败')
 
 const handlePlaceOrder = (payload: { symbol: string; side: 'BUY' | 'SELL'; quantity: number }) => {
   store.orderSymbol = payload.symbol
@@ -153,68 +132,21 @@ const handlePlaceOrder = (payload: { symbol: string; side: 'BUY' | 'SELL'; quant
   handleSubmitOrder()
 }
 
-const handleSubmitOrder = async () => {
-  try {
-    await submitOrder()
-    toast.success('委托提交成功')
-  } catch {
-    toast.error('委托提交失败')
-  }
-}
+const handleSubmitOrder = () => withToast(submitOrder, '委托提交成功', '委托提交失败')
 
-const handleCancelOrder = async (id: number) => {
-  try {
-    await cancelOrder(id)
-    toast.success('撤单成功')
-  } catch {
-    toast.error('撤单失败')
-  }
-}
+const handleCancelOrder = (id: number) => withToast(() => cancelOrder(id), '撤单成功', '撤单失败')
 
-const handleDeposit = async (payload: { amount: number; remark: string }) => {
-  try {
-    await deposit(payload.amount, payload.remark)
-    toast.success('充值成功，资金已到账')
-  } catch {
-    toast.error('充值失败')
-  }
-}
+const handleDeposit = (payload: { amount: number; remark: string }) =>
+  withToast(() => deposit(payload.amount, payload.remark), '充值成功，资金已到账', '充值失败')
 
-const handleWithdraw = async (payload: { amount: number; remark: string }) => {
-  try {
-    await withdraw(payload.amount, payload.remark)
-    toast.success('提现成功，资金已扣除')
-  } catch {
-    toast.error('提现失败')
-  }
-}
+const handleWithdraw = (payload: { amount: number; remark: string }) =>
+  withToast(() => withdraw(payload.amount, payload.remark), '提现成功，资金已扣除', '提现失败')
 
-const handleSaveProfile = async () => {
-  try {
-    await saveProfile()
-    toast.success('资料保存成功')
-  } catch {
-    toast.error('保存失败')
-  }
-}
+const handleSaveProfile = () => withToast(saveProfile, '资料保存成功', '保存失败')
 
-const handleUploadAvatar = async (file: File) => {
-  try {
-    await uploadAvatar(file)
-    toast.success('头像上传成功')
-  } catch {
-    toast.error('上传失败')
-  }
-}
+const handleUploadAvatar = (file: File) => withToast(() => uploadAvatar(file), '头像上传成功', '上传失败')
 
-const handleFetchHotNews = async () => {
-  try {
-    await fetchHotNews()
-    toast.success('新闻已刷新')
-  } catch {
-    toast.error('刷新失败')
-  }
-}
+const handleFetchHotNews = () => withToast(fetchHotNews, '新闻已刷新', '刷新失败')
 
 watch(() => [store.view, store.user?.id, store.paper?.id], ([view]) => {
   view === 'paper' ? startPaperRefresh() : stopPaperRefresh()
@@ -280,8 +212,11 @@ function closeUserMenu() {
 
 <template>
   <ToastNotification />
-  <main class="min-h-screen bg-[#f3f4f6] text-slate-900">
-    <div v-if="store.loading" class="flex min-h-screen items-center justify-center">
+  <main class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 text-slate-900">
+    <div
+      v-if="store.loading"
+      class="flex min-h-screen items-center justify-center"
+    >
       <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-3 shadow-sm">
         <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-950" />
         <span class="text-[13px] text-slate-500">正在恢复终端状态...</span>
@@ -313,8 +248,15 @@ function closeUserMenu() {
       @submit="submitAuth"
     />
 
-    <div v-else class="flex min-h-screen">
-      <div v-if="store.sidebarOpen && !store.sidebarCollapsed" class="fixed inset-0 z-30 bg-slate-950/20 lg:hidden" @click="store.sidebarOpen = false" />
+    <div
+      v-else
+      class="flex min-h-screen"
+    >
+      <div
+        v-if="store.sidebarOpen && !store.sidebarCollapsed"
+        class="fixed inset-0 z-30 bg-slate-950/20 lg:hidden"
+        @click="store.sidebarOpen = false"
+      />
 
       <TerminalSidebar
         :active-view="store.view"
@@ -329,7 +271,10 @@ function closeUserMenu() {
         @logout="handleLogout"
       />
 
-      <div class="min-w-0 flex-1 overflow-visible transition-[margin-left] duration-200" :class="margin">
+      <div
+        class="min-w-0 flex-1 overflow-visible transition-[margin-left] duration-200"
+        :class="margin"
+      >
         <TerminalHeader
           :active-view="store.view"
           :auth-user="store.user!"
@@ -344,7 +289,10 @@ function closeUserMenu() {
 
         <div class="flex items-center justify-end px-4 py-1 lg:px-6">
           <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
-            <span class="inline-block h-2 w-2 rounded-full transition-colors duration-300" :class="wsConnected ? 'bg-emerald-400' : 'bg-red-400'" />
+            <span
+              class="inline-block h-2 w-2 rounded-full transition-colors duration-300"
+              :class="wsConnected ? 'bg-emerald-400' : 'bg-red-400'"
+            />
             <span>{{ wsConnected ? '行情已连接' : '行情断开' }}</span>
           </div>
         </div>

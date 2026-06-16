@@ -20,7 +20,7 @@ target/
 .idea/
 *.iml
 *.log
-
+*.yml
 # --- Frontend / Node 相关 ---
 node_modules/
 dist/

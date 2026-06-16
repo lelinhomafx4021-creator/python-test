@@ -41,17 +41,14 @@ export const formatMoney = (value?: number, fallback = '--') =>
     ? new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value)
     : fallback
 
-/** 普通数值：1,234.56（千分位 + 两位小数），空值返回 fallback */
+/** 普通数值/价格：1,234.56（千分位 + 两位小数），空值返回 fallback */
 export const formatNumber = (value?: number, fallback = '--', decimals = 2) =>
   value != null
     ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
     : fallback
 
-/** 价格/数量：1,234.56（千分位 + 两位小数，整数用，空值返回 fallback） */
-export const formatPrice = (value?: number, fallback = '--', decimals = 2) =>
-  value != null
-    ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
-    : fallback
+/** @deprecated 使用 formatNumber 代替 */
+export const formatPrice = formatNumber
 
 /** 百分比：+12.50%（正数带 + 号，两位小数），空值返回 fallback */
 export const formatPercent = (value?: number, fallback = '--', showSign = true) => {

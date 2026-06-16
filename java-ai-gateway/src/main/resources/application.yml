@@ -1,11 +1,16 @@
 spring:
   application:
     name: java-ai-gateway
+  threads:
+    virtual:
+      enabled: true
   config:
     import:
-      - optional:classpath:application-dev.yml
       - optional:classpath:application-local.yml
   datasource:
+    url: ${MYSQL_URL:jdbc:mysql://127.0.0.1:3306/ai_investor?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
@@ -66,8 +71,6 @@ python:
     max-in-memory-size: ${PYTHON_AI_MAX_IN_MEMORY_SIZE:10485760}
 
 app:
-  cors:
-    allowed-origins: ${APP_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   cache:
     market-quote-ttl-seconds: 30
     account-lock-seconds: 10

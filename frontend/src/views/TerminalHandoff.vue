@@ -73,7 +73,9 @@ const toggleExpand = (traceId: string) => {
             <Headset class="h-3.5 w-3.5" />
             人工支持
           </div>
-          <h3 class="mt-4 text-[24px] font-semibold text-slate-950">我的工单</h3>
+          <h3 class="mt-4 text-[24px] font-semibold text-slate-950">
+            我的工单
+          </h3>
           <p class="mt-2 text-[13px] leading-6 text-slate-500">
             这里展示的是 AI 已经整理好的人工工单。你看到的是问题摘要、处理进度和客服回复，而不是后台处理界面。
           </p>
@@ -81,22 +83,37 @@ const toggleExpand = (traceId: string) => {
 
         <div class="grid min-w-[260px] flex-1 gap-3 sm:grid-cols-3">
           <div class="rounded-2xl bg-slate-50 px-4 py-4">
-            <div class="text-[11px] text-slate-500">待处理</div>
-            <div class="mt-2 text-[24px] font-semibold text-slate-950">{{ openCount }}</div>
+            <div class="text-[11px] text-slate-500">
+              待处理
+            </div>
+            <div class="mt-2 text-[24px] font-semibold text-slate-950">
+              {{ openCount }}
+            </div>
           </div>
           <div class="rounded-2xl bg-slate-50 px-4 py-4">
-            <div class="text-[11px] text-slate-500">处理中</div>
-            <div class="mt-2 text-[24px] font-semibold text-slate-950">{{ processingCount }}</div>
+            <div class="text-[11px] text-slate-500">
+              处理中
+            </div>
+            <div class="mt-2 text-[24px] font-semibold text-slate-950">
+              {{ processingCount }}
+            </div>
           </div>
           <div class="rounded-2xl bg-slate-50 px-4 py-4">
-            <div class="text-[11px] text-slate-500">已完成</div>
-            <div class="mt-2 text-[24px] font-semibold text-slate-950">{{ closedCount }}</div>
+            <div class="text-[11px] text-slate-500">
+              已完成
+            </div>
+            <div class="mt-2 text-[24px] font-semibold text-slate-950">
+              {{ closedCount }}
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section v-if="pagedTickets.length" class="space-y-3">
+    <section
+      v-if="pagedTickets.length"
+      class="space-y-3"
+    >
       <article
         v-for="ticket in pagedTickets"
         :key="ticket.traceId"
@@ -108,7 +125,10 @@ const toggleExpand = (traceId: string) => {
         >
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium" :class="statusClass(ticket.status)">
+              <span
+                class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium"
+                :class="statusClass(ticket.status)"
+              >
                 {{ statusText(ticket.status) }}
               </span>
               <span class="inline-flex items-center gap-1 text-[12px] text-slate-400">
@@ -119,27 +139,42 @@ const toggleExpand = (traceId: string) => {
 
             <div class="mt-3 flex items-start gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-[13px] leading-6 text-slate-700">
               <Sparkles class="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-              <div class="line-clamp-2">{{ summaryText(ticket) }}</div>
+              <div class="line-clamp-2">
+                {{ summaryText(ticket) }}
+              </div>
             </div>
           </div>
 
           <div class="flex items-center gap-2 text-slate-400">
-            <ChevronUp v-if="expandedMap[ticket.traceId]" class="h-4 w-4" />
-            <ChevronDown v-else class="h-4 w-4" />
+            <ChevronUp
+              v-if="expandedMap[ticket.traceId]"
+              class="h-4 w-4"
+            />
+            <ChevronDown
+              v-else
+              class="h-4 w-4"
+            />
           </div>
         </button>
 
-        <div v-if="expandedMap[ticket.traceId]" class="border-t border-slate-100 px-5 py-4">
+        <div
+          v-if="expandedMap[ticket.traceId]"
+          class="border-t border-slate-100 px-5 py-4"
+        >
           <div class="space-y-3">
             <div>
-              <div class="text-[12px] text-slate-500">AI 整理摘要</div>
+              <div class="text-[12px] text-slate-500">
+                AI 整理摘要
+              </div>
               <div class="mt-1 rounded-2xl bg-slate-50 px-4 py-3 text-[13px] leading-6 text-slate-800">
                 {{ ticket.handoffSummary || '暂无摘要，系统已将你的问题转交人工处理。' }}
               </div>
             </div>
 
             <div>
-              <div class="text-[12px] text-slate-500">原始问题</div>
+              <div class="text-[12px] text-slate-500">
+                原始问题
+              </div>
               <div class="mt-1 rounded-2xl bg-white px-4 py-3 text-[13px] leading-6 text-slate-700 border border-slate-200">
                 {{ ticket.query }}
               </div>
@@ -149,11 +184,17 @@ const toggleExpand = (traceId: string) => {
               转人工原因：{{ reasonText(ticket.handoffReason) }}
             </div>
 
-            <div v-if="ticket.responseMessage" class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-[13px] leading-6 text-emerald-800">
+            <div
+              v-if="ticket.responseMessage"
+              class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-[13px] leading-6 text-emerald-800"
+            >
               客服回复：{{ ticket.responseMessage }}
             </div>
 
-            <div v-if="ticket.processNote" class="text-[12px] leading-6 text-slate-500">
+            <div
+              v-if="ticket.processNote"
+              class="text-[12px] leading-6 text-slate-500"
+            >
               处理备注：{{ ticket.processNote }}
             </div>
           </div>
@@ -168,7 +209,9 @@ const toggleExpand = (traceId: string) => {
       <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-700">
         <Headset class="h-7 w-7" />
       </div>
-      <h4 class="mt-5 text-[22px] font-semibold text-slate-950">当前没有人工工单</h4>
+      <h4 class="mt-5 text-[22px] font-semibold text-slate-950">
+        当前没有人工工单
+      </h4>
       <p class="mt-3 text-[13px] leading-6 text-slate-500">
         当 AI 需要把问题转交人工时，这里会出现整理后的工单摘要和处理进度。
       </p>

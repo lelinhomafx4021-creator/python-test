@@ -128,11 +128,11 @@ const fetchKlineData = async (
         period,
         days: period === 'daily' ? 120 : period === 'intraday_5d' ? 5 : 1,
       },
+      headers: { satoken: localStorage.getItem('ai-investor-token') || '' },
     })
     const raw = res.data?.data?.items || res.data?.items || res.data?.data || res.data || []
     klineData.value = Array.isArray(raw) ? normalizeKlineItems(raw) : []
-  } catch (e) {
-    console.error('获取 K 线数据失败', e)
+  } catch {
     klineData.value = []
   } finally {
     klineLoading.value = false
@@ -194,8 +194,7 @@ const onSearchInput = (event: Event) => {
       })
       searchSuggestions.value = res.data.data?.items || []
       showSuggestions.value = searchSuggestions.value.length > 0
-    } catch (e) {
-      console.error('搜索失败', e)
+    } catch {
       searchSuggestions.value = []
     } finally {
       searchLoading.value = false
@@ -268,10 +267,16 @@ onUnmounted(() => {
       <div class="border-b border-slate-100 px-5 py-4 transition-colors duration-300">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <div class="text-[16px] font-semibold text-slate-950 transition-colors duration-300">市场股票列表</div>
-            <div class="mt-1 text-[11px] text-slate-400">搜索、加入自选，或直接点买入委托</div>
+            <div class="text-[16px] font-semibold text-slate-950 transition-colors duration-300">
+              市场股票列表
+            </div>
+            <div class="mt-1 text-[11px] text-slate-400">
+              搜索、加入自选，或直接点买入委托
+            </div>
           </div>
-          <div class="text-[11px] text-slate-400">共 {{ marketTotal }} 只</div>
+          <div class="text-[11px] text-slate-400">
+            共 {{ marketTotal }} 只
+          </div>
         </div>
 
         <div class="mt-3 grid gap-2 md:grid-cols-[180px_160px_1fr]">
@@ -284,18 +289,24 @@ onUnmounted(() => {
               @input="onSearchInput"
               @keydown="onSearchKeydown"
               @focus="searchSuggestions.length > 0 && (showSuggestions = true)"
-            />
+            >
 
             <div
               v-if="showSuggestions"
               class="absolute left-0 right-0 top-full z-50 mt-1 max-h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg"
             >
-              <div v-if="searchLoading" class="flex items-center justify-center py-4">
+              <div
+                v-if="searchLoading"
+                class="flex items-center justify-center py-4"
+              >
                 <Loader2 class="h-4 w-4 animate-spin text-slate-400" />
                 <span class="ml-2 text-[12px] text-slate-400">搜索中...</span>
               </div>
 
-              <div v-else ref="suggestionsRef">
+              <div
+                v-else
+                ref="suggestionsRef"
+              >
                 <div
                   v-for="(stock, index) in searchSuggestions"
                   :key="stock.symbol"
@@ -309,7 +320,10 @@ onUnmounted(() => {
                     <div class="flex items-center gap-2">
                       <span class="text-[12px] font-medium text-slate-900">{{ stock.symbol }}</span>
                       <span class="text-[12px] text-slate-600">{{ stock.name }}</span>
-                      <span v-if="stock.pinyin" class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{{ stock.pinyin }}</span>
+                      <span
+                        v-if="stock.pinyin"
+                        class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500"
+                      >{{ stock.pinyin }}</span>
                     </div>
                   </div>
                   <button
@@ -320,7 +334,10 @@ onUnmounted(() => {
                   </button>
                 </div>
 
-                <div v-if="searchSuggestions.length === 0" class="py-4 text-center text-[12px] text-slate-400">
+                <div
+                  v-if="searchSuggestions.length === 0"
+                  class="py-4 text-center text-[12px] text-slate-400"
+                >
                   未找到匹配的股票
                 </div>
               </div>
@@ -333,7 +350,7 @@ onUnmounted(() => {
             placeholder="新分组名称"
             class="rounded-xl border border-slate-200 px-3 py-2 text-[12px] outline-none transition-all duration-150 focus:border-slate-400 focus:shadow-sm"
             @input="emit('update:createName', ($event.target as HTMLInputElement).value)"
-          />
+          >
           <button
             class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-[12px] font-medium text-white transition-all duration-150 hover:bg-slate-800 hover:shadow-sm active:scale-[0.98]"
             @click="emit('create')"
@@ -347,13 +364,27 @@ onUnmounted(() => {
       <div class="grid grid-cols-[88px_1fr_70px_100px_84px_96px_80px_72px_80px] bg-slate-50/80 px-4 py-2 text-[11px] font-medium text-slate-500 transition-colors duration-300">
         <div>代码</div>
         <div>名称</div>
-        <div class="text-center">K线</div>
-        <div class="text-right">现价</div>
-        <div class="text-right">涨跌幅</div>
-        <div class="text-right">成交额</div>
-        <div class="text-right">自选</div>
-        <div class="text-right">买入</div>
-        <div class="text-right">更新时间</div>
+        <div class="text-center">
+          K线
+        </div>
+        <div class="text-right">
+          现价
+        </div>
+        <div class="text-right">
+          涨跌幅
+        </div>
+        <div class="text-right">
+          成交额
+        </div>
+        <div class="text-right">
+          自选
+        </div>
+        <div class="text-right">
+          买入
+        </div>
+        <div class="text-right">
+          更新时间
+        </div>
       </div>
 
       <div v-if="marketStocks.length">
@@ -362,8 +393,13 @@ onUnmounted(() => {
           :key="stock.symbol"
           class="grid grid-cols-[88px_1fr_70px_100px_84px_96px_80px_72px_80px] items-center border-t border-slate-50 px-4 py-2 text-[12px] transition-colors duration-100 hover:bg-slate-50/60"
         >
-          <div class="font-medium text-slate-900 transition-colors duration-300">{{ stock.symbol }}</div>
-          <button class="truncate text-left text-slate-600 transition-colors duration-150 hover:text-slate-950 active:scale-[0.96]" @click="selectStockForChart(stock.symbol, stock.name)">
+          <div class="font-medium text-slate-900 transition-colors duration-300">
+            {{ stock.symbol }}
+          </div>
+          <button
+            class="truncate text-left text-slate-600 transition-colors duration-150 hover:text-slate-950 active:scale-[0.96]"
+            @click="selectStockForChart(stock.symbol, stock.name)"
+          >
             {{ stock.name }}
           </button>
           <div class="text-center">
@@ -374,11 +410,18 @@ onUnmounted(() => {
               查看
             </button>
           </div>
-          <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ formatNumber(stock.lastPrice) }}</div>
-          <div class="text-right tabular-nums" :class="(stock.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+          <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">
+            {{ formatNumber(stock.lastPrice) }}
+          </div>
+          <div
+            class="text-right tabular-nums"
+            :class="(stock.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+          >
             {{ formatPercent(stock.changePercent) }}
           </div>
-          <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ formatNumber((stock.turnover || 0) / 100000000) }} 亿</div>
+          <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">
+            {{ formatNumber((stock.turnover || 0) / 100000000) }} 亿
+          </div>
           <div class="text-right">
             <button
               class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.96]"
@@ -395,11 +438,18 @@ onUnmounted(() => {
               买入
             </button>
           </div>
-          <div class="text-right text-[11px] tabular-nums text-slate-400">{{ formatTime(stock.quoteTime) }}</div>
+          <div class="text-right text-[11px] tabular-nums text-slate-400">
+            {{ formatTime(stock.quoteTime) }}
+          </div>
         </div>
       </div>
 
-      <div v-else class="px-4 py-6 text-center text-[12px] text-slate-500">没有查到符合条件的股票。</div>
+      <div
+        v-else
+        class="px-4 py-6 text-center text-[12px] text-slate-500"
+      >
+        没有查到符合条件的股票。
+      </div>
 
       <div class="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500 transition-colors duration-300">
         <div>第 {{ marketPage }} / {{ totalPages }} 页</div>
@@ -427,8 +477,12 @@ onUnmounted(() => {
     <div class="space-y-3">
       <section class="rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md">
         <div class="border-b border-slate-100 px-5 py-4 transition-colors duration-300">
-          <div class="text-[16px] font-semibold text-slate-950 transition-colors duration-300">{{ selectedWatchlist?.name || '我的自选' }}</div>
-          <div class="mt-1 text-[11px] text-slate-400">分组切换、备注和快速买入都在这里完成</div>
+          <div class="text-[16px] font-semibold text-slate-950 transition-colors duration-300">
+            {{ selectedWatchlist?.name || '我的自选' }}
+          </div>
+          <div class="mt-1 text-[11px] text-slate-400">
+            分组切换、备注和快速买入都在这里完成
+          </div>
         </div>
 
         <div class="px-5 py-4">
@@ -439,14 +493,14 @@ onUnmounted(() => {
               placeholder="股票代码"
               class="rounded-xl border border-slate-200 px-3 py-2 text-[12px] outline-none transition-all duration-150 focus:border-slate-400 focus:shadow-sm"
               @input="emit('update:addSymbol', ($event.target as HTMLInputElement).value)"
-            />
+            >
             <input
               :value="addNote"
               type="text"
               placeholder="备注，例如：回调观察、财报跟踪"
               class="rounded-xl border border-slate-200 px-3 py-2 text-[12px] outline-none transition-all duration-150 focus:border-slate-400 focus:shadow-sm"
               @input="emit('update:addNote', ($event.target as HTMLInputElement).value)"
-            />
+            >
             <button
               class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-[12px] font-medium text-white transition-all duration-150 hover:bg-slate-800 hover:shadow-sm active:scale-[0.98]"
               @click="emit('add')"
@@ -472,7 +526,10 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <div v-if="selectedWatchlist?.items?.length" class="space-y-2">
+          <div
+            v-if="selectedWatchlist?.items?.length"
+            class="space-y-2"
+          >
             <div
               v-for="item in selectedWatchlist.items"
               :key="item.id"
@@ -492,10 +549,15 @@ onUnmounted(() => {
                   >
                     {{ item.name || item.symbol }}
                   </button>
-                  <div class="mt-1 text-[11px] text-slate-400">{{ item.symbol }}</div>
+                  <div class="mt-1 text-[11px] text-slate-400">
+                    {{ item.symbol }}
+                  </div>
                 </div>
                 <div class="flex items-center gap-2">
-                  <div :class="(item.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'" class="text-[11px] tabular-nums">
+                  <div
+                    :class="(item.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+                    class="text-[11px] tabular-nums"
+                  >
                     {{ formatPercent(item.changePercent) }}
                   </div>
                   <button
@@ -519,15 +581,25 @@ onUnmounted(() => {
                   <Bell class="mr-1 inline h-3.5 w-3.5" />
                   {{ item.alertEnabled ? '提醒已开启' : '提醒未开启' }}
                 </div>
-                <div class="truncate">备注：{{ item.note || '暂无备注' }}</div>
+                <div class="truncate">
+                  备注：{{ item.note || '暂无备注' }}
+                </div>
               </div>
             </div>
           </div>
-          <div v-else class="text-center text-[12px] text-slate-400">当前分组还没有股票。</div>
+          <div
+            v-else
+            class="text-center text-[12px] text-slate-400"
+          >
+            当前分组还没有股票。
+          </div>
         </div>
       </section>
 
-      <div v-if="showKline" class="rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md">
+      <div
+        v-if="showKline"
+        class="rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md"
+      >
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 transition-colors duration-300">
           <div>
             <div class="flex items-center gap-2">
@@ -536,7 +608,9 @@ onUnmounted(() => {
                 {{ periodLabelMap[klinePeriod] }}
               </span>
             </div>
-            <div class="mt-0.5 text-[12px] text-slate-400">{{ selectedStockName }} · {{ selectedStockSymbol }}</div>
+            <div class="mt-0.5 text-[12px] text-slate-400">
+              {{ selectedStockName }} · {{ selectedStockSymbol }}
+            </div>
           </div>
           <button
             class="rounded-lg p-1.5 text-slate-400 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 active:scale-[0.96]"
@@ -578,17 +652,31 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div v-if="klineLoading" class="flex items-center justify-center py-16">
+        <div
+          v-if="klineLoading"
+          class="flex items-center justify-center py-16"
+        >
           <Loader2 class="h-6 w-6 animate-spin text-slate-400" />
           <span class="ml-2 text-[13px] text-slate-400">加载 K 线数据...</span>
         </div>
 
-        <div v-else-if="klineData.length" class="p-2">
-          <KLineChart :symbol="`${selectedStockName} ${periodLabelMap[klinePeriod]}`" :data="klineData" />
+        <div
+          v-else-if="klineData.length"
+          class="p-2"
+        >
+          <KLineChart
+            :symbol="`${selectedStockName} ${periodLabelMap[klinePeriod]}`"
+            :data="klineData"
+          />
         </div>
 
-        <div v-else class="flex flex-col items-center justify-center py-16 text-center">
-          <div class="mb-3 text-[13px] text-slate-400">暂无 K 线数据</div>
+        <div
+          v-else
+          class="flex flex-col items-center justify-center py-16 text-center"
+        >
+          <div class="mb-3 text-[13px] text-slate-400">
+            暂无 K 线数据
+          </div>
           <button
             class="text-[12px] text-blue-500 transition-colors duration-150 hover:text-blue-600 active:scale-[0.96]"
             @click="fetchKlineData(selectedStockSymbol, klinePeriod)"
@@ -609,10 +697,17 @@ onUnmounted(() => {
       <div class="w-full max-w-[360px] rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.18)] transition-colors duration-300">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <div class="text-[16px] font-semibold text-slate-950 transition-colors duration-300">快速委托</div>
-            <div class="mt-1 text-[12px] text-slate-400">{{ quickTradeForm.name }} · {{ quickTradeForm.symbol }}</div>
+            <div class="text-[16px] font-semibold text-slate-950 transition-colors duration-300">
+              快速委托
+            </div>
+            <div class="mt-1 text-[12px] text-slate-400">
+              {{ quickTradeForm.name }} · {{ quickTradeForm.symbol }}
+            </div>
           </div>
-          <button class="rounded-lg p-1.5 text-slate-400 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 active:scale-[0.96]" @click="closeTrade">
+          <button
+            class="rounded-lg p-1.5 text-slate-400 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 active:scale-[0.96]"
+            @click="closeTrade"
+          >
             <X class="h-4 w-4" />
           </button>
         </div>
@@ -642,7 +737,7 @@ onUnmounted(() => {
               type="number"
               min="1"
               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-[12px] outline-none transition-all duration-150 focus:border-slate-400 focus:shadow-sm"
-            />
+            >
           </label>
 
           <div class="rounded-xl bg-slate-50 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500 transition-colors duration-300">

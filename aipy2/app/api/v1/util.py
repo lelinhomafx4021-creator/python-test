@@ -15,7 +15,7 @@ from fastapi import APIRouter, Query, Request
 
 from app.core.llm import llm
 from app.core.logger import logger
-from app.prompts.investor_prompts import GENERATE_TITLE_PROMPT, TITLE_PARSER
+from app.prompts.investor_prompts import GENERATE_TITLE_PROMPT, TitleResult
 from app.tools.news_tool import collect_hot_news
 from app.tools.stockdata_tool import get_stock_quote_core, load_market_page, search_market_stocks
 
@@ -131,15 +131,6 @@ def _response_text(response) -> str:
     return content if isinstance(content, str) else str(content)
 
 
-def _parse_title(response) -> str:
-    """优先按结构化协议解析标题，失败时回退为纯文本规范化。"""
-    content_text = _response_text(response)
-    try:
-        return _normalize_title(TITLE_PARSER.parse(content_text).title)
-    except Exception:
-        return _normalize_title(content_text)
-
-
 @router.post("/generate_title")
 async def generate_title(request: Request):
     """根据用户问题生成简短中文标题。
@@ -162,14 +153,12 @@ async def generate_title(request: Request):
         query = body.get("query", "新对话")
         logger.info("[标题生成] 收到问题：%s", query)
 
-        # 2) 调用大模型，让其按结构化格式返回标题
-        res = await llm.ainvoke(
-            GENERATE_TITLE_PROMPT.format_messages(
-                query=query,
-                format_instructions=TITLE_PARSER.get_format_instructions(),
-            )
+        # 2) 调用大模型，走原生 function calling 获取标题
+        structured_llm = llm.with_structured_output(TitleResult)
+        result = await structured_llm.ainvoke(
+            GENERATE_TITLE_PROMPT.format_messages(query=query)
         )
-        title = _parse_title(res)
+        title = _normalize_title(result.title)
 
         logger.info("[标题生成] 生成结果：%s", title)
         return {"code": 200, "data": {"title": title}, "message": "成功"}

@@ -7,7 +7,7 @@
 import { ArrowRight, Bot, ChartColumn, CreditCard, Megaphone, Radar, Star, Ticket } from 'lucide-vue-next'
 import { Crown } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { formatMoney, formatNumber, formatPercent, formatTime } from '../utils/format'
 import axios from 'axios'
 import type {
@@ -145,8 +145,7 @@ const fetchEquityData = async () => {
     }
     // 如果API不可用，使用模拟数据
     equityData.value = generateMockEquityCurve()
-  } catch (e) {
-    console.error('获取权益曲线数据失败', e)
+  } catch {
     equityData.value = generateMockEquityCurve()
   } finally {
     equityLoading.value = false
@@ -199,12 +198,19 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
 <template>
   <div class="space-y-3">
     <!-- 系统公告横幅 -->
-    <div v-if="announcements.length" class="rounded-2xl border border-blue-200 bg-blue-50/60 px-5 py-3">
+    <div
+      v-if="announcements.length"
+      class="rounded-2xl border border-blue-200 bg-blue-50/60 px-5 py-3"
+    >
       <div class="flex items-center gap-2">
         <Megaphone class="h-4 w-4 shrink-0 text-blue-600" />
         <div class="min-w-0 flex-1 overflow-hidden">
           <div class="flex animate-marquee gap-8 whitespace-nowrap">
-            <span v-for="ann in announcements" :key="ann.id" class="inline-flex items-center gap-2 text-[13px]">
+            <span
+              v-for="ann in announcements"
+              :key="ann.id"
+              class="inline-flex items-center gap-2 text-[13px]"
+            >
               <span
                 class="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
                 :class="{
@@ -232,8 +238,12 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
             <Crown class="h-5 w-5 text-amber-500" />
           </div>
           <div>
-            <div class="text-[14px] font-semibold text-slate-900">升级专业版，解锁完整 AI 投研能力</div>
-            <div class="mt-0.5 text-[12px] text-slate-500">无限 AI 问答 · 深度财务分析 · 并行数据引擎 · 优先工单响应</div>
+            <div class="text-[14px] font-semibold text-slate-900">
+              升级专业版，解锁完整 AI 投研能力
+            </div>
+            <div class="mt-0.5 text-[12px] text-slate-500">
+              无限 AI 问答 · 深度财务分析 · 并行数据引擎 · 优先工单响应
+            </div>
           </div>
         </div>
         <button
@@ -246,11 +256,18 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
     </div>
 
     <section class="grid gap-3 xl:grid-cols-[1.45fr_0.75fr]">
-      <div class="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
+      <div class="rounded-2xl border border-indigo-200/50 bg-gradient-to-br from-white to-indigo-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-indigo-300/50">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <div class="text-[11px] text-slate-400">账户总览</div>
-            <div class="mt-1 text-[26px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">{{ formatMoney(paperAccount?.totalAsset) }}</div>
+            <div class="text-[11px] text-slate-400">
+              账户总览
+            </div>
+            <div class="mt-1 text-[26px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">
+              {{ formatMoney(paperAccount?.totalAsset) }}
+            </div>
+            <div class="mt-0.5 text-[11px]" :class="(paperAccount?.totalPnl || 0) >= 0 ? 'text-rose-500' : 'text-emerald-500'">
+              {{ (paperAccount?.totalPnl || 0) >= 0 ? '↑' : '↓' }} {{ formatMoney(Math.abs(paperAccount?.totalPnl || 0)) }}
+            </div>
           </div>
           <button
             class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-white hover:shadow-sm active:scale-[0.98]"
@@ -262,21 +279,37 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
         </div>
 
         <div class="mt-3 grid gap-2 md:grid-cols-4">
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-colors duration-150 hover:bg-slate-100/80">
-            <div class="text-[11px] text-slate-400">可用资金</div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ formatMoney(paperAccount?.cashBalance) }}</div>
+          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
+            <div class="text-[11px] text-slate-400">
+              可用资金
+            </div>
+            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">
+              {{ formatMoney(paperAccount?.cashBalance) }}
+            </div>
           </div>
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-colors duration-150 hover:bg-slate-100/80">
-            <div class="text-[11px] text-slate-400">累计盈亏</div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ formatMoney(paperAccount?.totalPnl) }}</div>
+          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
+            <div class="text-[11px] text-slate-400">
+              累计盈亏
+            </div>
+            <div class="mt-1 text-[16px] font-semibold tabular-nums transition-colors duration-300" :class="(paperAccount?.totalPnl || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+              {{ formatMoney(paperAccount?.totalPnl) }}
+            </div>
           </div>
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-colors duration-150 hover:bg-slate-100/80">
-            <div class="text-[11px] text-slate-400">持仓数量</div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ positions.length }}</div>
+          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
+            <div class="text-[11px] text-slate-400">
+              持仓数量
+            </div>
+            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">
+              {{ positions.length }}
+            </div>
           </div>
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-colors duration-150 hover:bg-slate-100/80">
-            <div class="text-[11px] text-slate-400">会话数量</div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">{{ sessions.length }}</div>
+          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
+            <div class="text-[11px] text-slate-400">
+              会话数量
+            </div>
+            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">
+              {{ sessions.length }}
+            </div>
           </div>
         </div>
 
@@ -284,9 +317,15 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
           <div class="grid grid-cols-[88px_1fr_100px_90px_120px] bg-slate-50/80 px-3 py-2 text-[11px] font-medium text-slate-500 transition-colors duration-300">
             <div>代码</div>
             <div>名称</div>
-            <div class="text-right">最新价</div>
-            <div class="text-right">涨跌幅</div>
-            <div class="text-right">浮盈</div>
+            <div class="text-right">
+              最新价
+            </div>
+            <div class="text-right">
+              涨跌幅
+            </div>
+            <div class="text-right">
+              浮盈
+            </div>
           </div>
 
           <div v-if="positions.length">
@@ -295,27 +334,48 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
               :key="position.id"
               class="grid grid-cols-[88px_1fr_100px_90px_120px] items-center border-t border-slate-50 px-3 py-2 text-[12px] transition-colors duration-100 hover:bg-slate-50/60"
             >
-              <div class="font-medium text-slate-900 transition-colors duration-300">{{ position.symbol }}</div>
-              <div class="truncate text-slate-600 transition-colors duration-300">{{ position.name }}</div>
-              <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ formatNumber(position.latestPrice) }}</div>
-              <div class="text-right tabular-nums" :class="(position.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+              <div class="font-medium text-slate-900 transition-colors duration-300">
+                {{ position.symbol }}
+              </div>
+              <div class="truncate text-slate-600 transition-colors duration-300">
+                {{ position.name }}
+              </div>
+              <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">
+                {{ formatNumber(position.latestPrice) }}
+              </div>
+              <div
+                class="text-right tabular-nums"
+                :class="(position.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+              >
                 {{ formatPercent(position.changePercent) }}
               </div>
-              <div class="text-right tabular-nums" :class="position.floatingPnl >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+              <div
+                class="text-right tabular-nums"
+                :class="position.floatingPnl >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+              >
                 {{ formatMoney(position.floatingPnl) }}
               </div>
             </div>
           </div>
 
-          <div v-else class="px-3 py-4 text-center text-[12px] text-slate-400">当前没有持仓。</div>
+          <div
+            v-else
+            class="px-3 py-4 text-center text-[12px] text-slate-400"
+          >
+            当前没有持仓。
+          </div>
         </div>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
+      <div class="rounded-2xl border border-amber-200/50 bg-gradient-to-br from-white to-amber-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <div class="text-[11px] text-slate-400">会员与配额</div>
-            <div class="mt-1 text-[22px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">{{ membership?.planName || '普通版' }}</div>
+            <div class="text-[11px] text-amber-600">
+              会员与配额
+            </div>
+            <div class="mt-1 text-[22px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">
+              {{ membership?.planName || '普通版' }}
+            </div>
           </div>
           <div class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors duration-300">
             {{ membership?.planCode === 'vip' ? '会员版' : '普通版' }}
@@ -329,14 +389,18 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
             class="rounded-xl border border-slate-200 px-3 py-2.5 transition-all duration-150 hover:border-slate-300 hover:shadow-sm"
           >
             <div class="flex items-center justify-between gap-3 text-[12px]">
-              <div class="font-medium text-slate-800 transition-colors duration-300">{{ quotaLabel(quota.featureCode) }}</div>
-              <div class="tabular-nums text-slate-500 transition-colors duration-300">{{ quota.usedCount }} / {{ quota.limitCount }}</div>
+              <div class="font-medium text-slate-800 transition-colors duration-300">
+                {{ quotaLabel(quota.featureCode) }}
+              </div>
+              <div class="tabular-nums text-slate-500 transition-colors duration-300">
+                {{ quota.usedCount }} / {{ quota.limitCount }}
+              </div>
             </div>
             <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 transition-colors duration-300">
               <div
                 class="h-1.5 rounded-full bg-slate-900 transition-all duration-500 ease-out"
                 :style="{ width: `${Math.min(100, (quota.usedCount / Math.max(1, quota.limitCount)) * 100)}%` }"
-              ></div>
+              />
             </div>
           </div>
         </div>
@@ -351,7 +415,10 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
             class="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 transition-all duration-150 hover:border-slate-300 hover:bg-white hover:shadow-sm"
           >
             <div class="flex items-center justify-between gap-2">
-              <component :is="card.icon" class="h-4 w-4 text-slate-500" />
+              <component
+                :is="card.icon"
+                class="h-4 w-4 text-slate-500"
+              />
               <div class="text-[11px] tabular-nums text-slate-400">{{ card.meta }}</div>
             </div>
             <div class="mt-2 text-[12px] font-medium text-slate-900 transition-colors duration-300">{{ card.title }}</div>
@@ -362,43 +429,77 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
 
     <!-- 第二行：股票列表 + 新闻Feed -->
     <section class="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-      <div class="rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md">
-        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 transition-colors duration-300">
+      <div class="rounded-2xl border border-emerald-200/50 bg-gradient-to-br from-white to-emerald-50/20 shadow-sm transition-all duration-300 hover:shadow-md">
+        <div class="flex items-center justify-between border-b border-emerald-100/50 px-5 py-4 transition-colors duration-300">
           <div class="flex items-center gap-2">
-            <ChartColumn class="h-4 w-4 text-slate-500" />
+            <ChartColumn class="h-4 w-4 text-emerald-500" />
             <div>
-              <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">市场脉搏</div>
-              <div class="text-[11px] text-slate-400">直接看价格、涨跌和成交额</div>
+              <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">
+                市场脉搏
+              </div>
+              <div class="text-[11px] text-slate-400">
+                直接看价格、涨跌和成交额
+              </div>
             </div>
           </div>
-          <button class="text-[12px] text-slate-500 transition-all duration-150 hover:text-slate-900 active:scale-[0.98]" @click="emit('open', 'watchlist')">查看自选</button>
+          <button
+            class="text-[12px] text-slate-500 transition-all duration-150 hover:text-slate-900 active:scale-[0.98]"
+            @click="emit('open', 'watchlist')"
+          >
+            查看自选
+          </button>
         </div>
 
-        <div class="grid grid-cols-[88px_1fr_96px_84px_100px_84px_80px] bg-slate-50/80 px-4 py-2 text-[11px] font-medium text-slate-500 transition-colors duration-300">
+        <div class="grid grid-cols-[80px_minmax(80px,1fr)_90px_80px_90px_70px_80px] bg-slate-50/80 px-4 py-2 text-[11px] font-medium text-slate-500 transition-colors duration-300">
           <div>代码</div>
           <div>名称</div>
-          <div class="text-right">最新价</div>
-          <div class="text-right">涨跌幅</div>
-          <div class="text-right">成交额</div>
-          <div class="text-right">振幅</div>
-          <div class="text-right">更新时间</div>
+          <div class="text-right">
+            最新价
+          </div>
+          <div class="text-right">
+            涨跌幅
+          </div>
+          <div class="text-right">
+            成交额
+          </div>
+          <div class="text-right">
+            振幅
+          </div>
+          <div class="text-right">
+            更新时间
+          </div>
         </div>
 
         <div>
           <div
             v-for="quote in quotes"
             :key="quote.symbol"
-            class="grid grid-cols-[88px_1fr_96px_84px_100px_84px_80px] items-center border-t border-slate-50 px-4 py-2 text-[12px] transition-colors duration-100 hover:bg-slate-50/60"
+            class="grid grid-cols-[80px_minmax(80px,1fr)_90px_80px_90px_70px_80px] items-center border-t border-slate-50 px-4 py-2 text-[12px] transition-colors duration-100 hover:bg-slate-50/60"
           >
-            <div class="font-medium text-slate-900 transition-colors duration-300">{{ quote.symbol }}</div>
-            <div class="truncate text-slate-600 transition-colors duration-300">{{ quote.name }}</div>
-            <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">{{ formatNumber(quote.lastPrice) }}</div>
-            <div class="text-right tabular-nums" :class="(quote.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+            <div class="font-medium text-slate-900 transition-colors duration-300">
+              {{ quote.symbol }}
+            </div>
+            <div class="whitespace-nowrap text-slate-600 transition-colors duration-300">
+              {{ quote.name }}
+            </div>
+            <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">
+              {{ formatNumber(quote.lastPrice) }}
+            </div>
+            <div
+              class="text-right tabular-nums"
+              :class="(quote.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+            >
               {{ formatPercent(quote.changePercent) }}
             </div>
-            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ formatNumber((quote.turnover || 0) / 100000000) }} 亿</div>
-            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">{{ formatNumber(quote.amplitude) }}%</div>
-            <div class="text-right text-[11px] tabular-nums text-slate-400">{{ formatTime(quote.quoteTime) }}</div>
+            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">
+              {{ formatNumber((quote.turnover || 0) / 100000000) }} 亿
+            </div>
+            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">
+              {{ formatNumber(quote.amplitude) }}%
+            </div>
+            <div class="text-right text-[11px] tabular-nums text-slate-400">
+              {{ formatTime(quote.quoteTime) }}
+            </div>
           </div>
         </div>
       </div>
@@ -419,20 +520,25 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
         }))"
       />
 
-      <div class="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
+      <div class="rounded-2xl border border-violet-200/50 bg-gradient-to-br from-white to-violet-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
         <div class="flex items-center gap-2">
-          <Star class="h-4 w-4 text-slate-500" />
+          <Star class="h-4 w-4 text-violet-500" />
           <div>
-            <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">板块与自选</div>
-            <div class="text-[11px] text-slate-400">后端板块列表和自选分组都已接入</div>
+            <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">
+              板块与自选
+            </div>
+            <div class="text-[11px] text-slate-400">
+              后端板块列表和自选分组都已接入
+            </div>
           </div>
         </div>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
           <span
-            v-for="sector in sectors.slice(0, 8)"
+            v-for="(sector, idx) in sectors.slice(0, 8)"
             :key="sector.sectorCode"
-            class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600 transition-colors duration-150 hover:bg-slate-200/80"
+            class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-200 hover:scale-105"
+            :class="idx % 3 === 0 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : idx % 3 === 1 ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'"
           >
             {{ sector.sectorName }}
           </span>
@@ -445,8 +551,12 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
             class="rounded-xl border border-slate-200 px-3 py-2.5 transition-all duration-150 hover:border-slate-300 hover:shadow-sm"
           >
             <div class="flex items-center justify-between gap-3">
-              <div class="text-[12px] font-medium text-slate-900 transition-colors duration-300">{{ watchlist.name }}</div>
-              <div class="text-[11px] tabular-nums text-slate-400">{{ watchlist.items.length }} 只股票</div>
+              <div class="text-[12px] font-medium text-slate-900 transition-colors duration-300">
+                {{ watchlist.name }}
+              </div>
+              <div class="text-[11px] tabular-nums text-slate-400">
+                {{ watchlist.items.length }} 只股票
+              </div>
             </div>
             <div class="mt-2 flex flex-wrap gap-1.5">
               <span
@@ -471,38 +581,61 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
 
     <!-- 第五行：最近委托 -->
     <section>
-      <div class="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
+      <div class="rounded-2xl border border-cyan-200/50 bg-gradient-to-br from-white to-cyan-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-2">
-            <CreditCard class="h-4 w-4 text-slate-500" />
+            <CreditCard class="h-4 w-4 text-cyan-500" />
             <div>
-              <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">最近委托</div>
-              <div class="text-[11px] text-slate-400">保留最近交易流水</div>
+              <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">
+                最近委托
+              </div>
+              <div class="text-[11px] text-slate-400">
+                保留最近交易流水
+              </div>
             </div>
           </div>
-          <button class="text-[12px] text-slate-500 transition-all duration-150 hover:text-slate-900 active:scale-[0.98]" @click="emit('open', 'paper')">进入交易</button>
+          <button
+            class="text-[12px] text-slate-500 transition-all duration-150 hover:text-slate-900 active:scale-[0.98]"
+            @click="emit('open', 'paper')"
+          >
+            进入交易
+          </button>
         </div>
 
-        <div v-if="orders.length" class="mt-3 space-y-2">
+        <div
+          v-if="orders.length"
+          class="mt-3 space-y-2"
+        >
           <div
             v-for="order in orders.slice(0, 5)"
             :key="order.id"
             class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-[12px] transition-all duration-150 hover:border-slate-300 hover:shadow-sm"
           >
             <div>
-              <div class="font-medium text-slate-900 transition-colors duration-300">{{ order.symbol }}</div>
-              <div class="mt-1 text-[11px] text-slate-400">{{ formatTime(order.createdAt) }}</div>
+              <div class="font-medium text-slate-900 transition-colors duration-300">
+                {{ order.symbol }}
+              </div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ formatTime(order.createdAt) }}
+              </div>
             </div>
             <div class="text-right">
               <div :class="order.side === 'BUY' ? 'text-rose-600' : 'text-emerald-600'">
                 {{ order.side === 'BUY' ? '买入' : '卖出' }}
               </div>
-              <div class="mt-1 text-[11px] tabular-nums text-slate-400">{{ order.orderQty }} 股</div>
+              <div class="mt-1 text-[11px] tabular-nums text-slate-400">
+                {{ order.orderQty }} 股
+              </div>
             </div>
           </div>
         </div>
 
-        <div v-else class="mt-3 rounded-xl bg-slate-50/80 px-3 py-3 text-center text-[12px] text-slate-400 transition-colors duration-300">当前没有委托记录。</div>
+        <div
+          v-else
+          class="mt-3 rounded-xl bg-slate-50/80 px-3 py-3 text-center text-[12px] text-slate-400 transition-colors duration-300"
+        >
+          当前没有委托记录。
+        </div>
       </div>
     </section>
   </div>

@@ -24,8 +24,9 @@ def build_market_code(symbol: str) -> str:
     """把 6 位股票代码转换成腾讯接口需要的市场前缀格式。
 
     股票代码规则：
-    - 以 5/6/9 开头：上海市场（sh）
-    - 其他：深圳市场（sz）
+    - 以 5/6/9 开头：上海市场（sh）—— 5xx=ETF/基金，6xx=股票，688=科创板，9xx=B股
+    - 以 8 开头：北交所（bj）—— 8xx.xxx = 北交所股票
+    - 其他：深圳市场（sz）—— 000=深市主板，001=深市主板，300/301=创业板
 
     Args:
         symbol: 6 位数字股票代码，例如 "600519"
@@ -38,7 +39,11 @@ def build_market_code(symbol: str) -> str:
     """
     if not re.fullmatch(r"\d{6}", symbol):
         raise ValueError("symbol 必须是 6 位数字，例如 600519")
-    return f"sh{symbol}" if symbol.startswith(("5", "6", "9")) else f"sz{symbol}"
+    if symbol.startswith(("5", "6", "9")):
+        return f"sh{symbol}"
+    if symbol.startswith("8"):
+        return f"bj{symbol}"
+    return f"sz{symbol}"
 
 
 def build_secid(symbol: str) -> str:
@@ -46,6 +51,7 @@ def build_secid(symbol: str) -> str:
 
     东方财富接口的市场编码规则：
     - 以 5/6/9 开头：上海市场（1）
+    - 以 8 开头：北交所（0）—— 东方财富北交所也用 0 前缀
     - 其他：深圳市场（0）
 
     Args:

@@ -28,11 +28,18 @@ const getSentiment = (item: NewsFeedItem) =>
 <template>
   <div class="rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md">
     <div class="border-b border-slate-100 px-5 py-4">
-      <div class="text-[16px] font-semibold text-slate-950">财经热点</div>
-      <div class="mt-0.5 text-[11px] text-slate-400">最新市场动态与研报摘要</div>
+      <div class="text-[16px] font-semibold text-slate-950">
+        财经热点
+      </div>
+      <div class="mt-0.5 text-[11px] text-slate-400">
+        最新市场动态与研报摘要
+      </div>
     </div>
 
-    <div v-if="items.length" class="divide-y divide-slate-50">
+    <div
+      v-if="items.length"
+      class="divide-y divide-slate-50"
+    >
       <div
         v-for="(item, idx) in items"
         :key="idx"
@@ -55,7 +62,10 @@ const getSentiment = (item: NewsFeedItem) =>
               </span>
             </div>
             <!-- 摘要 -->
-            <p v-if="item.summary" class="mt-1.5 text-[12px] leading-relaxed text-slate-500 line-clamp-2">
+            <p
+              v-if="item.summary"
+              class="mt-1.5 text-[12px] leading-relaxed text-slate-500 line-clamp-2"
+            >
               {{ item.summary }}
             </p>
           </div>
@@ -68,7 +78,10 @@ const getSentiment = (item: NewsFeedItem) =>
             class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium ring-1 ring-inset transition-all duration-150"
             :class="getSentiment(item).class"
           >
-            <component :is="getSentiment(item).icon" class="h-3 w-3" />
+            <component
+              :is="getSentiment(item).icon"
+              class="h-3 w-3"
+            />
             {{ getSentiment(item).label }}
           </span>
 
@@ -81,10 +94,16 @@ const getSentiment = (item: NewsFeedItem) =>
           </span>
 
           <!-- 来源 -->
-          <span v-if="item.source" class="text-[11px] text-slate-400">{{ item.source }}</span>
+          <span
+            v-if="item.source"
+            class="text-[11px] text-slate-400"
+          >{{ item.source }}</span>
 
           <!-- 时间 -->
-          <span v-if="item.publishedAt" class="flex items-center gap-1 text-[11px] text-slate-400">
+          <span
+            v-if="item.publishedAt"
+            class="flex items-center gap-1 text-[11px] text-slate-400"
+          >
             <Clock class="h-3 w-3" />
             {{ formatTime(item.publishedAt) }}
           </span>
@@ -93,7 +112,10 @@ const getSentiment = (item: NewsFeedItem) =>
     </div>
 
     <!-- 空状态 -->
-    <div v-else class="flex flex-col items-center justify-center px-4 py-10 text-center">
+    <div
+      v-else
+      class="flex flex-col items-center justify-center px-4 py-10 text-center"
+    >
       <Newspaper class="mb-3 h-10 w-10 text-slate-300" />
       <span class="text-[13px] text-slate-400">暂无新闻数据</span>
     </div>

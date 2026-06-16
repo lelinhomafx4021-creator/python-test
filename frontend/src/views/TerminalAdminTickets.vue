@@ -105,22 +105,42 @@ const submitTicket = () => {
             <Ticket class="h-4 w-4" />
           </div>
           <div>
-            <div class="text-[18px] font-semibold text-slate-950">工单处理台</div>
-            <div class="mt-1 text-[12px] text-slate-500">人工主要处理的是 AI 已整理好的摘要单，原始问题只作为辅助上下文。</div>
+            <div class="text-[18px] font-semibold text-slate-950">
+              工单处理台
+            </div>
+            <div class="mt-1 text-[12px] text-slate-500">
+              人工主要处理的是 AI 已整理好的摘要单，原始问题只作为辅助上下文。
+            </div>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
-          <button class="rounded-full px-3 py-1.5 text-[12px]" :class="statusFilter === 'open' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'" @click="statusFilter = 'open'">
+          <button
+            class="rounded-full px-3 py-1.5 text-[12px]"
+            :class="statusFilter === 'open' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="statusFilter = 'open'"
+          >
             待处理 {{ openCount }}
           </button>
-          <button class="rounded-full px-3 py-1.5 text-[12px]" :class="statusFilter === 'processing' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'" @click="statusFilter = 'processing'">
+          <button
+            class="rounded-full px-3 py-1.5 text-[12px]"
+            :class="statusFilter === 'processing' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="statusFilter = 'processing'"
+          >
             处理中 {{ processingCount }}
           </button>
-          <button class="rounded-full px-3 py-1.5 text-[12px]" :class="statusFilter === 'closed' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'" @click="statusFilter = 'closed'">
+          <button
+            class="rounded-full px-3 py-1.5 text-[12px]"
+            :class="statusFilter === 'closed' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="statusFilter = 'closed'"
+          >
             已关闭 {{ closedCount }}
           </button>
-          <button class="rounded-full px-3 py-1.5 text-[12px]" :class="statusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'" @click="statusFilter = 'all'">
+          <button
+            class="rounded-full px-3 py-1.5 text-[12px]"
+            :class="statusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="statusFilter = 'all'"
+          >
             全部 {{ tickets.length }}
           </button>
         </div>
@@ -133,7 +153,10 @@ const submitTicket = () => {
           工单列表
         </div>
 
-        <div v-if="pagedTickets.length" class="divide-y divide-slate-100">
+        <div
+          v-if="pagedTickets.length"
+          class="divide-y divide-slate-100"
+        >
           <button
             v-for="ticket in pagedTickets"
             :key="ticket.traceId"
@@ -150,7 +173,10 @@ const submitTicket = () => {
                   <div class="truncate text-[14px] font-semibold text-slate-950">
                     {{ ticket.username || ticket.userId || '未知用户' }}
                   </div>
-                  <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium" :class="statusClass(ticket.status)">
+                  <span
+                    class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+                    :class="statusClass(ticket.status)"
+                  >
                     {{ statusLabel(ticket.status) }}
                   </span>
                 </div>
@@ -169,7 +195,10 @@ const submitTicket = () => {
           </button>
         </div>
 
-        <div v-else class="px-4 py-8 text-[12px] text-slate-500">
+        <div
+          v-else
+          class="px-4 py-8 text-[12px] text-slate-500"
+        >
           当前筛选下没有工单。
         </div>
 
@@ -191,24 +220,33 @@ const submitTicket = () => {
           </div>
         </div>
 
-        <div v-if="selectedTicket" class="grid gap-4 px-4 py-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <div
+          v-if="selectedTicket"
+          class="grid gap-4 px-4 py-4 xl:grid-cols-[1.05fr_0.95fr]"
+        >
           <div class="space-y-3">
             <div>
-              <div class="text-[12px] text-slate-500">AI 整理摘要</div>
+              <div class="text-[12px] text-slate-500">
+                AI 整理摘要
+              </div>
               <div class="mt-1 rounded-lg bg-slate-50 px-3 py-3 text-[13px] leading-6 text-slate-900">
                 {{ selectedTicket.handoffSummary || '暂无 AI 摘要' }}
               </div>
             </div>
 
             <div>
-              <div class="text-[12px] text-slate-500">转人工原因</div>
+              <div class="text-[12px] text-slate-500">
+                转人工原因
+              </div>
               <div class="mt-1 rounded-lg bg-slate-50 px-3 py-3 text-[13px] leading-6 text-slate-700">
                 {{ selectedTicket.handoffReason || '--' }}
               </div>
             </div>
 
             <div>
-              <div class="text-[12px] text-slate-500">原始问题</div>
+              <div class="text-[12px] text-slate-500">
+                原始问题
+              </div>
               <div class="mt-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-[13px] leading-6 text-slate-700">
                 {{ selectedTicket.query || '--' }}
               </div>
@@ -223,19 +261,29 @@ const submitTicket = () => {
 
           <div class="space-y-3">
             <div>
-              <div class="mb-1 text-[12px] text-slate-500">处理状态</div>
+              <div class="mb-1 text-[12px] text-slate-500">
+                处理状态
+              </div>
               <select
                 v-model="forms[selectedTicket.traceId].status"
                 class="w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-slate-400"
               >
-                <option value="open">待处理</option>
-                <option value="processing">处理中</option>
-                <option value="closed">已关闭</option>
+                <option value="open">
+                  待处理
+                </option>
+                <option value="processing">
+                  处理中
+                </option>
+                <option value="closed">
+                  已关闭
+                </option>
               </select>
             </div>
 
             <div>
-              <div class="mb-1 text-[12px] text-slate-500">处理备注</div>
+              <div class="mb-1 text-[12px] text-slate-500">
+                处理备注
+              </div>
               <textarea
                 v-model="forms[selectedTicket.traceId].processNote"
                 rows="5"
@@ -245,7 +293,9 @@ const submitTicket = () => {
             </div>
 
             <div>
-              <div class="mb-1 text-[12px] text-slate-500">回复用户</div>
+              <div class="mb-1 text-[12px] text-slate-500">
+                回复用户
+              </div>
               <textarea
                 v-model="forms[selectedTicket.traceId].responseMessage"
                 rows="5"
@@ -265,7 +315,10 @@ const submitTicket = () => {
           </div>
         </div>
 
-        <div v-else class="px-4 py-10 text-[13px] text-slate-500">
+        <div
+          v-else
+          class="px-4 py-10 text-[13px] text-slate-500"
+        >
           当前筛选下没有可处理的工单。
         </div>
       </div>

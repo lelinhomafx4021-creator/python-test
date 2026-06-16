@@ -3,6 +3,8 @@ package com.aiinvestor.gateway.modules.identity.interceptor;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.stp.StpUtil;
 import com.aiinvestor.gateway.modules.shared.annotation.LoginRequired;
+import com.aiinvestor.gateway.modules.shared.annotation.RequireAdmin;
+import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
 import com.aiinvestor.gateway.modules.shared.context.UserContext;
 import com.aiinvestor.gateway.modules.identity.dao.entity.UserDO;
 import com.aiinvestor.gateway.modules.identity.service.UserService;
@@ -95,6 +97,16 @@ public class LoginInterceptor implements HandlerInterceptor {
             // 顺手清理无效用户的登录态，避免脏数据堆积
             StpUtil.logout(userId);
             throw new NotLoginException("登录已失效", null, null);
+        }
+
+        // ---------- 校验管理员权限（@RequireAdmin 注解）----------
+        // 逻辑和 @LoginRequired 一样：先查方法级注解，再查类级注解
+        boolean requireAdmin =
+                handlerMethod.getMethodAnnotation(RequireAdmin.class) != null
+                        || handlerMethod.getBeanType().getAnnotation(RequireAdmin.class) != null;
+
+        if (requireAdmin && !"admin".equals(user.getRole())) {
+            throw new BusinessException("权限不足，仅管理员可操作");
         }
 
         // ---------- 将用户存入 ThreadLocal 上下文 ----------

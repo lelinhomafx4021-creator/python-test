@@ -4,8 +4,8 @@ import com.aiinvestor.gateway.modules.ai.dao.entity.ChatTurnDO;
 import com.aiinvestor.gateway.modules.ai.dao.mapper.ChatTurnMapper;
 import com.aiinvestor.gateway.modules.ai.vo.ChatSessionSummaryVO;
 import com.aiinvestor.gateway.modules.ai.vo.ChatTurnVO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,23 +25,16 @@ import java.util.List;
  *
  * @author AI Investor Team
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class ChatHistoryService {
-
-    private static final Logger log = LoggerFactory.getLogger(ChatHistoryService.class);
 
     private final ChatTurnMapper chatTurnMapper;
     private final PythonAiClientService pythonAiClientService;
 
     /** AI 会话 Mapper（管理 ai_sessions 表） */
     private final com.aiinvestor.gateway.modules.ai.dao.mapper.AiSessionMapper aiSessionMapper;
-    public ChatHistoryService(ChatTurnMapper chatTurnMapper,
-                               PythonAiClientService pythonAiClientService,
-                               com.aiinvestor.gateway.modules.ai.dao.mapper.AiSessionMapper aiSessionMapper) {
-        this.chatTurnMapper = chatTurnMapper;
-        this.pythonAiClientService = pythonAiClientService;
-        this.aiSessionMapper = aiSessionMapper;
-    }
 
     /**
      * 保存一轮对话，并异步生成会话标题。

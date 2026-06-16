@@ -44,8 +44,14 @@ public class WatchlistService {
     }
 
     /**
-     * 获取当前用户的自选分组。
-     * 首次访问时会自动创建一个默认分组。
+     * 获取当前用户的自选分组列表，含股票条目和实时行情。
+     * <p>
+     * 首次访问时会自动创建默认分组"我的自选"。
+     * 一次性批量查询所有分组下的条目及其行情，避免 N+1 问题。
+     *
+     * @param userId 用户 ID
+     * @param role   用户角色
+     * @return 自选分组视图列表，每个分组包含股票条目及最新价/涨跌幅
      */
     @Transactional
     public List<WatchlistVO> listWatchlists(Long userId, String role) {
@@ -106,6 +112,14 @@ public class WatchlistService {
 
     /**
      * 创建自选分组。
+     * <p>
+     * 受会员等级配额（watchlist_count）限制，超出限额会拒绝创建。
+     *
+     * @param userId  用户 ID
+     * @param role    用户角色
+     * @param request 创建请求，含分组名称
+     * @return 新建的分组视图
+     * @throws BusinessException 当分组数量已达会员上限时
      */
     @Transactional
     public WatchlistVO createWatchlist(Long userId, String role, CreateWatchlistRequest request) {
@@ -129,7 +143,14 @@ public class WatchlistService {
     }
 
     /**
-     * 向分组中添加股票。
+     * 向自选分组中添加一只股票。
+     * <p>
+     * 添加前校验分组归属权限，并检查重复添加（同一股票在同一分组中只能存在一次）。
+     *
+     * @param userId      用户 ID
+     * @param watchlistId 目标分组 ID
+     * @param request     添加请求，含股票代码、备注和提醒开关
+     * @throws BusinessException 当分组不属于当前用户或股票已存在时
      */
     @Transactional
     public void addItem(Long userId, Long watchlistId, AddWatchlistItemRequest request) {
@@ -156,6 +177,13 @@ public class WatchlistService {
 
     /**
      * 删除自选股条目。
+     * <p>
+     * 删除前校验分组归属权限和条目的分组归属一致性。
+     *
+     * @param userId      用户 ID
+     * @param watchlistId 分组 ID
+     * @param itemId      待删除的条目 ID
+     * @throws BusinessException 当分组不属于当前用户或条目不在该分组中时
      */
     @Transactional
     public void deleteItem(Long userId, Long watchlistId, Long itemId) {
@@ -167,6 +195,15 @@ public class WatchlistService {
         watchlistItemMapper.deleteById(itemId);
     }
 
+    /**
+     * 为用户创建默认自选分组"我的自选"。
+     * <p>
+     * 先检查会员配额是否支持自选分组功能。
+     *
+     * @param userId 用户 ID
+     * @param role   用户角色
+     * @throws BusinessException 当会员等级不支持自选分组时
+     */
     private void createDefaultWatchlist(Long userId, String role) {
         int limit = membershipService.getQuotaLimit(userId, role, "watchlist_count");
         if (limit <= 0) {
@@ -181,6 +218,14 @@ public class WatchlistService {
         membershipService.syncPermanentQuota(userId, role, "watchlist_count", 1);
     }
 
+    /**
+     * 获取用户拥有的自选分组，同时校验归属权限。
+     *
+     * @param userId      用户 ID
+     * @param watchlistId 分组 ID
+     * @return 分组实体
+     * @throws BusinessException 当分组不存在或不属于当前用户时
+     */
     private WatchlistDO getOwnedWatchlist(Long userId, Long watchlistId) {
         WatchlistDO watchlist = watchlistMapper.selectById(watchlistId);
         if (watchlist == null || !userId.equals(watchlist.getUserId())) {
