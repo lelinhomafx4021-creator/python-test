@@ -11,8 +11,8 @@
 
 ## 项目预览
 
-| K 线详情 | AI 投研助手 |
-| --- | --- |
+| K 线详情                                              | AI 投研助手                                              |
+| ----------------------------------------------------- | -------------------------------------------------------- |
 | ![K 线详情](docs/images/screenshots/kline-detail.png) | ![AI 投研助手](docs/images/screenshots/ai-assistant.png) |
 
 ## 为什么值得看
@@ -42,11 +42,11 @@ graph LR
 
 ### 分层思路
 
-| 层级 | 职责 |
-| --- | --- |
-| `frontend/` | 终端式工作台、宣传页、登录页、管理台、图表和 AI 会话展示 |
-| `java-ai-gateway/` | 登录鉴权、用户会员、行情缓存、自选股、模拟交易、工单、AI 请求代理 |
-| `aipy2/` | LangGraph 工作流、RAG 检索、联网搜索、行情工具、K 线数据、SSE 流式输出 |
+| 层级                 | 职责                                                                   |
+| -------------------- | ---------------------------------------------------------------------- |
+| `frontend/`          | 终端式工作台、宣传页、登录页、管理台、图表和 AI 会话展示               |
+| `java-ai-gateway/`   | 登录鉴权、用户会员、行情缓存、自选股、模拟交易、工单、AI 请求代理      |
+| `aipy2/`             | LangGraph 工作流、RAG 检索、联网搜索、行情工具、K 线数据、SSE 流式输出 |
 | `docker-compose.yml` | MySQL、Redis、RabbitMQ、Postgres/pgvector、Langfuse、Sentinel 本地编排 |
 
 ## 核心功能
@@ -165,14 +165,14 @@ npm run dev -- --host 127.0.0.1 --port 5173
 
 ## 常用地址
 
-| 服务 | 地址 |
-| --- | --- |
-| 前端工作台 | `http://127.0.0.1:5173` |
-| Java 网关 | `http://127.0.0.1:8080` |
-| Python AI 服务 | `http://127.0.0.1:8000` |
-| RabbitMQ 管理台 | `http://127.0.0.1:15672` |
-| Langfuse | `http://127.0.0.1:3000` |
-| Sentinel Dashboard | `http://127.0.0.1:8858` |
+| 服务               | 地址                     |
+| ------------------ | ------------------------ |
+| 前端工作台         | `http://127.0.0.1:5173`  |
+| Java 网关          | `http://127.0.0.1:8080`  |
+| Python AI 服务     | `http://127.0.0.1:8000`  |
+| RabbitMQ 管理台    | `http://127.0.0.1:15672` |
+| Langfuse           | `http://127.0.0.1:3000`  |
+| Sentinel Dashboard | `http://127.0.0.1:8858`  |
 
 ## 演示数据
 
@@ -249,24 +249,6 @@ python .\stress_test.py --concurrency 10 --requests 20 --markdown-out docs/PRESS
 ├── stress_test.py            # 简单并发压测脚本
 └── README.md
 ```
-
-## 面试讲解建议
-
-可以按这个顺序讲：
-
-1. 先讲业务闭环：行情、自选、K 线、AI 投研、模拟交易、人工兜底、管理台。
-2. 再讲架构拆分：Java 做稳定业务网关，Python 做 AI 编排和工具调用。
-3. 重点解释为什么前端不直连大模型：鉴权、会员、限流、审计、人工兜底都需要统一入口。
-4. 展开 AI 链路：SSE 流式输出、LangGraph、RAG、联网检索、traceId 和 Langfuse 观测。
-5. 最后讲工程化：Redis 缓存、RabbitMQ 异步化、Flyway/Alembic 迁移、Sentinel 限流、冒烟和压测。
-
-适合重点展开的技术问题：
-
-- 为什么 `EventSource` 不适合需要认证 Header 的场景，所以使用 `fetch + ReadableStream`。
-- 为什么行情需要 Redis 短 TTL 缓存和 MySQL 快照兜底。
-- 为什么业务数据放 MySQL，而向量检索和 LangGraph checkpoint 放 Postgres/pgvector。
-- 为什么 AI 系统需要人工兜底，而不是让模型在低置信度时硬答。
-- Spring Security 改造后，如何保持 Controller 层的业务权限语义清晰。
 
 ## 参考文档
 
