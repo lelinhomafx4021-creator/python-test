@@ -6,6 +6,7 @@ import com.aiinvestor.gateway.modules.market.dao.mapper.MarketQuoteMapper;
 import com.aiinvestor.gateway.modules.market.dao.mapper.SectorMapper;
 import com.aiinvestor.gateway.modules.market.dao.mapper.StockMapper;
 import com.aiinvestor.gateway.modules.market.vo.MarketQuoteVO;
+import com.aiinvestor.gateway.modules.market.vo.MarketStockListItemVO;
 import com.aiinvestor.gateway.modules.market.vo.MarketStockPageVO;
 import com.aiinvestor.gateway.modules.market.vo.SectorVO;
 import com.aiinvestor.gateway.modules.market.dao.entity.SectorDO;
@@ -116,7 +117,7 @@ class MarketServiceTest {
             when(pythonMarketClient.fetchQuotes(List.of("601179")))
                     .thenReturn(List.of(sampleQuote));
             when(marketQuoteMapper.upsert(any())).thenReturn(1);
-            when(stockMapper.selectOne(any())).thenReturn(null);
+            when(stockMapper.selectList(any())).thenReturn(List.of());
 
             List<MarketQuoteVO> result = marketService.getQuotes(List.of("601179"));
 
@@ -124,11 +125,7 @@ class MarketServiceTest {
             assertEquals("601179", result.get(0).getSymbol());
             verify(pythonMarketClient).fetchQuotes(List.of("601179"));
             // 应写入缓存
-            verify(redisJsonCacheService).set(
-                    eq("market:quote:601179"),
-                    any(MarketQuoteVO.class),
-                    any(Duration.class)
-            );
+            verify(redisJsonCacheService).setAll(anyMap(), any(Duration.class));
         }
 
         @Test
@@ -150,7 +147,7 @@ class MarketServiceTest {
             when(pythonMarketClient.fetchQuotes(List.of("000001")))
                     .thenReturn(List.of(quote2));
             when(marketQuoteMapper.upsert(any())).thenReturn(1);
-            when(stockMapper.selectOne(any())).thenReturn(null);
+            when(stockMapper.selectList(any())).thenReturn(List.of());
 
             List<MarketQuoteVO> result = marketService.getQuotes(List.of("601179", "000001"));
 
@@ -165,7 +162,7 @@ class MarketServiceTest {
             when(pythonMarketClient.fetchQuotes(List.of("601179")))
                     .thenReturn(List.of(sampleQuote));
             when(marketQuoteMapper.upsert(any())).thenReturn(1);
-            when(stockMapper.selectOne(any())).thenReturn(null);
+            when(stockMapper.selectList(any())).thenReturn(List.of());
 
             List<MarketQuoteVO> result = marketService.refreshQuotes(List.of("601179"));
 
@@ -195,6 +192,29 @@ class MarketServiceTest {
             assertEquals(1, result.size());
             // 只请求一次
             verify(pythonMarketClient, never()).fetchQuotes(any());
+        }
+
+        @Test
+        @DisplayName("缓存只有代码名称但无行情字段时应重新拉取")
+        void shouldIgnoreEmptyCachedQuote() {
+            MarketQuoteVO emptyCachedQuote = new MarketQuoteVO(
+                    "601179", "中国电建",
+                    null, null, null, null, null, null,
+                    null, null, null, null, LocalDateTime.now()
+            );
+            when(redisJsonCacheService.get("market:quote:601179", MarketQuoteVO.class))
+                    .thenReturn(emptyCachedQuote);
+            when(pythonMarketClient.fetchQuotes(List.of("601179")))
+                    .thenReturn(List.of(sampleQuote));
+            when(marketQuoteMapper.upsert(any())).thenReturn(1);
+            when(stockMapper.selectList(any())).thenReturn(List.of());
+
+            List<MarketQuoteVO> result = marketService.getQuotes(List.of("601179"));
+
+            assertEquals(1, result.size());
+            assertEquals(new BigDecimal("10.50"), result.get(0).getLastPrice());
+            verify(pythonMarketClient).fetchQuotes(List.of("601179"));
+            verify(redisJsonCacheService).setAll(anyMap(), any(Duration.class));
         }
 
         @Test
@@ -257,6 +277,38 @@ class MarketServiceTest {
     }
 
     // =====================================================================
+    // listStocks - 股票列表
+    // =====================================================================
+
+    @Nested
+    @DisplayName("listStocks - 股票列表")
+    class ListStocks {
+
+        @Test
+        @DisplayName("列表行情字段为空时应从行情接口补全")
+        void shouldEnrichStockListItemsWithQuotes() {
+            MarketStockListItemVO stockItem = new MarketStockListItemVO();
+            stockItem.setSymbol("601179");
+            stockItem.setName("中国电建");
+            stockItem.setPinyin("zgdj");
+            when(pythonMarketClient.fetchStocks(1, 10, ""))
+                    .thenReturn(new MarketStockPageVO(1, 10, 1, List.of(stockItem)));
+            when(redisJsonCacheService.get("market:quote:601179", MarketQuoteVO.class))
+                    .thenReturn(sampleQuote);
+
+            MarketStockPageVO result = marketService.listStocks(1, 10, "");
+
+            assertEquals(1, result.getItems().size());
+            MarketStockListItemVO enriched = result.getItems().get(0);
+            assertEquals(new BigDecimal("10.50"), enriched.getLastPrice());
+            assertEquals(new BigDecimal("2.34"), enriched.getChangePercent());
+            assertEquals(new BigDecimal("1296780000"), enriched.getTurnover());
+            verify(marketQuoteMapper, never()).upsert(any());
+            verify(redisJsonCacheService, never()).setAll(anyMap(), any(Duration.class));
+        }
+    }
+
+    // =====================================================================
     // listSectors - 板块列表
     // =====================================================================
 
@@ -307,7 +359,7 @@ class MarketServiceTest {
             when(pythonMarketClient.fetchQuotes(any()))
                     .thenReturn(List.of(sampleQuote));
             when(marketQuoteMapper.upsert(any())).thenReturn(1);
-            when(stockMapper.selectOne(any())).thenReturn(null);
+            when(stockMapper.selectList(any())).thenReturn(List.of());
 
             marketService.getQuotes(List.of("601179"));
 
@@ -330,7 +382,7 @@ class MarketServiceTest {
             when(pythonMarketClient.fetchQuotes(any()))
                     .thenReturn(List.of(szQuote));
             when(marketQuoteMapper.upsert(any())).thenReturn(1);
-            when(stockMapper.selectOne(any())).thenReturn(null);
+            when(stockMapper.selectList(any())).thenReturn(List.of());
 
             marketService.getQuotes(List.of("000001"));
 

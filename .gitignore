@@ -1,43 +1,84 @@
-# --- Python 相关 ---
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-env/
+# Environment and secrets
 .env
-*.log
-*.db
-dist/
-build/
-*.egg-info/
-logs/
-
-# --- Java 相关 ---
-target/
-*.class
-.mvn/
-.idea/
-*.iml
-*.log
-*.yml
-# --- Frontend / Node 相关 ---
-node_modules/
-dist/
-.DS_Store
-
-# --- 项目特定路径 (aipy2) ---
-/aipy2/.env
-/aipy2/aipy2.log*
-/aipy2/app/db/aipy2.db
-
-# --- Java 本地配置 ---
+.env.*
+!.env.example
+!*.env.example
+!**/.env.example
+!.env.prod.example
+application-local.yml
+application-*-local.yml
 /java-ai-gateway/src/main/resources/application-local.yml
 /java-ai-gateway/src/main/resources/application-dev-local.yml
 
-# --- 本地运行时数据 ---
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Java / Maven
+target/
+*.class
+.mvn/
+
+# Logs, runtime files and local databases
+logs/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+tmp/
+temp/
+/tmp/
+/.codex-run/
+/aipy2/aipy2.log*
+/aipy2/app/db/aipy2.db
+
+# Docker and local persistent data
 /data/mysql/
 /data/postgres/
 /data/rabbit/
 /data/redis/
-/tmp/
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.iml
+
+# Local AI assistant / agent workspace files
+/.claude/
+/.agents/
+/.codex/
+/.uv-cache/
+/.mcp.json
+/skills-lock.json
+/CLAUDE.md
+/AGENTS.md
+/.husky/
+
+# Private learning notes and generated reports
+/aipy2/note/
+/aipy2/PROJECT_BOOK.md
+/docs/learning/
+/report_work/

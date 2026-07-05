@@ -25,11 +25,11 @@ const goNext = () => {
 </script>
 
 <template>
-  <div class="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-[12px] text-slate-500">
+  <div class="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 text-[12px] text-slate-500">
     <div>共 {{ total }} 条</div>
     <div class="flex items-center gap-2">
       <button
-        class="rounded-lg border border-slate-200 px-2.5 py-1 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
+        class="secondary-button px-3 py-1.5 text-[12px] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="page <= 1"
         @click="goPrev"
       >
@@ -37,7 +37,7 @@ const goNext = () => {
       </button>
       <span class="tabular-nums">第 {{ page }} / {{ totalPages }} 页</span>
       <button
-        class="rounded-lg border border-slate-200 px-2.5 py-1 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
+        class="secondary-button px-3 py-1.5 text-[12px] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="page >= totalPages"
         @click="goNext"
       >

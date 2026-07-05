@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,7 +35,6 @@ import java.util.Map;
  * 仅管理员可查看申请列表和执行审核。
  */
 @Slf4j
-@CrossOrigin
 @RestController
 @RequestMapping("/gateway/vip")
 @Tag(name = "VIP申请", description = "用户 VIP 申请与管理员审核")

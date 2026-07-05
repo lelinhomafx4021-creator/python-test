@@ -5,17 +5,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * 应用缓存配置。
- * 统一管理行情缓存与账户锁的过期时间，避免把数字散落在业务代码里。
+ * Centralized cache TTL settings.
  */
 @Data
 @Component
 @ConfigurationProperties(prefix = "app.cache")
 public class AppCacheProperties {
 
-    /** 行情缓存秒数。 */
     private long marketQuoteTtlSeconds = 30;
 
-    /** 账户分布式锁秒数。 */
+    private long emailCodeTtlSeconds = 300;
+
+    private long emailCooldownTtlSeconds = 60;
+
     private long accountLockSeconds = 10;
 }

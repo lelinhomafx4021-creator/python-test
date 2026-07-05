@@ -30,6 +30,7 @@ import type {
   VipApplication,
   Watchlist,
 } from '../types/terminal'
+import { createSSE } from './sse'
 
 // 本地开发直连 Java，隧道/部署时用空字符串走 Vite 代理
 const isTunnel = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
@@ -43,43 +44,6 @@ const TOKEN_KEY = 'ai-investor-token'
  * fetch-based SSE 客户端，替代原生 EventSource（原生不支持自定义 Header）。
  * 解决 Token 只能放 URL 查询参数的安全问题。
  */
-const createSSE = (
-  url: string,
-  headers: Record<string, string>,
-  onMessage: (data: string, close: () => void) => void,
-  onError: (close: () => void) => void,
-) => {
-  const controller = new AbortController()
-  let closed = false
-  const close = () => {
-    closed = true
-    controller.abort()
-  }
-
-  fetch(url, { headers, signal: controller.signal })
-    .then(async (response) => {
-      if (!response.ok || !response.body) { onError(close); return }
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (!closed) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (trimmed.startsWith('data:')) {
-            onMessage(trimmed.slice(5).trimStart(), close)
-          }
-        }
-      }
-    })
-    .catch(() => { if (!closed) onError(close) })
-
-  return close
-}
 
 export const normalizeRole = (role?: string | null) => (role || '').trim().toLowerCase()
 export const isAdminRole = (role?: string | null) => normalizeRole(role) === 'admin'
@@ -153,13 +117,180 @@ export const store = reactive({
   vipApplications: [] as VipApplication[],
 })
 
-const headers = () => store.token ? { satoken: store.token } : {}
+const headers = () => store.token ? { Authorization: `Bearer ${store.token}` } : {}
 
 const asArray = <T>(value: unknown): T[] => {
   if (Array.isArray(value)) return value as T[]
   if (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).items)) return (value as Record<string, unknown>).items as T[]
   if (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).records)) return (value as Record<string, unknown>).records as T[]
   return []
+}
+
+const firstText = (...values: unknown[]) => {
+  for (const value of values) {
+    if (value == null) continue
+    const text = String(value).trim()
+    if (text && text !== 'null' && text !== 'undefined') return text
+  }
+  return ''
+}
+
+const firstNumber = (...values: unknown[]) => {
+  for (const value of values) {
+    if (value == null || value === '') continue
+    const number = Number(value)
+    if (Number.isFinite(number)) return number
+  }
+  return undefined
+}
+
+const quoteNameBySymbol = (symbol: string) => {
+  if (!symbol) return ''
+  const quote = store.quotes.find((item) => item.symbol === symbol)
+  return firstText(quote?.name)
+}
+
+export const stockDisplayName = (stock: Partial<MarketStock> & Record<string, unknown>) => {
+  const symbol = firstText(stock.symbol, stock.code, stock.stockCode, stock.secuCode)
+  return firstText(
+    stock.name,
+    stock.stockName,
+    stock.securityName,
+    stock.displayName,
+    stock.shortName,
+    stock.secuAbbr,
+    quoteNameBySymbol(symbol),
+    symbol,
+  )
+}
+
+const normalizeMarketQuote = (quote: Partial<MarketQuote> & Record<string, unknown>): MarketQuote => {
+  const symbol = firstText(quote.symbol, quote.code, quote.stockCode, quote.secuCode)
+  return {
+    ...quote,
+    symbol,
+    name: firstText(
+      quote.name,
+      quote.stockName,
+      quote.securityName,
+      quote.displayName,
+      quote.shortName,
+      quote.secuAbbr,
+      symbol,
+    ),
+    lastPrice: firstNumber(quote.lastPrice, quote.latestPrice, quote.currentPrice, quote.price),
+    changePercent: firstNumber(quote.changePercent, quote.pctChg, quote.changeRate),
+    changeAmount: firstNumber(quote.changeAmount, quote.change),
+    highPrice: firstNumber(quote.highPrice, quote.high),
+    lowPrice: firstNumber(quote.lowPrice, quote.low),
+    openPrice: firstNumber(quote.openPrice, quote.open),
+    volume: firstNumber(quote.volume, quote.vol),
+    turnover: firstNumber(quote.turnover, quote.amount),
+    turnoverRate: firstNumber(quote.turnoverRate),
+    amplitude: firstNumber(quote.amplitude),
+    quoteTime: firstText(quote.quoteTime, quote.tradeTime, quote.updateTime, quote.updatedAt),
+  } as MarketQuote
+}
+
+export const normalizeMarketStock = (stock: Partial<MarketStock> & Record<string, unknown>): MarketStock => {
+  const symbol = firstText(stock.symbol, stock.code, stock.stockCode, stock.secuCode)
+  return {
+    ...stock,
+    symbol,
+    name: stockDisplayName({ ...stock, symbol }),
+    pinyin: firstText(stock.pinyin, stock.py),
+    lastPrice: firstNumber(stock.lastPrice, stock.latestPrice, stock.currentPrice, stock.price),
+    changePercent: firstNumber(stock.changePercent, stock.pctChg, stock.changeRate),
+    changeAmount: firstNumber(stock.changeAmount, stock.change),
+    volume: firstNumber(stock.volume, stock.vol),
+    turnover: firstNumber(stock.turnover, stock.amount),
+    turnoverRate: firstNumber(stock.turnoverRate),
+    highPrice: firstNumber(stock.highPrice, stock.high),
+    lowPrice: firstNumber(stock.lowPrice, stock.low),
+    openPrice: firstNumber(stock.openPrice, stock.open),
+    totalMarketValue: firstNumber(stock.totalMarketValue, stock.totalMv),
+    circulatingMarketValue: firstNumber(stock.circulatingMarketValue, stock.floatMv),
+    sixtyDayChangePercent: firstNumber(stock.sixtyDayChangePercent),
+    yearToDateChangePercent: firstNumber(stock.yearToDateChangePercent),
+    quoteTime: firstText(stock.quoteTime, stock.tradeTime, stock.updateTime, stock.updatedAt),
+  } as MarketStock
+}
+
+const PLACEHOLDER_SESSION_TITLES = new Set(['新会话', '新的会话', '未命名会话'])
+
+const meaningfulSessionTitle = (title?: string) => {
+  const text = firstText(title)
+  return text && !PLACEHOLDER_SESSION_TITLES.has(text) ? text : ''
+}
+
+export const buildSessionTitle = (message?: string) => {
+  const compact = firstText(message)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[“”"'`]+/g, '')
+    .replace(/[，。！？、；：,.!?;:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const title = compact
+    .replace(/^(请|麻烦)?(帮我|帮忙|请你)?(分析一下|分析|看一下|看看|比较|制定|梳理|总结)/, '')
+    .trim() || compact
+  if (!title) return '新会话'
+  return title.length > 18 ? `${title.slice(0, 18)}...` : title
+}
+
+const inferSessionTime = (sessionId: string) => {
+  const timestamp = sessionId.match(/sess_(\d{11,13})/)?.[1]
+  if (!timestamp) return ''
+  const date = new Date(Number(timestamp))
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString()
+}
+
+const sessionFallbackTitle = (sessionId: string) => {
+  const suffix = sessionId ? sessionId.slice(-6).toUpperCase() : 'NEW'
+  return `投研会话 ${suffix}`
+}
+
+const sessionTimeValue = (session: SessionSummary) => {
+  if (!session.lastAt) return 0
+  const time = new Date(session.lastAt).getTime()
+  return Number.isFinite(time) ? time : 0
+}
+
+const upsertSessionSummary = (summary: SessionSummary) => {
+  if (!summary.sessionId) return
+  const index = store.sessions.findIndex((item) => item.sessionId === summary.sessionId)
+  const existing = index >= 0 ? store.sessions[index] : null
+  const merged: SessionSummary = {
+    sessionId: summary.sessionId,
+    title: meaningfulSessionTitle(summary.title) || meaningfulSessionTitle(existing?.title) || sessionFallbackTitle(summary.sessionId),
+    turnCount: summary.turnCount ?? existing?.turnCount,
+    lastAt: summary.lastAt || existing?.lastAt || inferSessionTime(summary.sessionId),
+  }
+  const next = index >= 0
+    ? [merged, ...store.sessions.slice(0, index), ...store.sessions.slice(index + 1)]
+    : [merged, ...store.sessions]
+  store.sessions = next.sort((a, b) => sessionTimeValue(b) - sessionTimeValue(a))
+}
+
+const normalizeSessionSummary = (session: Record<string, unknown>): SessionSummary => {
+  const sessionId = firstText(session.sessionId, session.session_id, session.id)
+  const firstQuery = firstText(session.query, session.lastQuery, session.firstQuery)
+  const title = meaningfulSessionTitle(firstText(session.title, session.sessionTitle)) || (firstQuery ? buildSessionTitle(firstQuery) : '')
+  return {
+    sessionId,
+    title,
+    turnCount: firstNumber(session.turnCount, session.turn_count, session.messageCount),
+    lastAt: firstText(session.lastAt, session.lastChatTime, session.updatedAt, session.createdAt) || inferSessionTime(sessionId),
+  }
+}
+
+const touchCurrentSession = (sessionId: string, query: string) => {
+  const existing = store.sessions.find((item) => item.sessionId === sessionId)
+  upsertSessionSummary({
+    sessionId,
+    title: meaningfulSessionTitle(existing?.title) || buildSessionTitle(query),
+    turnCount: (existing?.turnCount || 0) + 1,
+    lastAt: new Date().toISOString(),
+  })
 }
 
 const get = async (url: string, key: keyof typeof store, fallback: unknown = []) => {
@@ -404,15 +535,19 @@ export const uploadAvatar = async (file: File) => {
   }
 }
 
-export const fetchQuotes = async () => get(`${API}/market/quotes?symbols=600519,000001,300750,600036,601318,000858,002594,601688`, 'quotes')
+export const fetchQuotes = async () => {
+  const res = await axios.get(`${API}/market/quotes?symbols=600519,000001,300750,600036,601318,000858,002594,601688`, { headers: headers() })
+  store.quotes = asArray<Record<string, unknown>>(res.data?.data).map(normalizeMarketQuote)
+}
 export const fetchSectors = async () => get(`${API}/sectors`, 'sectors')
 export const fetchHotNews = async () => get(`${API}/news/hot?limit=20`, 'hotNews')
 
 export const fetchMarketStocks = async () => {
   const kw = store.marketKeyword.trim() ? `&keyword=${encodeURIComponent(store.marketKeyword.trim())}` : ''
   const res = await axios.get(`${API}/market/stocks?page=${store.marketPage}&pageSize=40${kw}`, { headers: headers() })
-  store.marketStocks = res.data.data?.items || []
-  store.marketTotal = res.data.data?.total || 0
+  const pageData = res.data?.data || {}
+  store.marketStocks = asArray<Record<string, unknown>>(pageData).map(normalizeMarketStock)
+  store.marketTotal = Number(pageData.total ?? store.marketStocks.length ?? 0)
 }
 
 export const fetchWatchlists = async () => {
@@ -485,8 +620,8 @@ export const fetchTransfers = async () => {
 
 export const fetchTransactions = async () => {
   try {
-    const res = await axios.get(`${API}/paper/transactions?page=${store.transactionPage}&pageSize=20`, { headers: headers() })
-    store.transactions = res.data.data?.items || []
+    const res = await axios.get(`${API}/transactions?page=${store.transactionPage}&pageSize=20`, { headers: headers() })
+    store.transactions = res.data.data?.items || res.data.data?.records || []
     store.transactionTotal = res.data.data?.total || 0
   } catch (e) {
     if (isUnauthorized(e)) throw e
@@ -557,12 +692,19 @@ let _sse: (() => void) | null = null
 
 export const fetchSessions = async () => {
   const res = await axios.get(`${AI}/sessions`, { headers: headers() })
-  store.sessions = (res.data.data || []).map((s: any) => ({
-    sessionId: s.sessionId,
-    title: s.title,
-    turnCount: s.turnCount,
-    lastAt: s.lastAt || s.lastChatTime,
-  }))
+  const serverSessions = asArray<Record<string, unknown>>(res.data?.data)
+    .map(normalizeSessionSummary)
+    .filter((item) => item.sessionId)
+  const optimisticOnly = store.sessions.filter(
+    (local) => local.sessionId && !serverSessions.some((server) => server.sessionId === local.sessionId),
+  )
+  store.sessions = [...serverSessions, ...optimisticOnly]
+    .map((session) => ({
+      ...session,
+      title: meaningfulSessionTitle(session.title) || sessionFallbackTitle(session.sessionId),
+      lastAt: session.lastAt || inferSessionTime(session.sessionId),
+    }))
+    .sort((a, b) => sessionTimeValue(b) - sessionTimeValue(a))
 }
 
 export const fetchTickets = async () => get(`${API}/ai/handoff-tickets`, 'tickets')
@@ -594,6 +736,7 @@ export const sendChat = async () => {
   store.sessionId = sid
   store.view = 'chat'
   store.messages.push({ role: 'user', content: q })
+  touchCurrentSession(sid, q)
   store.draft = ''
   const ai = store.messages.push({ role: 'assistant', content: '', thoughts: [], showThoughts: true }) - 1
 
@@ -604,7 +747,7 @@ export const sendChat = async () => {
 
   _sse = createSSE(
     url,
-    { satoken: store.token },
+    { Authorization: `Bearer ${store.token}` },
     async (data, close) => {
       const p = (() => { try { return JSON.parse(data) } catch { return null } })()
       if (!p) {

@@ -1,4 +1,4 @@
-"""K 线与分时数据接口。"""
+"""K-line and intraday data endpoints."""
 
 from __future__ import annotations
 
@@ -8,10 +8,12 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import akshare as ak
-import httpx
+import requests
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 
 from app.core.logger import logger
+from app.services.kline_pattern_service import annotate_kline_patterns
 from app.tools.common import build_market_code
 
 TENCENT_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
@@ -31,6 +33,10 @@ INTRADAY_PERIODS = {"intraday_1d", "intraday_5d"}
 _memory_cache: dict[str, tuple[float, Any]] = {}
 
 
+def _build_market_code(symbol: str) -> str:
+    return build_market_code(symbol.strip())
+
+
 def _get_cache_key(symbol: str, period: str, days: int) -> str:
     raw = f"kline:{symbol}:{period}:{days}"
     return hashlib.md5(raw.encode()).hexdigest()
@@ -40,6 +46,7 @@ def _cache_get(key: str) -> Optional[Any]:
     entry = _memory_cache.get(key)
     if entry is None:
         return None
+
     ts, value = entry
     if time.time() - ts > CACHE_TTL_SECONDS:
         _memory_cache.pop(key, None)
@@ -51,48 +58,20 @@ def _cache_set(key: str, value: Any) -> None:
     _memory_cache[key] = (time.time(), value)
 
 
-async def _fetch_daily_kline(symbol: str, period: str, days: int) -> list[dict[str, Any]]:
-    market_code = build_market_code(symbol)
-    params = {"param": f"{market_code},{period},,,{days},qfq"}
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            TENCENT_KLINE_URL,
-            params=params,
-            headers={
-                "Referer": "https://web.ifzq.gtimg.cn/",
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-            },
-            timeout=REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-    if not data or "data" not in data:
-        raise ValueError("腾讯 K 线接口返回为空")
-
-    stock_data = data["data"].get(market_code, {})
-    kline_key = f"qfq{period}"
-    raw_klines = stock_data.get(kline_key) or stock_data.get(period, [])
-    if not raw_klines:
-        raise ValueError(f"未获取到 {symbol} 的 {period} K 线数据")
-
+def _parse_kline_data(raw_klines: list[Any], symbol: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for row in raw_klines:
-        if len(row) < 6:
+        if not isinstance(row, (list, tuple)) or len(row) < 6:
             continue
         try:
-            open_price = float(row[1]) if row[1] else None
-            close_price = float(row[2]) if row[2] else None
-            high_price = float(row[3]) if row[3] else None
-            low_price = float(row[4]) if row[4] else None
-            volume = int(float(row[5])) if row[5] else 0
-            if open_price is None or open_price == 0:
+            open_price = float(row[1]) if row[1] not in (None, "") else None
+            close_price = float(row[2]) if row[2] not in (None, "") else None
+            high_price = float(row[3]) if row[3] not in (None, "") else None
+            low_price = float(row[4]) if row[4] not in (None, "") else None
+            volume = int(float(row[5])) if row[5] not in (None, "") else 0
+            if open_price in (None, 0):
                 continue
+
             result.append(
                 {
                     "date": str(row[0]).strip(),
@@ -109,7 +88,47 @@ async def _fetch_daily_kline(symbol: str, period: str, days: int) -> list[dict[s
     return result
 
 
-def _normalize_intraday_df(df, symbol: str) -> list[dict[str, Any]]:
+def _fetch_tencent_kline(symbol: str, period: str, days: int) -> dict[str, Any]:
+    market_code = _build_market_code(symbol)
+    params = {"param": f"{market_code},{period},,,{days},qfq"}
+    resp = requests.get(
+        TENCENT_KLINE_URL,
+        params=params,
+        headers={
+            "Referer": "https://web.ifzq.gtimg.cn/",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+        },
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def _fetch_daily_kline(symbol: str, period: str, days: int) -> list[dict[str, Any]]:
+    market_code = _build_market_code(symbol)
+    data = await run_in_threadpool(_fetch_tencent_kline, symbol, period, days)
+
+    if not data or "data" not in data:
+        raise ValueError("腾讯 K 线接口返回为空")
+
+    stock_data = data["data"].get(market_code, {})
+    raw_klines = (
+        stock_data.get(f"qfq{period}")
+        or stock_data.get(period, [])
+        or stock_data.get("qfqday")
+        or stock_data.get("day", [])
+    )
+    parsed = annotate_kline_patterns(_parse_kline_data(raw_klines, symbol))
+    if not parsed:
+        raise ValueError(f"未获取到 {symbol} 的 {period} K 线数据")
+    return parsed
+
+
+def _normalize_intraday_df(df: Any, symbol: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     if df is None or df.empty:
         return result
@@ -123,7 +142,7 @@ def _normalize_intraday_df(df, symbol: str) -> list[dict[str, Any]]:
         "volume": ["成交量", "volume", "vol"],
     }
 
-    def pick(row: dict[str, Any], aliases: list[str]):
+    def pick(row: dict[str, Any], aliases: list[str]) -> Any:
         for alias in aliases:
             if alias in row and row[alias] not in (None, "", "None"):
                 return row[alias]
@@ -133,6 +152,7 @@ def _normalize_intraday_df(df, symbol: str) -> list[dict[str, Any]]:
         date_value = pick(row, column_map["date"])
         if not date_value:
             continue
+
         try:
             open_value = pick(row, column_map["open"])
             close_value = pick(row, column_map["close"])
@@ -177,7 +197,7 @@ def _latest_trade_dates(rows: list[dict[str, Any]], limit: int) -> list[str]:
 
 
 def _fetch_intraday_1d(symbol: str) -> list[dict[str, Any]]:
-    market_code = build_market_code(symbol)
+    market_code = _build_market_code(symbol)
     df = ak.stock_zh_a_minute(symbol=market_code, period="1", adjust="")
     rows = _normalize_intraday_df(df, symbol)
     if not rows:
@@ -217,32 +237,32 @@ async def get_kline(
     period: str = Query("daily", description="周期：daily / intraday_1d / intraday_5d / weekly / monthly"),
     days: int = Query(120, ge=1, le=500, description="获取天数或窗口大小"),
 ):
+    symbol = symbol.strip()
+    if not symbol.isdigit() or len(symbol) != 6:
+        raise HTTPException(status_code=400, detail="symbol 必须是 6 位数字代码")
+
+    normalized_period = period.lower()
+    cache_key = _get_cache_key(symbol, normalized_period, days)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return {
+            "code": 200,
+            "data": {
+                "symbol": symbol,
+                "period": normalized_period,
+                "count": len(cached),
+                "items": cached,
+                "cached": True,
+            },
+            "message": "成功",
+        }
+
     try:
-        symbol = symbol.strip()
-        if not symbol.isdigit() or len(symbol) != 6:
-            raise HTTPException(status_code=400, detail="symbol 必须是 6 位数字代码")
-
-        normalized_period = period.lower()
-        cache_key = _get_cache_key(symbol, normalized_period, days)
-        cached = _cache_get(cache_key)
-        if cached is not None:
-            return {
-                "code": 200,
-                "data": {
-                    "symbol": symbol,
-                    "period": normalized_period,
-                    "count": len(cached),
-                    "items": cached,
-                    "cached": True,
-                },
-                "message": "成功",
-            }
-
         if normalized_period in INTRADAY_PERIODS:
             if normalized_period == "intraday_1d":
-                parsed = _fetch_intraday_1d(symbol)
+                parsed = annotate_kline_patterns(_fetch_intraday_1d(symbol))
             else:
-                parsed = _fetch_intraday_5d(symbol)
+                parsed = annotate_kline_patterns(_fetch_intraday_5d(symbol))
         else:
             tencent_period = PERIOD_MAP.get(normalized_period)
             if not tencent_period:
@@ -267,9 +287,9 @@ async def get_kline(
         }
     except HTTPException:
         raise
-    except httpx.TimeoutException:
+    except requests.Timeout:
         raise HTTPException(status_code=504, detail="数据源请求超时，请稍后重试")
-    except httpx.HTTPError:
+    except requests.RequestException:
         raise HTTPException(status_code=502, detail="数据源请求失败")
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

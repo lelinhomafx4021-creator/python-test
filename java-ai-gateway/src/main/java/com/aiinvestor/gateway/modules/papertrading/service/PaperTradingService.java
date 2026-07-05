@@ -24,6 +24,7 @@ import com.aiinvestor.gateway.modules.papertrading.vo.PaperCashTransferVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperOrderVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperPortfolioSnapshotVO;
 import com.aiinvestor.gateway.modules.papertrading.vo.PaperPositionVO;
+import com.aiinvestor.gateway.modules.shared.cache.RedisKeys;
 import com.aiinvestor.gateway.modules.shared.config.AppCacheProperties;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
 import com.aiinvestor.gateway.modules.shared.service.UserNotificationService;
@@ -276,7 +277,7 @@ public class PaperTradingService {
     @Transactional
     public PaperOrderVO placeOrder(Long userId, CreatePaperOrderRequest request) {
         PaperAccountDO account = getOwnedAccount(userId, request.getAccountId());
-        String lockKey = "paper:account:lock:" + account.getId();
+        String lockKey = RedisKeys.paperAccountLock(account.getId());
         String lockValue = UUID.randomUUID().toString();
         Boolean locked = stringRedisTemplate.opsForValue().setIfAbsent(
                 lockKey,

@@ -1,6 +1,30 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+:root {
+  color-scheme: light;
+  --bg-canvas: #f5f4f1;
+  --bg-subtle: #ecebe6;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-strong: rgba(255, 255, 255, 0.88);
+  --surface-muted: #f8f7f3;
+  --line: rgba(79, 75, 67, 0.14);
+  --line-strong: rgba(79, 75, 67, 0.24);
+  --text-strong: #171717;
+  --text: #37352f;
+  --text-soft: #6f6a5f;
+  --text-faint: #9a9488;
+  --brand: #171717;
+  --brand-strong: #000000;
+  --brand-soft: rgba(186, 132, 46, 0.12);
+  --accent: #b9822f;
+  --success: #16794c;
+  --danger: #c2413b;
+  --warning: #a56418;
+  --shadow-sm: 0 6px 18px rgba(22, 22, 20, 0.035);
+  --shadow-md: 0 12px 30px rgba(22, 22, 20, 0.055);
+}
+
 @layer base {
   html,
   body,
@@ -8,40 +32,242 @@
     height: 100%;
   }
 
+  html {
+    background: var(--bg-canvas);
+  }
+
   body {
     @apply antialiased;
-    color: #0f172a;
-    background: #f8fafc;
+    color: var(--text-strong);
+    background:
+      linear-gradient(180deg, #fbfaf7 0%, var(--bg-canvas) 46%, #efeee9 100%);
     overflow-x: hidden;
     overflow-y: auto;
+    font-feature-settings: "tnum" 1, "cv02" 1;
   }
 
-  /* 全局按钮点击反馈 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(112, 107, 96, 0.42) transparent;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
   button {
-    @apply transition-all duration-150 ease-out cursor-pointer;
-  }
-  button:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-  /* 提交类按钮更强的反馈 */
-  button[type="submit"]:active:not(:disabled) {
-    transform: scale(0.96);
-    filter: brightness(0.95);
-  }
-  /* 链接点击反馈 */
-  a:active {
-    opacity: 0.7;
+    @apply cursor-pointer transition duration-150 ease-out;
   }
 
-  /* 选中文本样式 */
+  button:disabled {
+    @apply cursor-not-allowed opacity-55;
+  }
+
+  button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  a {
+    @apply transition-colors duration-150;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgba(185, 130, 47, 0.7);
+    outline-offset: 2px;
+  }
+
   ::selection {
-    background: rgba(99, 102, 241, 0.15);
-    color: #312e81;
+    background: rgba(185, 130, 47, 0.16);
+    color: var(--text-strong);
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen text-neutral-950;
+    background:
+      linear-gradient(180deg, #fbfaf7 0%, #f5f4f1 44%, #efeee9 100%);
+  }
+
+  .glass-nav {
+    background: rgba(251, 250, 247, 0.72);
+    border-color: rgba(255, 255, 255, 0.74);
+    backdrop-filter: blur(22px) saturate(150%);
+    box-shadow: 0 1px 0 rgba(79, 75, 67, 0.08);
+  }
+
+  .app-panel,
+  .data-sheet {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(14px);
+    @apply rounded-lg;
+  }
+
+  .app-panel-strong,
+  .data-sheet-strong {
+    background: var(--surface-strong);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(18px);
+    @apply rounded-lg;
+  }
+
+  .app-panel-muted {
+    background: rgba(248, 247, 243, 0.8);
+    border: 1px solid var(--line);
+    @apply rounded-lg;
+  }
+
+  .section-band {
+    @apply border-t border-neutral-200/80;
+    background: rgba(255, 255, 255, 0.34);
+  }
+
+  .terminal-strip {
+    @apply flex min-h-10 items-center gap-3 overflow-x-auto border-y px-3 text-[12px];
+    border-color: var(--line);
+    background: rgba(23, 23, 23, 0.94);
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .data-row {
+    @apply grid items-center border-t px-3 py-2 text-[12px];
+    border-color: rgba(229, 226, 217, 0.86);
+  }
+
+  .section-title {
+    @apply text-[14px] font-semibold text-neutral-950;
+  }
+
+  .section-subtitle {
+    @apply mt-0.5 text-[11px] leading-5 text-neutral-500;
+  }
+
+  .toolbar-button {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border px-3 text-[12px] font-medium text-neutral-700;
+    border-color: var(--line);
+    background: rgba(255, 255, 255, 0.56);
+    backdrop-filter: blur(16px);
+  }
+
+  .toolbar-button:hover {
+    border-color: var(--line-strong);
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .primary-button {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold text-white;
+    background: var(--brand);
+    box-shadow: 0 8px 20px rgba(23, 23, 23, 0.12);
+  }
+
+  .primary-button:hover {
+    background: var(--brand-strong);
+  }
+
+  .secondary-button {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border px-3.5 text-[12px] font-medium text-neutral-700;
+    border-color: var(--line);
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(14px);
+  }
+
+  .secondary-button:hover {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: var(--line-strong);
+  }
+
+  .badge,
+  .badge-neutral,
+  .badge-brand,
+  .badge-success,
+  .badge-warn {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium;
+  }
+
+  .badge-neutral {
+    @apply bg-neutral-100 text-neutral-600;
+  }
+
+  .badge-brand {
+    color: #7b531b;
+    background: var(--brand-soft);
+  }
+
+  .badge-success {
+    @apply text-emerald-700;
+    background: rgba(22, 121, 76, 0.1);
+  }
+
+  .badge-warn {
+    @apply text-amber-700;
+    background: rgba(185, 130, 47, 0.13);
+  }
+
+  .metric-card {
+    @apply rounded-lg border px-3 py-2;
+    background: rgba(248, 247, 243, 0.72);
+    border-color: var(--line);
+  }
+
+  .metric-label {
+    @apply text-[10px] uppercase tracking-[0.08em] text-neutral-400;
+  }
+
+  .metric-value {
+    @apply mt-1 text-[18px] font-semibold leading-none tracking-tight text-neutral-950;
+  }
+
+  .data-table {
+    @apply overflow-hidden rounded-lg border bg-[rgba(255,255,255,0.82)];
+    backdrop-filter: blur(14px);
+    border-color: var(--line);
+  }
+
+  .data-table-header {
+    @apply border-b bg-[#f3f1eb]/90 px-3 py-2 text-[10px] font-medium uppercase tracking-[0.06em] text-neutral-500;
+    border-color: var(--line);
+  }
+
+  .input-shell {
+    @apply h-9 w-full rounded-lg border bg-[rgba(255,255,255,0.88)] px-3 text-[12px] text-neutral-900 outline-none transition;
+    border-color: rgba(190, 184, 171, 0.74);
+  }
+
+  .input-shell::placeholder {
+    color: #a8a195;
+  }
+
+  .input-shell:focus,
+  .select-shell:focus,
+  .textarea-shell:focus {
+    border-color: rgba(185, 130, 47, 0.74);
+    box-shadow: 0 0 0 3px rgba(185, 130, 47, 0.12);
+  }
+
+  .select-shell {
+    @apply h-9 rounded-lg border bg-[rgba(255,255,255,0.88)] px-3 text-[12px] text-neutral-700 outline-none transition;
+    border-color: rgba(190, 184, 171, 0.74);
+  }
+
+  .textarea-shell {
+    @apply w-full rounded-lg border bg-[rgba(255,255,255,0.88)] px-3 py-2 text-[12px] text-neutral-900 outline-none transition;
+    border-color: rgba(190, 184, 171, 0.74);
+  }
+
+  .empty-state {
+    @apply rounded-lg border border-dashed border-neutral-200 bg-[#f8f7f3]/70 px-3 py-4 text-center text-[12px] text-neutral-500;
   }
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -49,49 +275,49 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.15);
-  border-radius: 10px;
-  transition: background 0.2s;
+  background: rgba(112, 107, 96, 0.32);
+  border-radius: 999px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.3);
+  background: rgba(112, 107, 96, 0.48);
 }
 
 .markdown-body {
-  @apply text-slate-700;
+  @apply text-neutral-700;
 }
 
 .markdown-body p { @apply my-2 leading-7 text-[13px]; }
 .markdown-body p:first-child { @apply mt-0; }
 .markdown-body p:last-child { @apply mb-0; }
-.markdown-body code { @apply rounded-md bg-indigo-50 px-1.5 py-0.5 text-[0.9em] text-indigo-700; }
-.markdown-body pre { @apply my-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-slate-100; }
-.markdown-body pre code { @apply bg-transparent p-0 text-zinc-100; }
+.markdown-body code { @apply rounded-md bg-amber-50 px-1.5 py-0.5 text-[0.9em] text-amber-700; }
+.markdown-body pre { @apply my-3 overflow-x-auto rounded-lg bg-neutral-950 p-4 text-neutral-100; }
+.markdown-body pre code { @apply bg-transparent p-0 text-neutral-100; }
 .markdown-body ul { @apply my-2 list-disc space-y-1.5 pl-5; }
 .markdown-body ol { @apply my-2 list-decimal space-y-1.5 pl-5; }
 .markdown-body li { @apply text-[13px] leading-6; }
-.markdown-body h1 { @apply mb-2 mt-5 text-lg font-semibold text-slate-800; }
-.markdown-body h2 { @apply mb-2 mt-4 text-base font-semibold text-slate-800; }
-.markdown-body h3 { @apply mb-1.5 mt-3 text-sm font-semibold text-slate-800; }
-.markdown-body blockquote { @apply my-3 rounded-lg border-l-3 border-indigo-200 bg-indigo-50/50 pl-4 py-1 text-slate-500; }
-.markdown-body table { @apply my-3 w-full text-[12px] border-collapse; }
-.markdown-body thead { @apply bg-slate-50; }
-.markdown-body th { @apply border border-slate-200 px-3 py-2 text-left font-semibold text-slate-600; }
-.markdown-body td { @apply border border-slate-100 px-3 py-2 text-slate-600; }
-.markdown-body tr:hover { @apply bg-slate-50/50; }
-.markdown-body strong { @apply font-semibold text-slate-800; }
-.markdown-body a { @apply text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-700; }
-.markdown-body hr { @apply my-4 border-slate-200; }
+.markdown-body h1 { @apply mb-2 mt-5 text-lg font-semibold text-neutral-900; }
+.markdown-body h2 { @apply mb-2 mt-4 text-base font-semibold text-neutral-900; }
+.markdown-body h3 { @apply mb-1.5 mt-3 text-sm font-semibold text-neutral-900; }
+.markdown-body blockquote { @apply my-3 rounded-lg border-l-4 border-amber-200 bg-amber-50/60 px-4 py-2 text-neutral-600; }
+.markdown-body table { @apply my-3 w-full border-collapse text-[12px]; }
+.markdown-body thead { @apply bg-neutral-50; }
+.markdown-body th { @apply border border-neutral-200 px-3 py-2 text-left font-semibold text-neutral-600; }
+.markdown-body td { @apply border border-neutral-100 px-3 py-2 text-neutral-600; }
+.markdown-body tr:hover { @apply bg-neutral-50/50; }
+.markdown-body strong { @apply font-semibold text-neutral-900; }
+.markdown-body a { @apply text-amber-700 underline decoration-amber-300 underline-offset-2 hover:text-amber-800; }
+.markdown-body hr { @apply my-4 border-neutral-200; }
 
-/* 公告横幅滚动动画 */
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+
 .animate-marquee {
   animation: marquee 30s linear infinite;
 }
+
 .animate-marquee:hover {
   animation-play-state: paused;
 }

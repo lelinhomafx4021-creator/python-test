@@ -36,6 +36,7 @@ public class UserContext {
      *   减少了一次数据库查询，性能更好。
      */
     private static final ThreadLocal<UserDO> USER_HOLDER = new ThreadLocal<>();
+    private static final ThreadLocal<String> TOKEN_HOLDER = new ThreadLocal<>();
 
     /**
      * 存入当前用户。
@@ -43,6 +44,10 @@ public class UserContext {
      */
     public static void set(UserDO user) {
         USER_HOLDER.set(user);
+    }
+
+    public static void setToken(String token) {
+        TOKEN_HOLDER.set(token);
     }
 
     /**
@@ -64,6 +69,10 @@ public class UserContext {
         return user != null ? user.getId() : null;
     }
 
+    public static String getToken() {
+        return TOKEN_HOLDER.get();
+    }
+
     /**
      * 清除当前线程的用户信息。
      * 由 LoginInterceptor 在请求结束后强制调用，
@@ -71,5 +80,6 @@ public class UserContext {
      */
     public static void remove() {
         USER_HOLDER.remove();
+        TOKEN_HOLDER.remove();
     }
 }

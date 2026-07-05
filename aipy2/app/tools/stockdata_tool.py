@@ -434,12 +434,18 @@ def _fetch_eastmoney_detail(symbol: str) -> dict[str, Any] | None:
 
 def _build_stock_items(candidates: list[dict[str, str]]) -> list[dict[str, Any]]:
     """给股票候选补齐实时行情字段 + PE/PB（从 EPS/BPS 计算）。"""
-    quote_map = _fetch_batch_quotes([item["symbol"] for item in candidates])
+    quote_map: dict[str, dict[str, Any]] = {}
+    quote_fetch_failed = False
+    try:
+        quote_map = _fetch_batch_quotes([item["symbol"] for item in candidates])
+    except Exception as exc:
+        quote_fetch_failed = True
+        logger.warning("批量行情获取失败，退化为静态股票列表: %s", exc)
     result: list[dict[str, Any]] = []
     for item in candidates:
         quote = quote_map.get(item["symbol"], {})
         # 尝试获取 EPS/BPS 并计算 PE/PB（失败不影响主流程）
-        detail = _fetch_eastmoney_detail(item["symbol"])
+        detail = None if quote_fetch_failed else _fetch_eastmoney_detail(item["symbol"])
         price = quote.get("lastPrice")
         pe = None
         pb = None

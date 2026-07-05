@@ -1,88 +1,84 @@
 services:
-  # ============================================================
-  # 中间件（MySQL / Redis / RabbitMQ / Postgres / 辅助工具）
-  # ============================================================
-
-  # 主业务数据库：Java 侧的业务真相存储
   mysql:
     image: mysql:8.0
-    restart: always
     container_name: ai-investor-mysql
-    command: --default-time-zone='+08:00' --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+    command:
+      - --default-time-zone=+08:00
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_ROOT_PASSWORD: 123456
       MYSQL_DATABASE: ai_investor
       TZ: Asia/Shanghai
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-  # 缓存与分布式锁：登录态、行情缓存、配额计数
+
   redis:
     image: redis:7
-    restart: always
     container_name: ai-investor-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-  # 消息队列：异步审计与后续事件消费
+
   rabbitmq:
     image: rabbitmq:3-management
-    restart: always
-    container_name: ai-investor-rabbit
+    container_name: ai-investor-rabbitmq
+    restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: 123456
+      TZ: Asia/Shanghai
     ports:
       - "5672:5672"
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
-  # 向量数据库：Python 侧的检索与 Langfuse 依赖的 Postgres
   postgres:
     image: ankane/pgvector:latest
-    restart: always
     container_name: ai-investor-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "123456"
+      POSTGRES_PASSWORD: 123456
       POSTGRES_DB: ai_investor
+      TZ: Asia/Shanghai
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # AI 观测平台：链路追踪、时延诊断、调试分析
   langfuse:
     image: langfuse/langfuse:2
-    restart: always
     container_name: ai-investor-langfuse
+    restart: unless-stopped
     depends_on:
       - postgres
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:123456@postgres:5432/ai_investor
+      NEXTAUTH_SECRET: 123456
+      NEXTAUTH_URL: http://localhost:3000
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_INIT_ORG_NAME: AI-Investor
+      LANGFUSE_INIT_PROJECT_NAME: Interview-Demo
+      LANGFUSE_INIT_USER_EMAIL: admin@local.test
+      LANGFUSE_INIT_USER_PASSWORD: 123456
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/ai_investor
-      - NEXTAUTH_SECRET=my_super_secret_key
-      - NEXTAUTH_URL=http://localhost:3000
-      - TELEMETRY_ENABLED=false
-      - LANGFUSE_INIT_ORG_NAME=AI-Investor-Org
-      - LANGFUSE_INIT_PROJECT_NAME=Investor-Agent
-      - LANGFUSE_INIT_USER_EMAIL=admin@example.com
-      - LANGFUSE_INIT_USER_PASSWORD=12345678
 
-  # 流控与降级控制台：给 Java 的 Sentinel 接入使用
   sentinel-dashboard:
     image: bladex/sentinel-dashboard:1.8.8
-    restart: always
     container_name: ai-investor-sentinel
+    restart: unless-stopped
     ports:
       - "8858:8858"
-
-  # （业务应用 java-gateway / aipy2 / frontend 已移除，仅保留中间件）
 
 volumes:
   mysql_data:

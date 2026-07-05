@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   store, fetchMe, refreshTerminal, login, register, logout,
   sendRegisterEmailCode,
@@ -29,15 +29,16 @@ import TerminalPaper from './views/TerminalPaper.vue'
 import TerminalTransactions from './views/TerminalTransactions.vue'
 import TerminalProfile from './views/TerminalProfile.vue'
 import TerminalWatchlists from './views/TerminalWatchlists.vue'
+import TerminalKlineDetail from './views/TerminalKlineDetail.vue'
 
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 
-// 通用的异步操作包装器，消除重复的 try/catch/toast 模式
 const withToast = async (
   fn: () => Promise<any>,
   successMsg: string,
-  errorMsg: string = '操作失败'
+  errorMsg: string = '操作失败',
 ) => {
   try {
     await fn()
@@ -48,12 +49,13 @@ const withToast = async (
 }
 
 const vipLabel = computed(() => store.membership?.planCode === 'vip' ? '会员版' : '普通版')
-const margin = computed(() => store.sidebarCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[260px]')
+const margin = computed(() => store.sidebarCollapsed ? 'lg:ml-[76px]' : 'lg:ml-[256px]')
+const sidebarActiveView = computed<NavKey>(() => store.view === 'kline' ? 'watchlist' : store.view)
 
 const { connected: wsConnected, connect: wsConnect, subscribe: wsSubscribe, disconnect: wsDisconnect } = useMarketWebSocket()
 
 const nav = computed<NavItem[]>(() => ([
-  { key: 'overview', label: '会员总览' },
+  { key: 'overview', label: '工作总览' },
   { key: 'chat', label: '智能副驾', count: store.sessions.length },
   { key: 'watchlist', label: '自选列表', count: store.watchlists.length },
   { key: 'paper', label: '交易终端', count: store.positions.length },
@@ -63,10 +65,40 @@ const nav = computed<NavItem[]>(() => ([
   { key: 'profile', label: '个人中心' },
 ]))
 
-const openView = (view: NavKey) => {
+const viewPathMap: Partial<Record<NavKey, string>> = {
+  overview: '/overview',
+  chat: '/chat',
+  watchlist: '/watchlist',
+  paper: '/paper',
+  transactions: '/transactions',
+  news: '/news',
+  handoff: '/handoff',
+  profile: '/profile',
+}
+
+const routeToView = (path: string): NavKey => {
+  if (path.startsWith('/watchlist/kline/')) return 'kline'
+  if (path.startsWith('/watchlist')) return 'watchlist'
+  if (path.startsWith('/chat')) return 'chat'
+  if (path.startsWith('/paper')) return 'paper'
+  if (path.startsWith('/transactions')) return 'transactions'
+  if (path.startsWith('/news')) return 'news'
+  if (path.startsWith('/handoff')) return 'handoff'
+  if (path.startsWith('/profile')) return 'profile'
+  return 'overview'
+}
+
+const syncViewFromRoute = () => {
+  store.view = routeToView(route.path)
+}
+
+const openView = (view: NavKey, updateRoute = true) => {
   store.view = view
   store.userMenuOpen = false
   if (window.innerWidth < 1024) store.sidebarOpen = false
+  if (updateRoute && viewPathMap[view] && route.path !== viewPathMap[view]) {
+    router.push(viewPathMap[view])
+  }
 }
 
 const toggle = () => {
@@ -81,7 +113,8 @@ const openProfile = () => {
 
 const submitAuth = async () => {
   try {
-    store.mode === 'login' ? await login() : await register()
+    if (store.mode === 'login') await login()
+    else await register()
     if (store.error) {
       toast.error(store.error)
       return
@@ -101,56 +134,43 @@ const submitAuth = async () => {
 const handleSendRegisterEmailCode = async () => {
   try {
     await sendRegisterEmailCode()
-    if (!store.error) toast.success('邮箱验证码已发送，请前往收件箱查看')
+    if (!store.error) toast.success('邮箱验证码已发送，请前往邮箱查看')
   } catch {
     toast.error(store.error || '发送邮箱验证码失败')
   }
 }
 
 const handleRefresh = () => withToast(refreshTerminal, '数据已刷新', '刷新失败')
-
 const handleLogout = async () => {
   await logout()
   router.replace('/overview')
   toast.info('已退出登录')
 }
-
 const handleCreateWatchlist = () => withToast(createWatchlist, '自选分组创建成功', '创建失败')
-
-const handleAddWatchlistItem = () => withToast(addWatchlistItem, '已添加到自选', '添加失败')
-
+const handleAddWatchlistItem = () => withToast(addWatchlistItem, '已加入自选', '添加失败')
 const handleRemoveWatchlistItem = (wlId: number, itemId: number) =>
   withToast(() => removeWatchlistItem(wlId, itemId), '已从自选中移除', '移除失败')
-
 const handleQuickAdd = (symbol: string, name?: string) =>
   withToast(() => quickAddToWatchlist(symbol, name), `已添加 ${symbol} 到自选`, '添加失败')
 
-const handlePlaceOrder = (payload: { symbol: string; side: 'BUY' | 'SELL'; quantity: number }) => {
-  store.orderSymbol = payload.symbol
-  store.orderSide = payload.side
-  store.orderQty = payload.quantity
-  handleSubmitOrder()
-}
-
 const handleSubmitOrder = () => withToast(submitOrder, '委托提交成功', '委托提交失败')
-
 const handleCancelOrder = (id: number) => withToast(() => cancelOrder(id), '撤单成功', '撤单失败')
-
 const handleDeposit = (payload: { amount: number; remark: string }) =>
   withToast(() => deposit(payload.amount, payload.remark), '充值成功，资金已到账', '充值失败')
-
 const handleWithdraw = (payload: { amount: number; remark: string }) =>
   withToast(() => withdraw(payload.amount, payload.remark), '提现成功，资金已扣除', '提现失败')
-
 const handleSaveProfile = () => withToast(saveProfile, '资料保存成功', '保存失败')
-
 const handleUploadAvatar = (file: File) => withToast(() => uploadAvatar(file), '头像上传成功', '上传失败')
-
 const handleFetchHotNews = () => withToast(fetchHotNews, '新闻已刷新', '刷新失败')
 
 watch(() => [store.view, store.user?.id, store.paper?.id], ([view]) => {
-  view === 'paper' ? startPaperRefresh() : stopPaperRefresh()
+  if (view === 'paper') startPaperRefresh()
+  else stopPaperRefresh()
 })
+
+watch(() => route.path, () => {
+  syncViewFromRoute()
+}, { immediate: true })
 
 watch(() => [store.marketKeyword, store.marketPage, store.user?.id], async ([, , userId]) => {
   if (userId) await fetchMarketStocks()
@@ -181,13 +201,14 @@ onMounted(async () => {
   if (store.token) {
     try {
       await fetchMe()
-      if (isAdminRole(store.user?.role)) {
-        router.replace('/admin')
-        return
-      }
-      await refreshTerminal()
-      router.replace('/overview')
-      wsConnect()
+    if (isAdminRole(store.user?.role)) {
+      router.replace('/admin')
+      return
+    }
+    await refreshTerminal()
+    syncViewFromRoute()
+    if (route.path === '/' || route.path === '/login') router.replace('/overview')
+    wsConnect()
       membershipPollTimer = setInterval(() => { pollMembership() }, 30_000)
     } catch {
       await logout()
@@ -212,14 +233,11 @@ function closeUserMenu() {
 
 <template>
   <ToastNotification />
-  <main class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 text-slate-900">
-    <div
-      v-if="store.loading"
-      class="flex min-h-screen items-center justify-center"
-    >
-      <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-3 shadow-sm">
-        <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-950" />
-        <span class="text-[13px] text-slate-500">正在恢复终端状态...</span>
+  <main class="app-shell">
+    <div v-if="store.loading" class="flex min-h-screen items-center justify-center">
+      <div class="data-sheet-strong flex items-center gap-3 px-5 py-4">
+        <div class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-950" />
+        <span class="text-[13px] text-neutral-500">正在恢复终端状态...</span>
       </div>
     </div>
 
@@ -236,7 +254,12 @@ function closeUserMenu() {
       :code-sending="store.emailCodeSending"
       :code-cooldown="store.emailCodeCooldown"
       :error="store.error"
-      :signals="[{ value: '量化金融终端', label: '把行情、自选、交易、热点、问答和工单收进一个终端。' }, { value: '自选列表管理', label: '支持分组、新增、移除和从行情页一键加入自选。' }, { value: '统一工作台', label: '盯盘、研究、下单和转人工都在一个入口完成。' }, { value: '用户终端', label: '这里只保留普通用户与会员用户的使用路径。' }]"
+      :signals="[
+        { value: '统一投研终端', label: '行情、自选、交易、热点、问答和工单收进一个工作区。' },
+        { value: '会员工作流', label: '普通用户、会员和管理员使用同一套入口，按权限进入不同界面。' },
+        { value: '运营可协同', label: '用户端与后台共享同一套状态语义，审核和工单能接得住。' },
+        { value: '金融产品感', label: '强调扫描效率、秩序感和可信度，不靠装饰堆氛围。' },
+      ]"
       @update:mode="store.mode = $event"
       @update:username="store.mode === 'login' ? (store.loginForm.username = $event) : (store.registerForm.username = $event)"
       @update:password="store.mode === 'login' ? (store.loginForm.password = $event) : (store.registerForm.password = $event)"
@@ -248,18 +271,11 @@ function closeUserMenu() {
       @submit="submitAuth"
     />
 
-    <div
-      v-else
-      class="flex min-h-screen"
-    >
-      <div
-        v-if="store.sidebarOpen && !store.sidebarCollapsed"
-        class="fixed inset-0 z-30 bg-slate-950/20 lg:hidden"
-        @click="store.sidebarOpen = false"
-      />
+    <div v-else class="flex min-h-screen">
+      <div v-if="store.sidebarOpen && !store.sidebarCollapsed" class="fixed inset-0 z-30 bg-neutral-950/20 lg:hidden" @click="store.sidebarOpen = false" />
 
       <TerminalSidebar
-        :active-view="store.view"
+        :active-view="sidebarActiveView"
         :auth-user="store.user!"
         :membership-label="vipLabel"
         :nav-items="nav"
@@ -271,10 +287,7 @@ function closeUserMenu() {
         @logout="handleLogout"
       />
 
-      <div
-        class="min-w-0 flex-1 overflow-visible transition-[margin-left] duration-200"
-        :class="margin"
-      >
+      <div class="min-w-0 flex-1 transition-[margin-left] duration-200" :class="margin">
         <TerminalHeader
           :active-view="store.view"
           :auth-user="store.user!"
@@ -287,17 +300,14 @@ function closeUserMenu() {
           @logout="handleLogout"
         />
 
-        <div class="flex items-center justify-end px-4 py-1 lg:px-6">
-          <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
-            <span
-              class="inline-block h-2 w-2 rounded-full transition-colors duration-300"
-              :class="wsConnected ? 'bg-emerald-400' : 'bg-red-400'"
-            />
-            <span>{{ wsConnected ? '行情已连接' : '行情断开' }}</span>
+        <div class="flex items-center justify-end px-4 py-2 lg:px-5">
+          <div class="badge-neutral">
+            <span class="inline-block h-2 w-2 rounded-full" :class="wsConnected ? 'bg-emerald-500' : 'bg-rose-500'" />
+            {{ wsConnected ? '行情连接正常' : '行情连接中断' }}
           </div>
         </div>
 
-        <div class="overflow-visible px-4 py-4 lg:px-6 lg:pb-6">
+        <div class="px-4 pb-5 lg:px-5">
           <TerminalOverview
             v-if="store.view === 'overview'"
             :membership="store.membership"
@@ -353,7 +363,12 @@ function closeUserMenu() {
             @add="handleAddWatchlistItem"
             @remove="handleRemoveWatchlistItem"
             @quick-add="handleQuickAdd"
-            @place-order="handlePlaceOrder"
+          />
+
+          <TerminalKlineDetail
+            v-else-if="store.view === 'kline'"
+            :watchlists="store.watchlists"
+            @quick-add="handleQuickAdd"
           />
 
           <TerminalPaper

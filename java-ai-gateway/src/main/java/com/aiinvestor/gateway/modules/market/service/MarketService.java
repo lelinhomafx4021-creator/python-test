@@ -11,10 +11,12 @@ import com.aiinvestor.gateway.modules.market.vo.HotNewsItemVO;
 import com.aiinvestor.gateway.modules.market.vo.MarketStockListItemVO;
 import com.aiinvestor.gateway.modules.market.vo.MarketStockPageVO;
 import com.aiinvestor.gateway.modules.market.vo.SectorVO;
+import com.aiinvestor.gateway.modules.shared.cache.RedisKeys;
 import com.aiinvestor.gateway.modules.shared.cache.RedisJsonCacheService;
 import com.aiinvestor.gateway.modules.shared.config.AppCacheProperties;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -29,9 +31,8 @@ import java.util.Map;
  * 读取顺序为 Redis -> Python 实时行情 -> MySQL 快照。
  */
 @Service
+@Slf4j
 public class MarketService {
-
-    private static final String QUOTE_CACHE_PREFIX = "market:quote:";
 
     private final PythonMarketClient pythonMarketClient;
     private final MarketQuoteMapper marketQuoteMapper;
@@ -105,8 +106,22 @@ public class MarketService {
     public MarketStockPageVO listStocks(int page, int pageSize, String keyword) {
         String trimmedKeyword = keyword == null ? "" : keyword.trim();
         
-        // 先尝试通过 Python 服务获取
-        MarketStockPageVO stockPage = pythonMarketClient.fetchStocks(page, pageSize, trimmedKeyword);
+        MarketStockPageVO stockPage;
+        try {
+            stockPage = pythonMarketClient.fetchStocks(page, pageSize, trimmedKeyword);
+        } catch (Exception e) {
+            log.warn("Python market stock service unavailable, fallback to database. page={}, pageSize={}, keyword={}",
+                    page, pageSize, trimmedKeyword, e);
+            MarketStockPageVO fallbackPage = listStocksFromDatabase(page, pageSize, trimmedKeyword);
+            enrichStockItemsWithQuotes(fallbackPage.getItems());
+            return fallbackPage;
+        }
+
+        if (stockPage == null) {
+            stockPage = new MarketStockPageVO(page, pageSize, 0, new ArrayList<>());
+        } else if (stockPage.getItems() == null) {
+            stockPage.setItems(new ArrayList<>());
+        }
         
         // 如果有搜索关键词，同时从数据库搜索拼音匹配的股票
         if (!trimmedKeyword.isEmpty()) {
@@ -125,19 +140,75 @@ public class MarketService {
             stockPage.setTotal(stockPage.getItems().size());
         }
         
-        // 批量缓存行情数据（减少 N+1）
-        List<MarketQuoteVO> quotes = stockPage.getItems().stream()
-                .map(item -> new MarketQuoteVO(
-                        item.getSymbol(), item.getName(), item.getLastPrice(),
-                        item.getChangePercent(), item.getChangeAmount(),
-                        item.getHighPrice(), item.getLowPrice(), item.getOpenPrice(),
-                        item.getVolume(), item.getTurnover(), item.getTurnoverRate(),
-                        null, LocalDateTime.now()))
-                .toList();
-        batchCacheAndPersistQuotes(quotes);
-        batchEnsureStockRecords(quotes);
+        enrichStockItemsWithQuotes(stockPage.getItems());
         
         return stockPage;
+    }
+
+    private void enrichStockItemsWithQuotes(List<MarketStockListItemVO> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+
+        List<String> symbols = items.stream()
+                .map(MarketStockListItemVO::getSymbol)
+                .filter(symbol -> symbol != null && !symbol.isBlank())
+                .distinct()
+                .toList();
+        if (symbols.isEmpty()) {
+            return;
+        }
+
+        Map<String, MarketQuoteVO> quoteMap = new LinkedHashMap<>();
+        for (MarketQuoteVO quote : getQuotes(symbols)) {
+            if (quote != null && quote.getSymbol() != null && !quote.getSymbol().isBlank() && hasQuoteData(quote)) {
+                quoteMap.put(quote.getSymbol(), quote);
+            }
+        }
+
+        for (MarketStockListItemVO item : items) {
+            if (item.getSymbol() == null) {
+                continue;
+            }
+            MarketQuoteVO quote = quoteMap.get(item.getSymbol());
+            if (quote != null) {
+                applyQuoteToStockItem(item, quote);
+            }
+        }
+    }
+
+    private void applyQuoteToStockItem(MarketStockListItemVO item, MarketQuoteVO quote) {
+        if ((item.getName() == null || item.getName().isBlank())
+                && quote.getName() != null && !quote.getName().isBlank()) {
+            item.setName(quote.getName());
+        }
+        if (quote.getLastPrice() != null) {
+            item.setLastPrice(quote.getLastPrice());
+        }
+        if (quote.getChangePercent() != null) {
+            item.setChangePercent(quote.getChangePercent());
+        }
+        if (quote.getChangeAmount() != null) {
+            item.setChangeAmount(quote.getChangeAmount());
+        }
+        if (quote.getVolume() != null) {
+            item.setVolume(quote.getVolume());
+        }
+        if (quote.getTurnover() != null) {
+            item.setTurnover(quote.getTurnover());
+        }
+        if (quote.getTurnoverRate() != null) {
+            item.setTurnoverRate(quote.getTurnoverRate());
+        }
+        if (quote.getHighPrice() != null) {
+            item.setHighPrice(quote.getHighPrice());
+        }
+        if (quote.getLowPrice() != null) {
+            item.setLowPrice(quote.getLowPrice());
+        }
+        if (quote.getOpenPrice() != null) {
+            item.setOpenPrice(quote.getOpenPrice());
+        }
     }
     
     /**
@@ -191,7 +262,12 @@ public class MarketService {
      * @return 热点财经新闻列表
      */
     public List<HotNewsItemVO> listHotNews(int limit) {
-        return pythonMarketClient.fetchHotNews(limit);
+        try {
+            return pythonMarketClient.fetchHotNews(limit);
+        } catch (Exception e) {
+            log.warn("Python hot news service unavailable, return empty list. limit={}", limit, e);
+            return List.of();
+        }
     }
 
     /**
@@ -203,7 +279,13 @@ public class MarketService {
      * @return K 线数据点列表
      */
     public List<Map<String, Object>> getKline(String symbol, String period, int days) {
-        return pythonMarketClient.fetchKline(symbol, period, days);
+        try {
+            return pythonMarketClient.fetchKline(symbol, period, days);
+        } catch (Exception e) {
+            log.warn("Python kline service unavailable, return empty list. symbol={}, period={}, days={}",
+                    symbol, period, days, e);
+            return List.of();
+        }
     }
 
     /**
@@ -248,7 +330,7 @@ public class MarketService {
             MarketQuoteVO cached = forceRefresh
                     ? null
                     : redisJsonCacheService.get(cacheKey(symbol), MarketQuoteVO.class);
-            if (cached != null) {
+            if (hasQuoteData(cached)) {
                 result.put(symbol, cached);
             } else {
                 missedSymbols.add(symbol);
@@ -256,12 +338,21 @@ public class MarketService {
         }
 
         if (!missedSymbols.isEmpty()) {
-            List<MarketQuoteVO> freshQuotes = pythonMarketClient.fetchQuotes(missedSymbols);
-            for (MarketQuoteVO quote : freshQuotes) {
+            List<MarketQuoteVO> freshQuotes;
+            try {
+                freshQuotes = pythonMarketClient.fetchQuotes(missedSymbols);
+            } catch (Exception e) {
+                log.warn("Python market quote service unavailable, fallback to snapshots. symbols={}", missedSymbols, e);
+                freshQuotes = List.of();
+            }
+            List<MarketQuoteVO> usableFreshQuotes = freshQuotes.stream()
+                    .filter(this::hasQuoteData)
+                    .toList();
+            for (MarketQuoteVO quote : usableFreshQuotes) {
                 result.put(quote.getSymbol(), quote);
             }
-            batchCacheAndPersistQuotes(freshQuotes);
-            batchEnsureStockRecords(freshQuotes);
+            batchCacheAndPersistQuotes(usableFreshQuotes);
+            batchEnsureStockRecords(usableFreshQuotes);
 
             for (String symbol : missedSymbols) {
                 if (result.containsKey(symbol)) {
@@ -350,6 +441,9 @@ public class MarketService {
      * @param quotes 行情视图对象列表
      */
     private void batchCacheAndPersistQuotes(List<MarketQuoteVO> quotes) {
+        if (quotes.isEmpty()) {
+            return;
+        }
         Duration ttl = Duration.ofSeconds(appCacheProperties.getMarketQuoteTtlSeconds());
         Map<String, Object> redisEntries = new LinkedHashMap<>();
         List<MarketQuoteDO> dbEntities = new ArrayList<>();
@@ -387,6 +481,9 @@ public class MarketService {
      * @param quotes 行情视图对象列表
      */
     private void batchEnsureStockRecords(List<MarketQuoteVO> quotes) {
+        if (quotes.isEmpty()) {
+            return;
+        }
         List<String> symbols = quotes.stream().map(MarketQuoteVO::getSymbol).toList();
         List<StockDO> existingStocks = stockMapper.selectList(
                 new LambdaQueryWrapper<StockDO>().in(StockDO::getSymbol, symbols)
@@ -440,7 +537,7 @@ public class MarketService {
      */
     private void fillFromSnapshot(String symbol, Map<String, MarketQuoteVO> result) {
         MarketQuoteVO cached = redisJsonCacheService.get(cacheKey(symbol), MarketQuoteVO.class);
-        if (cached != null) {
+        if (hasQuoteData(cached)) {
             result.put(symbol, cached);
             return;
         }
@@ -450,7 +547,7 @@ public class MarketService {
                         .eq(MarketQuoteDO::getSymbol, symbol)
                         .last("limit 1")
         );
-        if (dbQuote != null) {
+        if (dbQuote != null && hasQuoteData(dbQuote)) {
             result.put(symbol, toQuoteVO(dbQuote, findStockName(symbol)));
         }
     }
@@ -507,6 +604,72 @@ public class MarketService {
         return symbol.startsWith("6") || symbol.startsWith("5") || symbol.startsWith("9") ? "SH" : "SZ";
     }
 
+    private MarketStockPageVO listStocksFromDatabase(int page, int pageSize, String keyword) {
+        int total = stockMapper.selectCount(stockQuery(keyword)).intValue();
+        int offset = Math.max(0, (page - 1) * pageSize);
+        List<StockDO> stocks = stockMapper.selectList(
+                stockQuery(keyword)
+                        .orderByAsc(StockDO::getSymbol)
+                        .last("limit " + pageSize + " offset " + offset)
+        );
+        List<MarketStockListItemVO> items = stocks.stream()
+                .map(stock -> {
+                    MarketStockListItemVO item = new MarketStockListItemVO();
+                    item.setSymbol(stock.getSymbol());
+                    item.setName(stock.getName());
+                    item.setPinyin(stock.getPinyin());
+                    return item;
+                })
+                .toList();
+        return new MarketStockPageVO(page, pageSize, total, items);
+    }
+
+    private LambdaQueryWrapper<StockDO> stockQuery(String keyword) {
+        LambdaQueryWrapper<StockDO> wrapper = new LambdaQueryWrapper<StockDO>()
+                .eq(StockDO::getStatus, "active");
+        if (keyword != null && !keyword.isBlank()) {
+            String trimmed = keyword.trim();
+            wrapper.and(w -> w
+                    .like(StockDO::getSymbol, trimmed)
+                    .or()
+                    .like(StockDO::getName, trimmed)
+                    .or()
+                    .like(StockDO::getPinyin, trimmed.toUpperCase())
+            );
+        }
+        return wrapper;
+    }
+
+    private boolean hasQuoteData(MarketQuoteVO quote) {
+        return quote != null && (
+                quote.getLastPrice() != null
+                        || quote.getChangePercent() != null
+                        || quote.getChangeAmount() != null
+                        || quote.getHighPrice() != null
+                        || quote.getLowPrice() != null
+                        || quote.getOpenPrice() != null
+                        || quote.getVolume() != null
+                        || quote.getTurnover() != null
+                        || quote.getTurnoverRate() != null
+                        || quote.getAmplitude() != null
+        );
+    }
+
+    private boolean hasQuoteData(MarketQuoteDO quote) {
+        return quote != null && (
+                quote.getLastPrice() != null
+                        || quote.getChangePct() != null
+                        || quote.getChangeAmount() != null
+                        || quote.getHighPrice() != null
+                        || quote.getLowPrice() != null
+                        || quote.getOpenPrice() != null
+                        || quote.getVolume() != null
+                        || quote.getTurnover() != null
+                        || quote.getTurnoverRate() != null
+                        || quote.getAmplitude() != null
+        );
+    }
+
     /**
      * 构建 Redis 缓存键。
      *
@@ -514,6 +677,6 @@ public class MarketService {
      * @return 格式为 "market:quote:{symbol}" 的缓存键
      */
     private String cacheKey(String symbol) {
-        return QUOTE_CACHE_PREFIX + symbol;
+        return RedisKeys.marketQuote(symbol);
     }
 }

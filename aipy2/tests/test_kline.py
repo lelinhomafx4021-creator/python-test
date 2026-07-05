@@ -26,6 +26,7 @@ from app.api.v1.kline import (
     _parse_kline_data,
     CACHE_TTL_SECONDS,
 )
+from app.services.kline_pattern_service import annotate_kline_patterns
 
 
 # ===========================================================================
@@ -151,6 +152,30 @@ class TestParseKlineData:
         assert result[0]["low"] == 10.30
 
 
+class TestAnnotateKlinePatterns:
+    def test_adds_empty_patterns_field(self):
+        rows = annotate_kline_patterns(
+            [{"date": "2026-01-10", "open": 10, "close": 10.4, "high": 10.6, "low": 9.8, "volume": 100, "symbol": "601179"}]
+        )
+        assert "patterns" in rows[0]
+        assert isinstance(rows[0]["patterns"], list)
+
+    def test_detects_hammer(self):
+        rows = annotate_kline_patterns(
+            [{"date": "2026-01-10", "open": 10.2, "close": 10.4, "high": 10.45, "low": 9.3, "volume": 100, "symbol": "601179"}]
+        )
+        assert any(item["code"] == "hammer" for item in rows[0]["patterns"])
+
+    def test_detects_bullish_engulfing(self):
+        rows = annotate_kline_patterns(
+            [
+                {"date": "2026-01-09", "open": 10.5, "close": 10.0, "high": 10.6, "low": 9.9, "volume": 100, "symbol": "601179"},
+                {"date": "2026-01-10", "open": 9.95, "close": 10.7, "high": 10.8, "low": 9.9, "volume": 100, "symbol": "601179"},
+            ]
+        )
+        assert any(item["code"] == "bullish_engulfing" for item in rows[1]["patterns"])
+
+
 # ===========================================================================
 # 内存缓存单元测试
 # ===========================================================================
@@ -250,6 +275,7 @@ class TestKlineAPI:
             assert "high" in item
             assert "low" in item
             assert "volume" in item
+            assert "patterns" in item
 
     async def test_timeout_returns_504(self, client):
         """腾讯接口超时应返回 504。"""

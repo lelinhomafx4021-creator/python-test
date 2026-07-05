@@ -1,15 +1,15 @@
 package com.aiinvestor.gateway.modules.identity.interceptor;
 
-import cn.dev33.satoken.exception.NotLoginException;
-import cn.dev33.satoken.stp.StpUtil;
 import com.aiinvestor.gateway.modules.shared.annotation.LoginRequired;
 import com.aiinvestor.gateway.modules.shared.annotation.RequireAdmin;
-import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
 import com.aiinvestor.gateway.modules.shared.context.UserContext;
 import com.aiinvestor.gateway.modules.identity.dao.entity.UserDO;
-import com.aiinvestor.gateway.modules.identity.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -21,7 +21,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  *
  * 执行流程：
  *   1. 判断当前请求是否需要登录（检查 @LoginRequired 注解）
- *   2. 若需要：调用 Sa-Token 校验 token
+ *   2. 若需要：检查 Spring Security 中是否已有认证主体
  *   3. 将用户对象放入 UserContext（ThreadLocal）
  *   4. 请求结束后清理 UserContext
  *
@@ -34,13 +34,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
  */
 @Component
 public class LoginInterceptor implements HandlerInterceptor {
-
-    /** 用户查询服务（用于将 loginId 转为完整的 UserDO） */
-    private final UserService userService;
-
-    public LoginInterceptor(UserService userService) {
-        this.userService = userService;
-    }
 
     /**
      * 请求进入 Controller 之前执行。
@@ -65,52 +58,30 @@ public class LoginInterceptor implements HandlerInterceptor {
         // 支持两种方式标注 @LoginRequired：
         // 1. 标注在方法上（精细控制：只保护单个接口）
         // 2. 标注在类上（批量保护：整个 Controller 都需要登录）
+        boolean requireAdmin =
+                handlerMethod.getMethodAnnotation(RequireAdmin.class) != null
+                        || handlerMethod.getBeanType().getAnnotation(RequireAdmin.class) != null;
+
         boolean needLogin =
-                handlerMethod.getMethodAnnotation(LoginRequired.class) != null    // 方法级注解
-                        || handlerMethod.getBeanType().getAnnotation(LoginRequired.class) != null; // 类级注解
+                requireAdmin
+                        || handlerMethod.getMethodAnnotation(LoginRequired.class) != null
+                        || handlerMethod.getBeanType().getAnnotation(LoginRequired.class) != null;
 
         // 不需要登录的接口直接放行
         if (!needLogin) {
             return true;
         }
 
-        // ---------- 执行登录校验 ----------
-        // Sa-Token 的 checkLogin() 会：
-        // - 从请求中提取 token（Cookie 或 Header）
-        // - 校验 token 是否有效、是否过期
-        // - 无效则抛 NotLoginException
-        StpUtil.checkLogin();
-
-        // 获取 Sa-Token 中存储的 loginId（即 userId）
-        Object loginId = StpUtil.getLoginIdDefaultNull();
-        if (loginId == null) {
-            throw new NotLoginException("未登录", null, null);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof UserDO user)) {
+            throw new InsufficientAuthenticationException("请先登录后再继续操作");
         }
-
-        // ---------- 加载完整用户对象 ----------
-        // loginId 只是主键，Service 层可能需要用户名、状态等字段
-        Long userId = Long.valueOf(String.valueOf(loginId));
-        UserDO user = userService.getById(userId);
-
-        // 用户不存在或已被禁用 → 清理旧登录态，抛异常
-        if (user == null || !isUserActive(user.getStatus())) {
-            // 顺手清理无效用户的登录态，避免脏数据堆积
-            StpUtil.logout(userId);
-            throw new NotLoginException("登录已失效", null, null);
-        }
-
-        // ---------- 校验管理员权限（@RequireAdmin 注解）----------
-        // 逻辑和 @LoginRequired 一样：先查方法级注解，再查类级注解
-        boolean requireAdmin =
-                handlerMethod.getMethodAnnotation(RequireAdmin.class) != null
-                        || handlerMethod.getBeanType().getAnnotation(RequireAdmin.class) != null;
 
         if (requireAdmin && !"admin".equals(user.getRole())) {
-            throw new BusinessException("权限不足，仅管理员可操作");
+            throw new AccessDeniedException("权限不足，仅管理员可操作");
         }
 
-        // ---------- 将用户存入 ThreadLocal 上下文 ----------
-        // 后续的 Controller 和 Service 可以直接 UserContext.get() 获取
         UserContext.set(user);
         return true;
     }
@@ -128,13 +99,5 @@ public class LoginInterceptor implements HandlerInterceptor {
                                 Object handler, Exception ex) {
         // 请求结束，必须清理，绝不可省略！
         UserContext.remove();
-    }
-
-    private boolean isUserActive(String status) {
-        if (status == null || status.isBlank()) {
-            return false;
-        }
-        String normalized = status.trim();
-        return "1".equals(normalized) || "active".equalsIgnoreCase(normalized);
     }
 }

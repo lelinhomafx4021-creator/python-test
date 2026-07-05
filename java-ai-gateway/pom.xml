@@ -63,16 +63,6 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
         <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot3-starter</artifactId>
-            <version>1.39.0</version>
-        </dependency>
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-redis-jackson</artifactId>
-            <version>1.39.0</version>
-        </dependency>
-        <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>3.5.7</version>
@@ -145,7 +135,9 @@
                 </executions>
                 <configuration>
                     <toolchains>
-                        <version>21</version>
+                        <jdk>
+                            <version>21</version>
+                        </jdk>
                     </toolchains>
                 </configuration>
             </plugin>

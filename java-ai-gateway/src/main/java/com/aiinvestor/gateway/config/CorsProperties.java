@@ -27,7 +27,7 @@ public class CorsProperties {
      * 允许的前端来源地址，多个用逗号分隔。
      * 通过环境变量 APP_CORS_ORIGINS 可在部署时覆盖。
      */
-    private String allowedOrigins = "http://localhost:5173,http://127.0.0.1:5173";
+    private String allowedOrigins = "http://localhost:[*],http://127.0.0.1:[*],https://*.trycloudflare.com";
 
     /**
      * 解析为 List，方便直接使用。

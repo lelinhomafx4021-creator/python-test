@@ -2,15 +2,19 @@ package com.aiinvestor.gateway.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import com.aiinvestor.gateway.modules.identity.security.BearerTokenAuthenticationFilter;
 
 /**
  * ============================================================
@@ -18,15 +22,13 @@ import java.util.Arrays;
  * ============================================================
  *
  * 设计思路：
- *   因为本项目使用 Sa-Token 自行管理登录状态（而非 Spring Security 的
- *   session/oauth2），所以这里只是"借用" Spring Security 的过滤器链来
- *   处理 CORS（跨域），并关闭 CSRF、表单登录等默认行为。
+ *   当前项目使用 Spring Security + Bearer Token + Redis 维护登录态。
+ *   SecurityFilterChain 负责：
+ *   1. CORS / CSRF / 无状态会话
+ *   2. 注入自定义 BearerTokenAuthenticationFilter
+ *   3. 为后续 MVC 注解拦截器提供统一的 SecurityContext
  *
  * 面试要点：
- *   为什么不禁用整个 Spring Security？
- *   → 因为 CorsConfigurationSource 需要 SecurityFilterChain 来生效。
- *     完全排除 Spring Security 后需要自己写 CORS Filter，没必要。
- *
  * @author AI Investor Team
  */
 @Configuration
@@ -34,9 +36,12 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final CorsProperties corsProperties;
+    private final BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter;
 
-    public SecurityConfig(CorsProperties corsProperties) {
+    public SecurityConfig(CorsProperties corsProperties,
+                          BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter) {
         this.corsProperties = corsProperties;
+        this.bearerTokenAuthenticationFilter = bearerTokenAuthenticationFilter;
     }
 
     /**
@@ -45,7 +50,9 @@ public class SecurityConfig {
      * 逐个解释：
      * - csrf().disable()          : 关闭 CSRF 防护（前后端分离 + token 鉴权，无需 CSRF）
      * - cors()                    : 开启跨域支持，使用下方自定义的 CORS 配置
-     * - authorizeHttpRequests()   : 所有请求一律放行（鉴权交给 Sa-Token 拦截器）
+     * - sessionManagement()       : 无状态会话，后端不保留 HttpSession
+     * - addFilterBefore()         : 在用户名密码过滤器前注入 Bearer Token 解析逻辑
+     * - authorizeHttpRequests()   : 路由是否需要登录继续交给注解式 LoginInterceptor
      * - formLogin/httpBasic       : 关闭默认的登录页和 HTTP Basic 认证
      *
      * @param http Spring Security 的 HTTP 安全构建器
@@ -58,7 +65,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 // CORS：允许前端 (localhost:5173) 跨域访问后端 API
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // 授权：所有请求一律放行，真正的鉴权由 Sa-Token LoginInterceptor 完成
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 授权：所有请求一律放行，真正的鉴权由注解式 LoginInterceptor 完成
                 // Swagger UI 和 OpenAPI 文档路径也需要放行
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -68,7 +76,9 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/webjars/**"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().permitAll())
+                .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 // 关闭 Spring Security 自带的登录页（我们用 /gateway/auth/login）
                 .formLogin(AbstractHttpConfigurer::disable)
                 // 关闭 HTTP Basic 认证
@@ -88,7 +98,7 @@ public class SecurityConfig {
      * 配置解读：
      * - allowedOriginPatterns : 允许的来源域名（支持通配符模式）
      * - allowedMethods        : 允许的 HTTP 方法
-     * - allowedHeaders        : 允许的请求头（Sa-Token 通过 satoken 头传递 token）
+     * - allowedHeaders        : 允许的请求头（标准 Authorization Bearer）
      * - exposedHeaders        : 允许前端 JS 读取的响应头
      * - allowCredentials      : 允许携带 cookie（true 时不能用 * 做 origin）
      * - maxAge                : 预检请求（OPTIONS）的缓存时间（秒）
@@ -102,8 +112,9 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(corsProperties.getAllowedOriginList());
         // 允许常见的 RESTful 方法 + OPTIONS（预检请求）
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        // 允许携带的请求头：Authorization（标准）、Content-Type（JSON）、自定义头
+        // 允许携带的请求头：Authorization（标准 Bearer）和业务自定义头
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-User-Id", "X-Trace-Id", "satoken"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         // 预检请求缓存 1 小时，减少 OPTIONS 请求次数
         configuration.setMaxAge(3600L);
 

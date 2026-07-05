@@ -72,7 +72,14 @@ python:
 
 app:
   cache:
+    # Redis key policy:
+    # market:quote:{symbol}
+    # email:code:{scene}:{email}
+    # email:cooldown:{scene}:{email}
+    # paper:account:lock:{accountId}
     market-quote-ttl-seconds: 30
+    email-code-ttl-seconds: 300
+    email-cooldown-ttl-seconds: 60
     account-lock-seconds: 10
   email:
     mock-enabled: ${APP_EMAIL_MOCK_ENABLED:true}
@@ -91,6 +98,9 @@ app:
         qps: 8
   paper-trading:
     initial-cash: 1000000
+  auth:
+    token-ttl-seconds: 2592000
+    redis-key-prefix: "auth:token:"
 
 aliyun:
   oss:
@@ -119,15 +129,6 @@ springdoc:
     path: /swagger-ui.html
     tags-sorter: alpha
     operations-sorter: alpha
-
-sa-token:
-  token-name: satoken
-  timeout: 2592000
-  active-timeout: -1
-  is-concurrent: true
-  is-share: false
-  token-style: uuid
-  is-log: false
 
 server:
   port: ${SERVER_PORT:8080}

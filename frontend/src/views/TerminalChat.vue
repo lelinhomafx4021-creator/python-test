@@ -12,10 +12,13 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import {
   Bot,
+  ChartCandlestick,
   Check,
   ChevronDown,
   ChevronUp,
+  Clock3,
   Copy,
+  History,
   MessageSquare,
   Plus,
   SendHorizontal,
@@ -25,7 +28,7 @@ import {
 } from 'lucide-vue-next'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { ChatMessage, SessionSummary } from '../types/terminal'
-import { formatTime } from '../utils/format'
+import { formatRelativeTime, formatTime } from '../utils/format'
 
 const props = defineProps<{
   sessions: SessionSummary[]
@@ -51,9 +54,9 @@ const composerRef = useTemplateRef<HTMLTextAreaElement>('composerRef')
 const chatBodyRef = useTemplateRef<HTMLDivElement>('chatBodyRef')
 
 const suggestions = [
-  { icon: '📊', text: '分析贵州茅台的估值和盈利能力' },
-  { icon: '⚖️', text: '比较金融与新能源板块近一周走势' },
-  { icon: '🎯', text: '帮我制定稳健型自选观察框架' },
+  { icon: ChartCandlestick, label: '估值', text: '分析贵州茅台的估值和盈利能力' },
+  { icon: History, label: '板块', text: '比较金融与新能源板块近一周走势' },
+  { icon: MessageSquare, label: '策略', text: '帮我制定稳健型自选观察框架' },
 ]
 
 watch(
@@ -69,6 +72,18 @@ const pagedSessions = computed(() => {
   const start = (sessionPage.value - 1) * sessionPageSize
   return props.sessions.slice(start, start + sessionPageSize)
 })
+
+const sessionTitle = (session: SessionSummary) => {
+  const title = (session.title || '').trim()
+  if (title && title !== '新会话') return title
+  return `投研会话 ${session.sessionId.slice(-6).toUpperCase()}`
+}
+
+const sessionRelativeTime = (session: SessionSummary) =>
+  formatRelativeTime(session.lastAt) || '刚刚'
+
+const sessionFullTime = (session: SessionSummary) =>
+  formatTime(session.lastAt, sessionRelativeTime(session), true)
 
 const resizeComposer = async () => {
   await nextTick()
@@ -121,12 +136,21 @@ const copyMessage = async (content: string, index: number) => {
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-96px)] gap-3">
+  <div class="flex h-[calc(100vh-96px)] gap-2.5">
     <!-- ========== 左侧：会话列表 ========== -->
-    <section class="hidden w-[220px] shrink-0 flex-col rounded-2xl border border-slate-200/80 bg-white xl:flex">
-      <div class="border-b border-slate-100 p-3">
+    <section class="hidden w-[240px] shrink-0 flex-col overflow-hidden rounded-[12px] border border-white/65 bg-[rgba(255,255,255,0.72)] shadow-sm backdrop-blur-2xl xl:flex">
+      <div class="border-b border-slate-100 px-3 py-2.5">
+        <div class="mb-2 flex items-center justify-between">
+          <div class="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+            <History class="h-3.5 w-3.5" />
+            历史会话
+          </div>
+          <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] tabular-nums text-slate-500">
+            {{ sessions.length }}
+          </span>
+        </div>
         <button
-          class="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 text-[13px] font-medium text-white shadow-sm transition-all duration-200 hover:shadow-md hover:shadow-indigo-200 active:scale-[0.97]"
+          class="flex h-8 w-full items-center justify-center gap-2 rounded-[10px] bg-slate-950 text-[12px] font-medium text-white shadow-sm transition-all duration-200 hover:bg-slate-800 active:scale-[0.97]"
           @click="emit('create')"
         >
           <Plus class="h-4 w-4" />
@@ -134,29 +158,36 @@ const copyMessage = async (content: string, index: number) => {
         </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-2 custom-scrollbar">
+      <div class="flex-1 overflow-y-auto p-1.5 custom-scrollbar">
         <button
           v-for="session in pagedSessions"
           :key="session.sessionId"
-          class="group mb-1 w-full rounded-xl px-3 py-2.5 text-left transition-all duration-200"
+          class="group mb-1 w-full rounded-[10px] border px-2.5 py-2 text-left transition-all duration-200"
           :class="
             currentSessionId === session.sessionId
-              ? 'bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100'
-              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+              ? 'border-slate-200 bg-white text-slate-950 shadow-sm'
+              : 'border-transparent text-slate-500 hover:border-slate-100 hover:bg-white/70 hover:text-slate-700'
           "
+          :title="`${sessionTitle(session)} · ${sessionFullTime(session)}`"
           @click="emit('loadSession', session.sessionId)"
         >
-          <div class="flex items-start gap-2.5">
+          <div class="flex items-start gap-2">
             <MessageSquare
               class="mt-0.5 h-3.5 w-3.5 shrink-0 transition-colors"
-              :class="currentSessionId === session.sessionId ? 'text-indigo-400' : 'text-slate-300 group-hover:text-slate-400'"
+              :class="currentSessionId === session.sessionId ? 'text-slate-900' : 'text-slate-300 group-hover:text-slate-400'"
             />
             <div class="min-w-0 flex-1">
-              <div class="truncate text-[12px] font-medium leading-tight">
-                {{ session.title || '新会话' }}
+              <div class="truncate text-[12px] font-semibold leading-5">
+                {{ sessionTitle(session) }}
               </div>
-              <div class="mt-1 text-[11px] text-slate-400">
-                {{ formatTime(session.lastAt) }}
+              <div class="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-slate-400">
+                <span class="inline-flex min-w-0 items-center gap-1">
+                  <Clock3 class="h-3 w-3 shrink-0" />
+                  <span class="truncate">{{ sessionRelativeTime(session) }}</span>
+                </span>
+                <span class="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 tabular-nums text-slate-500">
+                  {{ session.turnCount || 1 }} 轮
+                </span>
               </div>
             </div>
           </div>
@@ -166,7 +197,7 @@ const copyMessage = async (content: string, index: number) => {
           v-if="!sessions.length"
           class="px-2 py-6 text-center"
         >
-          <MessageSquare class="mx-auto mb-2 h-8 w-8 text-slate-200" />
+          <MessageSquare class="mx-auto mb-2 h-7 w-7 text-slate-200" />
           <p class="text-[12px] leading-5 text-slate-400">
             还没有历史会话
           </p>
@@ -184,11 +215,11 @@ const copyMessage = async (content: string, index: number) => {
     </section>
 
     <!-- ========== 右侧：对话区 ========== -->
-    <section class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+    <section class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[12px] border border-white/65 bg-[rgba(255,255,255,0.82)] shadow-sm backdrop-blur-xl">
       <!-- 顶栏 -->
-      <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+      <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div class="flex items-center gap-3">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm shadow-indigo-200">
+          <div class="flex h-7.5 w-7.5 items-center justify-center rounded-[10px] bg-slate-950 text-white">
             <Sparkles class="h-4 w-4" />
           </div>
           <div>
@@ -201,7 +232,7 @@ const copyMessage = async (content: string, index: number) => {
           </div>
         </div>
         <button
-          class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-500 transition-all duration-150 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 active:scale-[0.97]"
+          class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-500 transition-all duration-150 hover:border-slate-300 hover:bg-white hover:text-slate-700 active:scale-[0.97]"
           @click="emit('openHandoffs')"
         >
           <Ticket class="h-3.5 w-3.5" />
@@ -225,7 +256,7 @@ const copyMessage = async (content: string, index: number) => {
           class="mx-auto flex w-full max-w-[520px] flex-col items-center px-4 text-center"
         >
           <div class="relative mb-4">
-            <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
+            <div class="flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm">
               <Bot class="h-8 w-8" />
             </div>
             <div class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-400 shadow-sm">
@@ -244,11 +275,14 @@ const copyMessage = async (content: string, index: number) => {
             <button
               v-for="item in suggestions"
               :key="item.text"
-              class="group flex w-full items-center gap-3 rounded-xl border border-slate-200/80 bg-white/80 px-4 py-3 text-left backdrop-blur-sm transition-all duration-200 hover:border-indigo-200 hover:bg-white hover:shadow-md hover:shadow-indigo-50 hover:-translate-y-0.5 active:scale-[0.99]"
+              class="group flex w-full items-center gap-3 rounded-[10px] border border-slate-200/80 bg-white/70 px-3.5 py-2.5 text-left backdrop-blur-sm transition-all duration-200 hover:border-slate-300 hover:bg-white active:scale-[0.99]"
               @click="useSuggestion(item.text)"
             >
-              <span class="text-[18px] transition-transform duration-200 group-hover:scale-110">{{ item.icon }}</span>
-              <span class="text-[13px] text-slate-600 group-hover:text-indigo-700">{{ item.text }}</span>
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-slate-100 text-slate-600 transition-colors duration-200 group-hover:bg-slate-950 group-hover:text-white">
+                <component :is="item.icon" class="h-3.5 w-3.5" />
+              </span>
+              <span class="min-w-0 flex-1 truncate text-[13px] text-slate-600 group-hover:text-slate-950">{{ item.text }}</span>
+              <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">{{ item.label }}</span>
             </button>
           </div>
         </div>
@@ -272,7 +306,7 @@ const copyMessage = async (content: string, index: number) => {
               <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-white shadow-sm">
                 <UserRound class="h-3.5 w-3.5" />
               </div>
-              <div class="rounded-2xl rounded-br-md bg-slate-800 px-4 py-2.5 text-[13px] leading-6 text-white shadow-sm">
+              <div class="rounded-[16px] rounded-br-md bg-slate-800 px-4 py-2.5 text-[13px] leading-6 text-white shadow-sm">
                 {{ message.content }}
               </div>
             </div>
@@ -282,7 +316,7 @@ const copyMessage = async (content: string, index: number) => {
               v-else
               class="flex w-full max-w-[85%] items-start gap-2.5"
             >
-              <div class="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm shadow-indigo-200">
+              <div class="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-slate-950 text-white shadow-sm">
                 <Bot class="h-3.5 w-3.5" />
               </div>
 
@@ -297,7 +331,7 @@ const copyMessage = async (content: string, index: number) => {
                     @click="message.showThoughts = !message.showThoughts"
                   >
                     <span class="flex items-center gap-1.5">
-                      <Sparkles class="h-3 w-3 text-indigo-400" />
+                      <Sparkles class="h-3 w-3 text-amber-500" />
                       思考过程（{{ message.thoughts.length }} 步）
                     </span>
                     <component
@@ -327,13 +361,13 @@ const copyMessage = async (content: string, index: number) => {
                 <!-- 回答内容 -->
                 <div class="group relative">
                   <div
-                    class="markdown-body rounded-2xl rounded-tl-md border border-slate-100 bg-white px-4 py-3 text-[13px] leading-7 shadow-sm"
+                  class="markdown-body rounded-[12px] rounded-tl-md border border-slate-100 bg-[rgba(255,255,255,0.92)] px-4 py-3 text-[13px] leading-7 shadow-sm"
                     v-html="renderMarkdown(message.content || (isStreaming && index === messages.length - 1 ? '正在生成回答...' : ''))"
                   />
                   <!-- 复制按钮 -->
                   <button
                     v-if="message.content && !isStreaming"
-                    class="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 opacity-0 shadow-sm transition-all duration-200 hover:border-slate-300 hover:text-slate-600 group-hover:opacity-100"
+                    class="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-400 opacity-0 shadow-sm transition-all duration-200 hover:border-slate-300 hover:text-slate-600 group-hover:opacity-100"
                     :class="copiedIndex === index ? 'border-emerald-300 text-emerald-500' : ''"
                     @click="copyMessage(message.content, index)"
                   >
@@ -348,10 +382,10 @@ const copyMessage = async (content: string, index: number) => {
       </div>
 
       <!-- 输入区 -->
-      <div class="border-t border-slate-100 bg-gradient-to-b from-slate-50/50 to-white px-5 py-4">
+      <div class="border-t border-slate-100 bg-[rgba(255,255,255,0.48)] px-4 py-3.5 backdrop-blur-xl">
         <div class="mx-auto max-w-[860px]">
           <div
-            class="flex items-end gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm transition-all duration-200 focus-within:border-indigo-300 focus-within:shadow-md focus-within:shadow-indigo-50"
+            class="flex items-end gap-2 rounded-[12px] border border-slate-200 bg-[rgba(255,255,255,0.9)] px-4 py-2.5 shadow-sm transition-all duration-200 focus-within:border-slate-300"
           >
             <textarea
               ref="composerRef"
@@ -367,7 +401,7 @@ const copyMessage = async (content: string, index: number) => {
               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
               :class="
                 draft.trim() && !isStreaming
-                  ? 'bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-sm shadow-indigo-200 hover:shadow-md hover:shadow-indigo-300 active:scale-95'
+                  ? 'bg-slate-950 text-white shadow-sm hover:bg-slate-800 active:scale-95'
                   : 'bg-slate-100 text-slate-400'
               "
               :disabled="!draft.trim() || isStreaming"
@@ -378,14 +412,14 @@ const copyMessage = async (content: string, index: number) => {
           </div>
           <div class="mt-2 flex items-center justify-between px-1">
             <span class="text-[11px] text-slate-400">
-              {{ isStreaming ? '⚡ 正在生成回答...' : 'Enter 发送 · Shift + Enter 换行' }}
+              {{ isStreaming ? '正在生成回答...' : 'Enter 发送 · Shift + Enter 换行' }}
               <span v-if="draft.length > 0" class="ml-2 text-slate-300">{{ draft.length }} 字</span>
             </span>
             <span
               v-if="isStreaming"
-              class="flex items-center gap-1.5 text-[11px] text-indigo-500"
+              class="flex items-center gap-1.5 text-[11px] text-emerald-600"
             >
-              <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
+              <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               实时生成中
             </span>
           </div>

@@ -7,6 +7,7 @@ LangGraph 的条件边通过这些函数决定下一步走哪个节点。
 import re
 from typing import Literal
 
+from app.core.logger import logger
 from app.graph.state import AgentState, _latest_user_query
 
 
@@ -30,9 +31,17 @@ def route_data_source(state: AgentState) -> Literal["parallel", "legacy"]:
     role = state.get("role", "normal")
     user_query = _latest_user_query(state)
     has_stock_code = bool(re.search(r"(?<!\d)\d{6}(?!\d)", user_query))
+    route = "parallel" if role == "vip" and has_stock_code else "legacy"
+    logger.info(
+        "数据源路由 role=%s has_stock_code=%s route=%s query=%s",
+        role,
+        has_stock_code,
+        route,
+        user_query[:120],
+    )
 
     # VIP用户且问题涉及具体股票 → 走并行获取
-    if role == "vip" and has_stock_code:
+    if route == "parallel":
         return "parallel"
     # 其他情况走旧路径（保持兼容）
     return "legacy"

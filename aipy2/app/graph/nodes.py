@@ -68,11 +68,13 @@ async def route_intent_node(state: AgentState):
     try:
         route_result = await structured_llm.ainvoke(messages)
         use_kb = route_result.route == "use_kb"
+        logger.info("意图路由完成 route=%s reason=%s query=%s", route_result.route, route_result.reason, user_msg[:120])
     except Exception:
         # 降级：structured output 失败时用原始 LLM + 关键词兜底
         res = await llm.ainvoke(messages)
         decision = _message_text(res).strip().lower()
         use_kb = "use_kb" in decision and "no_kb" not in decision
+        logger.warning("意图路由结构化输出失败，已降级 decision=%s query=%s", decision[:120], user_msg[:120])
 
     # 返回的值会自动合并到 AgentState 这个大公文包里
     return {
@@ -169,35 +171,49 @@ async def search_node(state: AgentState):
     queries = state["queries"]
     user_query = _latest_user_query(state)
     role = state.get("role", "normal")
+    logger.info("进入检索节点 role=%s query=%s queries=%s", role, user_query[:120], queries[:3])
 
-    if role == "vip":
-        # VIP 用户：完整检索模式，获取更多资料和新闻
-        skill_result = await stock_analysis_skill.run(
-            StockAnalysisSkillInput(
-                query=user_query,
-                queries=queries,
-                top_k=3,
+    try:
+        if role == "vip":
+            # VIP 用户：完整检索模式，获取更多资料和新闻
+            skill_result = await stock_analysis_skill.run(
+                StockAnalysisSkillInput(
+                    query=user_query,
+                    queries=queries,
+                    top_k=3,
+                )
             )
-        )
-        return {
-            "knowledge": skill_result.knowledge,
-            "skill_context": skill_result.to_prompt_context(),
-            "step": "🔍 [VIP] 高级 Skill 正在编排检索与行情数据..."
-        }
-    else:
-        # 普通用户：精简检索模式，仅获取基础行情，跳过新闻/公告
-        skill_result = await stock_analysis_skill.run(
-            StockAnalysisSkillInput(
-                query=user_query,
-                queries=queries[:1],  # 普通用户只用第一个搜索词，减少调用
-                top_k=1,
+            step = "🔍 [VIP] 高级 Skill 正在编排检索与行情数据..."
+        else:
+            # 普通用户：精简检索模式，仅获取基础行情，跳过新闻/公告
+            skill_result = await stock_analysis_skill.run(
+                StockAnalysisSkillInput(
+                    query=user_query,
+                    queries=queries[:1],  # 普通用户只用第一个搜索词，减少调用
+                    top_k=1,
+                )
             )
-        )
+            step = "🔍 [基础] 正在查询基础行情数据..."
+    except Exception as exc:
+        logger.warning("检索节点执行失败，返回空知识等待兜底回答 role=%s error=%s", role, exc, exc_info=True)
         return {
-            "knowledge": skill_result.knowledge,
-            "skill_context": skill_result.to_prompt_context(),
-            "step": "🔍 [基础] 正在查询基础行情数据..."
+            "knowledge": "",
+            "skill_context": "",
+            "step": "⚠️ 检索节点执行失败，已进入兜底",
         }
+
+    logger.info(
+        "检索节点完成 role=%s has_knowledge=%s has_quote=%s symbol=%s",
+        role,
+        bool(skill_result.knowledge),
+        bool(skill_result.quote),
+        skill_result.symbol or "",
+    )
+    return {
+        "knowledge": skill_result.knowledge,
+        "skill_context": skill_result.to_prompt_context(),
+        "step": step,
+    }
 
 
 async def fetch_data_node(state: AgentState):

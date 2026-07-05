@@ -11,7 +11,6 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import java.time.Instant;
-import java.util.UUID;
 
 /**
  * ============================================================
@@ -84,9 +83,14 @@ public class PythonAiClientService {
      * @param role      用户角色（"normal" 或 "vip"），决定 Python 端使用哪套图流程
      * @return SSE 事件流（Flux 响应式类型）
      */
-    public Flux<ServerSentEvent<String>> streamChatSse(String message, Long userId, String sessionId, String role) {
+    public Flux<ServerSentEvent<String>> streamChatSse(
+            String message,
+            Long userId,
+            String sessionId,
+            String role,
+            String traceId
+    ) {
         // 生成本次请求的追踪 ID
-        String traceId = UUID.randomUUID().toString();
 
         return pythonAiWebClient.post()
                 // 目标 URL：Python 服务的 AI 聊天流接口
@@ -94,6 +98,7 @@ public class PythonAiClientService {
                 // 告诉 Python：我期望 SSE 格式的响应
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 // 请求体是 JSON 格式
+                .header("X-Trace-Id", traceId)
                 .contentType(MediaType.APPLICATION_JSON)
                 // 构造请求体：消息内容 + 线程ID + 追踪ID + 用户角色
                 .bodyValue(new PythonChatRequest(message, userId + ":" + sessionId, traceId, role))

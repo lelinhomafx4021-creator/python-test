@@ -41,7 +41,7 @@ async def post_chat(req: ChatRequest):
     # 如果上游没传 trace_id，就在这里自动创建一个，方便排查问题。
     trace_id = req.trace_id or str(uuid.uuid4())
     answer_text = ""
-    source = []
+    source = ""
 
     # 统一走 InvestorService 的事件流。
     # 这里的 run_investor_flow 不是一次性返回，而是"边算边吐事件"。
@@ -58,7 +58,7 @@ async def post_chat(req: ChatRequest):
         # stage == final_answer 表示大模型最终输出已完成。
         if evt["stage"] == "final_answer":
             answer_text = evt["data"]["answer"]
-            source = evt["data"]["source"]
+            source = evt["data"].get("source", "") or ""
 
     return ChatResponse(trace_id=trace_id, answer=answer_text, source=source)
 

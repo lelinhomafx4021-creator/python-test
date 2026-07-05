@@ -266,5 +266,6 @@ async def fetch_all_data_parallel(
         "financial": financial,
         "announcements": ann,
         "news": news,
+        "retrieval": retrieval,
         "symbol": symbol,
     }

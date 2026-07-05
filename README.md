@@ -1,269 +1,282 @@
-# AI Investor
+# 星策智投 AI Investor
 
-<p align="center">
-  <img src="./frontend/src/assets/hero.png" alt="AI Investor cover" width="100%" />
-</p>
+一个面向投资研究场景的全栈 AI 工作台。项目把行情数据、自选股、K 线图表、模拟交易、AI 投研问答、人工兜底工单和后台管理串成一条完整业务链路，不是单纯的大模型聊天 Demo。
 
-<p align="center">
-  面向投顾会员场景的 AI 原生投资工作台。<br />
-  它不是单点的聊天 Demo，而是一套把 <strong>会员体系、行情查询、自选股、AI 投研副驾、模拟交易、AI 转人工闭环</strong> 串起来的产品骨架。
-</p>
+![Vue 3](https://img.shields.io/badge/Vue-3-42b883)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-6db33f)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python-009688)
+![LangGraph](https://img.shields.io/badge/LangGraph-Agent-111827)
+![Redis](https://img.shields.io/badge/Redis-Cache-dc382d)
+![Postgres](https://img.shields.io/badge/Postgres-pgvector-336791)
 
-<p align="center">
-  <img alt="Java 21" src="https://img.shields.io/badge/Java-21-orange" />
-  <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.x-6DB33F" />
-  <img alt="Python" src="https://img.shields.io/badge/Python-FastAPI-3776AB" />
-  <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Vue_3-42B883" />
-  <img alt="AI" src="https://img.shields.io/badge/AI-LangGraph%20%2B%20RAG-blueviolet" />
-</p>
+## 项目预览
 
-## 项目亮点
+| K 线详情 | AI 投研助手 |
+| --- | --- |
+| ![K 线详情](docs/images/screenshots/kline-detail.png) | ![AI 投研助手](docs/images/screenshots/ai-assistant.png) |
 
-- 不是“接个大模型 API”的玩具项目，而是有完整业务边界的 AI 产品工作台。
-- 采用 `Java + Python` 双后端架构：Java 负责主业务真相与对外 API，Python 负责 Agent、流式问答、RAG 与模型编排。
-- 具备从 `AI 问答 -> 风险升级 -> 人工兜底工单 -> 回到原会话` 的完整闭环，适合展示 AI 应用在真实业务中的落地能力。
-- 同时覆盖 `身份/会员/配额/行情/自选/模拟交易/Agent/观测`，更像一个可持续迭代的产品底座，而不只是一个功能点。
-- 仓库包含可运行的前后端与中间件编排，支持本地一键启动和完整演示。
+## 为什么值得看
 
-## 面试官应该看什么
+- **不是套壳聊天页**：有用户、会员、行情、自选、模拟交易、AI 会话、人工工单、管理台等完整业务对象。
+- **Java + Python 分层清楚**：Java 网关负责稳定业务、鉴权、缓存和审计；Python 服务负责 LangGraph、RAG、工具调用和行情补充。
+- **前端有产品形态**：Vue 3 数据终端风格界面，包含高密度工作台、K 线图、AI 会话、后台管理。
+- **AI 链路可解释**：支持会话历史、traceId、检索增强、Tavily 联网检索兜底、低置信度人工兜底。
+- **工程化不是摆设**：Spring Security、Redis 登录态、Flyway/Alembic 迁移、RabbitMQ、Sentinel、Langfuse、冒烟测试和压测脚本都有对应职责。
 
-这个项目重点展示的不是“模型会聊天”，而是下面这些工程能力：
-
-- 业务建模能力：把 AI 能力放进会员投顾产品，而不是孤立地做聊天框。
-- 架构拆分能力：知道什么放 Java 主业务，什么放 Python AI 侧车。
-- AI 应用工程化：SSE 流式输出、RAG、LangGraph、多服务协作、AI 转人工。
-- 产品意识：从用户登录、行情查看、自选股、AI 投研到模拟交易，形成完整故事线。
-- 可观测与可运维：Langfuse、Sentinel、RabbitMQ、Redis、MySQL、pgvector 都已经纳入系统设计。
-
-## 核心能力
-
-### 1. 会员身份与配额
-
-- 用户资料与身份信息
-- 会员权益识别
-- 功能配额与调用限制
-
-### 2. 行情与自选股
-
-- 个股行情查询
-- 板块信息查询
-- 自选分组管理
-
-### 3. AI 投研副驾
-
-- 流式问答
-- 标题摘要
-- 行情解释
-- 后续可扩展 RAG / Agent 工作流
-
-### 4. 模拟交易
-
-- 模拟账户
-- 持仓与订单
-- 下单与撤单
-
-### 5. AI 转人工闭环
-
-- AI 无法稳定处理时触发升级
-- 生成人工工单
-- 工单可回到原始会话继续处理
-
-## 系统架构
+## 技术架构
 
 ```mermaid
 graph LR
-    A[Vue 3 Frontend] --> B[Java Gateway]
-    B --> C[Python AI Service]
-    B --> D[(MySQL)]
-    B --> E[(Redis)]
-    B --> F[RabbitMQ]
-    C --> G[(Postgres + pgvector)]
-    C --> H[Langfuse]
-    B --> I[Sentinel]
+    User["用户 / 管理员"] --> Frontend["Vue 3 + TypeScript 前端"]
+    Frontend --> Gateway["Spring Boot Java 网关"]
+    Gateway --> MySQL[("MySQL 业务库")]
+    Gateway --> Redis[("Redis 登录态 / 缓存")]
+    Gateway --> RabbitMQ[("RabbitMQ 异步消息")]
+    Gateway --> Sentinel["Sentinel 限流熔断"]
+    Gateway --> Python["FastAPI Python AI 服务"]
+    Python --> LangGraph["LangGraph Agent 工作流"]
+    Python --> PG[("Postgres + pgvector")]
+    Python --> Tools["AkShare / Tavily / 自定义工具"]
+    Python --> Langfuse["Langfuse 观测"]
 ```
 
-### 架构分工
+### 分层思路
 
-- `frontend`：Vue 3 工作台，承接登录、行情、自选、模拟交易、AI 会话与工单面板。
-- `java-ai-gateway`：主业务服务，负责身份、会员、行情、自选、模拟交易、AI 会话入口、人工工单等业务真相。
-- `aipy2`：Python AI 服务，负责模型调用、SSE 流式输出、标题生成、RAG / LangGraph 扩展。
-- `docker-compose.yml`：本地中间件编排，包括 MySQL、Redis、RabbitMQ、Postgres、Langfuse、Sentinel。
+| 层级 | 职责 |
+| --- | --- |
+| `frontend/` | 终端式工作台、宣传页、登录页、管理台、图表和 AI 会话展示 |
+| `java-ai-gateway/` | 登录鉴权、用户会员、行情缓存、自选股、模拟交易、工单、AI 请求代理 |
+| `aipy2/` | LangGraph 工作流、RAG 检索、联网搜索、行情工具、K 线数据、SSE 流式输出 |
+| `docker-compose.yml` | MySQL、Redis、RabbitMQ、Postgres/pgvector、Langfuse、Sentinel 本地编排 |
 
-## 技术栈
+## 核心功能
 
-### 后端
+### 投研工作台
 
-- Java 17
-- Spring Boot
-- MyBatis / MyBatis-Plus
-- FastAPI
-- LangGraph
+- 行情列表、股票搜索、自选股分组、K 线详情页。
+- ECharts K 线图，支持 MA/MACD/KDJ/RSI/BOLL 等技术指标。
+- 个股名称、价格、涨跌幅、成交额、更新时间等数据表格化展示。
+- 热点资讯、监控提醒、个人中心和会员状态。
 
-### 前端
+### AI 投研助手
 
-- Vue 3
-- TypeScript
+- 流式 AI 问答，前端使用 `fetch + ReadableStream` 消费 SSE。
+- 会话历史、自动标题、时间记录和多轮上下文。
+- RAG 本地检索和 Tavily 联网检索兜底。
+- 低置信度或需要人工判断时创建人工工单。
+- Java 网关统一处理登录态、用户身份、会员配额和审计字段。
 
-### 基础设施
+### 模拟交易
 
-- MySQL
-- Redis
-- RabbitMQ
-- Postgres + pgvector
-- Langfuse
-- Sentinel
+- 模拟账户、资金余额、持仓、委托、成交和资金流水。
+- 行情数据与交易页面联动，便于演示“看行情 -> 问 AI -> 做模拟决策”的闭环。
+
+### 后台管理
+
+- 用户、会员、AI 会话、人工工单、公告等后台视图。
+- 管理员可以处理人工兜底工单，让 AI 系统有运营闭环。
+
+## 关键链路
+
+### 登录鉴权
+
+1. 用户登录 Java 网关。
+2. Spring Security 校验账号密码。
+3. 网关签发 Bearer Token 并写入 Redis。
+4. 后续请求通过过滤器解析 Token，写入用户上下文。
+5. 业务接口继续按角色、会员和配额做权限控制。
+
+### AI 流式问答
+
+1. 前端携带 Bearer Token 发起 AI 请求。
+2. Java 网关注入 `userId / role / traceId / sessionId`。
+3. 网关调用 Python AI 服务的流式接口。
+4. Python 通过 LangGraph 执行改写、检索、工具调用、生成和评审。
+5. SSE 增量返回给前端，同时保存会话历史和审计信息。
+6. 回答质量不足时进入人工工单。
+
+### 行情与 K 线
+
+1. 前端请求 Java 网关行情接口。
+2. Java 优先读取 Redis 缓存和 MySQL 快照。
+3. 缓存未命中时调用 Python 行情工具。
+4. Python 通过 AkShare/外部数据源拉取行情和 K 线。
+5. Java 回写缓存，前端展示表格和图表。
+
+## 本地启动
+
+### 环境要求
+
+- JDK 21
+- Maven 3.9+
+- Node.js 18+
+- Python 3.11+
+- uv
+- Docker Desktop / Docker Engine
+
+### 1. 启动中间件
+
+```powershell
+cd ai-investor
+docker compose up -d mysql redis rabbitmq postgres langfuse sentinel-dashboard
+```
+
+### 2. 初始化 Python AI 服务
+
+```powershell
+cd aipy2
+copy .env.example .env
+uv sync
+uv run alembic upgrade head
+uv run python main.py
+```
+
+`aipy2/.env` 中需要按你的模型供应商补齐 API Key。Tavily、Langfuse 等能力没有配置时，相关链路会降级或不可用。
+
+### 3. 启动 Java 网关
+
+```powershell
+cd java-ai-gateway
+mvn spring-boot:run
+```
+
+默认网关地址：`http://127.0.0.1:8080`
+
+如果端口被占用，可以直接换端口：
+
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=18095"
+```
+
+### 4. 启动前端
+
+```powershell
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+如果 Java 网关换了端口：
+
+```powershell
+$env:VITE_PROXY_TARGET="http://127.0.0.1:18095"
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+## 常用地址
+
+| 服务 | 地址 |
+| --- | --- |
+| 前端工作台 | `http://127.0.0.1:5173` |
+| Java 网关 | `http://127.0.0.1:8080` |
+| Python AI 服务 | `http://127.0.0.1:8000` |
+| RabbitMQ 管理台 | `http://127.0.0.1:15672` |
+| Langfuse | `http://127.0.0.1:3000` |
+| Sentinel Dashboard | `http://127.0.0.1:8858` |
+
+## 演示数据
+
+基础迁移会初始化管理员账号：
+
+```text
+admin / 123456
+```
+
+初始化演示用户、会员、自选股、持仓、会话和工单：
+
+```powershell
+cd aipy2
+uv run python -m scripts.seed_demo_data
+```
+
+演示脚本会创建以下用户，默认密码均为 `123456`：
+
+```text
+investor_zhang
+investor_li
+investor_wang
+investor_chen
+investor_sun
+```
+
+## 测试与构建
+
+前端构建：
+
+```powershell
+cd frontend
+npm run build
+```
+
+Java 测试：
+
+```powershell
+cd java-ai-gateway
+mvn test
+```
+
+Python 测试：
+
+```powershell
+cd aipy2
+uv run pytest
+```
+
+冒烟检查：
+
+```powershell
+cd ai-investor
+python .\demo_smoke_test.py
+```
+
+压测示例：
+
+```powershell
+cd ai-investor
+python .\stress_test.py --concurrency 10 --requests 20 --markdown-out docs/PRESSURE_TEST_RESULT.md
+```
 
 ## 仓库结构
 
 ```text
-ai-investor/
-├─ frontend/              # Vue 3 前端工作台
-├─ java-ai-gateway/       # Java 主业务服务
-├─ aipy2/                 # Python AI 服务
-├─ data/                  # 本地数据与中间件挂载目录
-├─ logs/                  # 一键启动后的日志输出
-├─ docker-compose.yml     # 中间件编排
-├─ start_all.ps1          # Windows 本地一键启动脚本
-├─ ARCHITECTURE.md        # 架构深度说明
-└─ PROJECT_PLAN.md        # 一期规划说明
+.
+├── frontend/                 # Vue 3 前端：宣传页、工作台、管理台
+├── java-ai-gateway/          # Spring Boot 网关：业务、鉴权、交易、工单、AI 代理
+├── aipy2/                    # FastAPI + LangGraph：AI 工作流、RAG、行情工具
+├── docs/                     # 演示说明、工程文档、压测结果和截图
+├── docker-compose.yml        # 本地中间件编排
+├── demo_smoke_test.py        # 演示环境冒烟脚本
+├── stress_test.py            # 简单并发压测脚本
+└── README.md
 ```
 
-## 快速启动
+## 面试讲解建议
 
-推荐在 Windows PowerShell 下直接运行：
+可以按这个顺序讲：
 
-```powershell
-.\start_all.ps1
-```
+1. 先讲业务闭环：行情、自选、K 线、AI 投研、模拟交易、人工兜底、管理台。
+2. 再讲架构拆分：Java 做稳定业务网关，Python 做 AI 编排和工具调用。
+3. 重点解释为什么前端不直连大模型：鉴权、会员、限流、审计、人工兜底都需要统一入口。
+4. 展开 AI 链路：SSE 流式输出、LangGraph、RAG、联网检索、traceId 和 Langfuse 观测。
+5. 最后讲工程化：Redis 缓存、RabbitMQ 异步化、Flyway/Alembic 迁移、Sentinel 限流、冒烟和压测。
 
-脚本会自动完成：
+适合重点展开的技术问题：
 
-- 检查 `docker`、`java`、`node`、`npm`、`mvn`、Python 虚拟环境
-- 启动 `docker compose` 中间件
-- 启动 Python AI、Java Gateway、Frontend
-- 轮询健康检查
-- 输出访问地址、演示账号和日志目录
+- 为什么 `EventSource` 不适合需要认证 Header 的场景，所以使用 `fetch + ReadableStream`。
+- 为什么行情需要 Redis 短 TTL 缓存和 MySQL 快照兜底。
+- 为什么业务数据放 MySQL，而向量检索和 LangGraph checkpoint 放 Postgres/pgvector。
+- 为什么 AI 系统需要人工兜底，而不是让模型在低置信度时硬答。
+- Spring Security 改造后，如何保持 Controller 层的业务权限语义清晰。
 
-### 启动后可访问地址
+## 参考文档
 
-- 前端工作台：`http://127.0.0.1:5173`
-- Java 网关：`http://127.0.0.1:8080`
-- Python AI：`http://127.0.0.1:8000`
-- Langfuse：`http://127.0.0.1:3000`
-- Sentinel 控制台：`http://127.0.0.1:8858`
+- [架构说明](ARCHITECTURE.md)
+- [演示手册](docs/DEMO_RUNBOOK.md)
+- [功能清单](docs/FEATURES.md)
+- [工程化说明](docs/ENGINEERING.md)
+- [压测说明](docs/PRESSURE_TEST.md)
+- [压测结果](docs/PRESSURE_TEST_RESULT.md)
 
-### 默认演示账号
+## 说明
 
-- 用户名：`admin`
-- 密码：`123456`
-
-## 演示路线
-
-### 路线 1：AI 投研 + 转人工闭环
-
-1. 使用 `admin / 123456` 登录。
-2. 在 AI 会话页发起普通投研问题，观察 SSE 流式回答。
-3. 再输入“转人工”或触发高风险 / 不稳定场景。
-4. 打开人工工单面板，查看兜底工单。
-5. 点击工单返回原始会话，演示完整闭环。
-
-### 路线 2：会员终端工作台
-
-1. 登录后查看用户资料与会员信息。
-2. 查询个股行情与板块。
-3. 创建自选分组并添加股票。
-4. 初始化模拟账户并尝试下单。
-5. 结合 AI 问答与人工工单，展示完整产品故事线。
-
-## 页面预览
-
-推荐把截图统一放在 `docs/images/` 目录，再在 README 里引用。
-
-### 会员总览工作台
-
-<p align="center">
-  <img src="./docs/images/imag1e.png" alt="AI Investor dashboard" width="100%" />
-</p>
-
-这张图适合放在 README 里作为第一张产品截图，能直接体现：
-
-- 会员工作台首页
-- 行情与自选联动
-- 财经热点卡片
-- 模拟交易入口
-- AI 与人工工单并存的产品形态
-
-### 最简单的 Markdown 写法
-
-```md
-![登录页](./docs/images/login.png)
-```
-
-### 想控制图片宽度时，用 HTML
-
-```html
-<p align="center">
-  <img src="./docs/images/dashboard.png" alt="dashboard" width="900" />
-</p>
-```
-
-### 多图并排展示
-
-```html
-<p align="center">
-  <img src="./docs/images/chat.png" alt="chat" width="48%" />
-  <img src="./docs/images/watchlist.png" alt="watchlist" width="48%" />
-</p>
-```
-
-### 使用图片时的注意点
-
-- 路径尽量使用相对路径，比如 `./docs/images/xxx.png`
-- GitHub 上路径区分大小写，文件名要和实际一致
-- 目录里要真的提交图片文件，否则远程仓库不会显示
-- 演示图优先放登录页、AI 会话页、自选股页、模拟交易页、人工工单页
-
-## 核心接口
-
-<details>
-<summary>展开查看一期核心接口</summary>
-
-### 身份与会员
-
-- `GET /api/v1/users/me`
-- `GET /api/v1/memberships/me`
-- `GET /api/v1/quotas/me`
-
-### 行情与自选
-
-- `GET /api/v1/market/quotes?symbols=600519,000001`
-- `GET /api/v1/sectors`
-- `GET /api/v1/watchlists`
-- `POST /api/v1/watchlists`
-- `POST /api/v1/watchlists/{id}/items`
-- `DELETE /api/v1/watchlists/{id}/items/{itemId}`
-
-### 模拟交易
-
-- `GET /api/v1/paper/accounts/me`
-- `GET /api/v1/paper/accounts/{id}/positions`
-- `GET /api/v1/paper/accounts/{id}/orders`
-- `POST /api/v1/paper/orders`
-- `POST /api/v1/paper/orders/{id}/cancel`
-
-### AI 副驾
-
-- `POST /api/v1/ai/chat`
-- `POST /api/v1/ai/chat/stream`
-- `GET /api/v1/ai/handoff-tickets`
-
-</details>
-
-## 相关文档
-
-- [架构深度说明](./ARCHITECTURE.md)
-- [一期计划书](./PROJECT_PLAN.md)
-
-## 当前状态
-
-项目仍在持续迭代中，当前重点是把“AI 投顾会员终端一期”做成一个更完整、可演示、可扩展的工程样板。
+本项目用于学习、作品集和面试展示。行情、AI 分析和模拟交易结果仅用于技术演示，不构成任何投资建议。

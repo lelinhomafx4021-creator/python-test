@@ -1,9 +1,15 @@
 # 开发环境配置（启用 MyBatis SQL 日志）
+# ============================================================
+# 注意：此文件覆盖 application.yml 主配置的同名项
+# 默认值已对齐 Docker 中间件（mysql root/123456，rabbitmq admin/123456）
+# 如需自定义，通过环境变量注入而非改默认值：
+#   set DEV_MYSQL_USERNAME=xxx && mvn spring-boot:run
+# ============================================================
 spring:
   datasource:
     url: ${DEV_MYSQL_URL:jdbc:mysql://127.0.0.1:3306/ai_investor?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
-    username: ${DEV_MYSQL_USERNAME:}
-    password: ${DEV_MYSQL_PASSWORD:}
+    username: ${DEV_MYSQL_USERNAME:root}
+    password: ${DEV_MYSQL_PASSWORD:123456}
   data:
     redis:
       host: ${DEV_REDIS_HOST:127.0.0.1}
@@ -12,8 +18,8 @@ spring:
   rabbitmq:
     host: ${DEV_RABBITMQ_HOST:127.0.0.1}
     port: ${DEV_RABBITMQ_PORT:5672}
-    username: ${DEV_RABBITMQ_USERNAME:}
-    password: ${DEV_RABBITMQ_PASSWORD:}
+    username: ${DEV_RABBITMQ_USERNAME:admin}
+    password: ${DEV_RABBITMQ_PASSWORD:123456}
 
 mybatis-plus:
   configuration:

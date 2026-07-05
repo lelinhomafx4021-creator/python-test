@@ -18,7 +18,6 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -56,7 +55,6 @@ import java.util.UUID;
  */
 @Slf4j
 @RequiredArgsConstructor
-@CrossOrigin                                       // 允许前端跨域
 @Validated                                         // 启用参数校验
 @RestController                                    // REST 控制器
 @RequestMapping("/gateway/ai")                     // 接口前缀
@@ -134,6 +132,7 @@ public class AiGatewayController {
         // threadId = 会话线程标识（用于 LangGraph 的 checkpointer 持久化对话上下文）
         final String traceId = UUID.randomUUID().toString();
         String threadId = pythonAiClientService.buildThreadId(userId, finalSessionId);
+        log.info("AI stream start traceId={}, userId={}, sessionId={}", traceId, userId, finalSessionId);
 
         // ---------- 步骤 4：写入占位记录 ----------
         // answer 先写 "[思考中...]"，等 Python 返回 final_answer 时再回填
@@ -154,7 +153,7 @@ public class AiGatewayController {
         // ---------- 步骤 5：透传 SSE 事件流 ----------
         // 从 UserContext 获取用户角色，传递给 Python 端决定使用哪套图流程
         String userRole = UserContext.get() != null ? UserContext.get().getRole() : "normal";
-        return pythonAiClientService.streamChatSse(message, userId, finalSessionId, userRole)
+        return pythonAiClientService.streamChatSse(message, userId, finalSessionId, userRole, traceId)
                 // 对每个 SSE 事件做副处理
                 .doOnNext(sse -> {
                     try {
@@ -172,6 +171,7 @@ public class AiGatewayController {
                         if ("final_answer".equals(stage)) {
                             String answer = node.path("data").path("answer").asText("");
                             chatHistoryService.updateTurnAnswerByTraceId(traceId, answer);
+                            log.info("AI stream final_answer traceId={}, answerLength={}", traceId, answer.length());
                         } else if ("handoff".equals(stage)) {
                             JsonNode data = node.path("data");
                             String handoffReason = data.path("reason").asText("");
@@ -181,6 +181,7 @@ public class AiGatewayController {
                             // 2. 真正的人工交接事件，才会带 reason/summary。
                             // 所以这里要等关键信息齐了再建单，避免落一个“空原因工单”。
                             if (!handoffReason.isBlank() || !handoffSummary.isBlank()) {
+                                log.info("AI stream handoff traceId={}, reason={}", traceId, handoffReason);
                                 humanHandoffService.createTicketIfAbsent(
                                         traceId,
                                         userId,
@@ -196,7 +197,8 @@ public class AiGatewayController {
                     } catch (Exception e) {
                         log.debug("SSE 事件解析失败 traceId={}", traceId, e);
                     }
-                });
+                })
+                .doFinally(signalType -> log.info("AI stream finished traceId={}, signal={}", traceId, signalType));
     }
 
     /** 获取当前用户的会话列表，用于前端左侧边栏展示历史会话入口 */

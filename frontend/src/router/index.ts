@@ -20,6 +20,11 @@ const routes: import('vue-router').RouteRecordRaw[] = [
     component: () => import('../AppAdmin.vue'),
   },
   {
+    path: '/watchlist/kline/:symbol',
+    name: 'TerminalKline',
+    component: () => import('../AppTerminal.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'Terminal',
     component: () => import('../AppTerminal.vue'),
@@ -35,8 +40,6 @@ const router = createRouter({
   },
 })
 
-// 路由守卫：已登录用户访问宣传页 → 直接跳主页
-// 未登录用户访问终端路由 → 由 AppTerminal.vue 内部显示登录页
 router.beforeEach((to, _from, next) => {
   const hasToken = !!localStorage.getItem(TOKEN_KEY)
   if (to.meta.guest && hasToken) {

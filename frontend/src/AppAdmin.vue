@@ -34,7 +34,7 @@ const nav = computed<NavItem[]>(() => [
   { key: 'admin-tickets', label: '工单处理', count: store.adminTickets.length },
 ])
 
-const margin = computed(() => store.sidebarCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[260px]')
+const margin = computed(() => store.sidebarCollapsed ? 'lg:ml-[76px]' : 'lg:ml-[256px]')
 const activeAdminView = computed(() => (
   store.view === 'admin' || store.view === 'admin-tickets' ? store.view : 'admin'
 ))
@@ -163,7 +163,7 @@ const handleDeleteAnnouncement = async (id: number) => {
 
 const restoreAdminSession = async () => {
   if (!store.token) {
-    await goToUnifiedLogin('请先登录，系统会按账号等级自动进入对应终端')
+    await goToUnifiedLogin('请先登录，系统会按账号权限进入对应终端')
     return
   }
 
@@ -200,26 +200,16 @@ function closeUserMenu() {
 
 <template>
   <ToastNotification />
-  <main class="min-h-screen bg-[#f3f4f6] text-slate-900">
-    <div
-      v-if="store.loading"
-      class="flex min-h-screen items-center justify-center"
-    >
-      <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-3 shadow-sm">
-        <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-950" />
-        <span class="text-[13px] text-slate-500">正在恢复管理端状态...</span>
+  <main class="app-shell">
+    <div v-if="store.loading" class="flex min-h-screen items-center justify-center">
+      <div class="data-sheet-strong flex items-center gap-3 px-5 py-4">
+        <div class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-950" />
+        <span class="text-[13px] text-neutral-500">正在恢复管理台状态...</span>
       </div>
     </div>
 
-    <div
-      v-else-if="isAdminRole(store.user?.role)"
-      class="flex min-h-screen"
-    >
-      <div
-        v-if="store.sidebarOpen && !store.sidebarCollapsed"
-        class="fixed inset-0 z-30 bg-slate-950/20 lg:hidden"
-        @click="store.sidebarOpen = false"
-      />
+    <div v-else-if="isAdminRole(store.user?.role)" class="flex min-h-screen">
+      <div v-if="store.sidebarOpen && !store.sidebarCollapsed" class="fixed inset-0 z-30 bg-neutral-950/20 lg:hidden" @click="store.sidebarOpen = false" />
 
       <TerminalSidebar
         :active-view="store.view"
@@ -227,7 +217,7 @@ function closeUserMenu() {
         membership-label="管理员"
         app-badge="会员运营终端"
         app-title="管理后台"
-        app-description="集中处理用户、会员、VIP 审核与工单流转"
+        app-description="集中处理用户、会员、VIP 审核、公告和人工工单"
         :nav-items="nav"
         :is-open="store.sidebarOpen"
         :collapsed="store.sidebarCollapsed"
@@ -237,10 +227,7 @@ function closeUserMenu() {
         @logout="handleLogout"
       />
 
-      <div
-        class="min-w-0 flex-1 overflow-visible transition-[margin-left] duration-200"
-        :class="margin"
-      >
+      <div class="min-w-0 flex-1 transition-[margin-left] duration-200" :class="margin">
         <TerminalHeader
           :active-view="store.view"
           :auth-user="store.user!"
@@ -253,7 +240,7 @@ function closeUserMenu() {
           @logout="handleLogout"
         />
 
-        <div class="overflow-visible px-4 py-4 lg:px-6 lg:pb-6">
+        <div class="px-4 pb-5 pt-3 lg:px-5">
           <TerminalAdmin
             v-if="activeAdminView === 'admin'"
             :overview="store.adminOverview"
@@ -285,16 +272,11 @@ function closeUserMenu() {
       </div>
     </div>
 
-    <div
-      v-else
-      class="flex min-h-screen items-center justify-center px-6"
-    >
-      <div class="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-center shadow-sm">
-        <div class="text-[14px] font-medium text-slate-900">
-          正在跳转到统一登录入口
-        </div>
-        <div class="mt-1 text-[12px] text-slate-500">
-          系统会根据账号等级自动进入管理员、VIP 或普通用户终端。
+    <div v-else class="flex min-h-screen items-center justify-center px-6">
+      <div class="data-sheet-strong max-w-[420px] px-6 py-5 text-center">
+        <div class="text-[15px] font-semibold text-neutral-950">正在跳转到统一登录入口</div>
+        <div class="mt-2 text-[12px] leading-6 text-neutral-500">
+          系统会根据账号权限自动进入管理员、会员或普通用户终端。
         </div>
       </div>
     </div>

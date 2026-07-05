@@ -47,7 +47,7 @@ public class LoginUserVO {
     private String role;
 
     /**
-     * 登录成功后签发的 JWT token，后续请求放入 Authorization 头
+     * 登录成功后签发的 Bearer token，后续请求放入 Authorization 头
      * 即可完成身份认证，有效期由服务端控制。
      */
     private String token;

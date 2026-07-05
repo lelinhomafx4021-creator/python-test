@@ -1,31 +1,34 @@
 package com.aiinvestor.gateway.modules.identity.service;
 
+import com.aiinvestor.gateway.modules.shared.cache.RedisKeys;
+import com.aiinvestor.gateway.modules.shared.config.AppCacheProperties;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
-import org.springframework.mail.MailException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Duration;
 
 /**
- * 邮箱验证码服务。
+ * Email verification code service.
  */
 @Service
 public class EmailVerificationService {
 
-    private static final Duration CODE_TTL = Duration.ofMinutes(5);
-    private static final Duration COOLDOWN_TTL = Duration.ofSeconds(60);
     private static final String SCENE_REGISTER = "register";
 
     private final StringRedisTemplate stringRedisTemplate;
     private final EmailDeliveryService emailDeliveryService;
+    private final AppCacheProperties appCacheProperties;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public EmailVerificationService(StringRedisTemplate stringRedisTemplate,
-                                    EmailDeliveryService emailDeliveryService) {
+                                    EmailDeliveryService emailDeliveryService,
+                                    AppCacheProperties appCacheProperties) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.emailDeliveryService = emailDeliveryService;
+        this.appCacheProperties = appCacheProperties;
     }
 
     public void sendRegisterCode(String email) {
@@ -35,8 +38,16 @@ public class EmailVerificationService {
         }
 
         String code = generateCode();
-        stringRedisTemplate.opsForValue().set(codeKey(normalizedEmail), code, CODE_TTL);
-        stringRedisTemplate.opsForValue().set(cooldownKey(normalizedEmail), "1", COOLDOWN_TTL);
+        stringRedisTemplate.opsForValue().set(
+                codeKey(normalizedEmail),
+                code,
+                Duration.ofSeconds(appCacheProperties.getEmailCodeTtlSeconds())
+        );
+        stringRedisTemplate.opsForValue().set(
+                cooldownKey(normalizedEmail),
+                "1",
+                Duration.ofSeconds(appCacheProperties.getEmailCooldownTtlSeconds())
+        );
         try {
             emailDeliveryService.sendVerificationCode(normalizedEmail, code);
         } catch (MailException ex) {
@@ -68,10 +79,10 @@ public class EmailVerificationService {
     }
 
     private String codeKey(String email) {
-        return "email:code:" + SCENE_REGISTER + ":" + email;
+        return RedisKeys.emailCode(SCENE_REGISTER, email);
     }
 
     private String cooldownKey(String email) {
-        return "email:cooldown:" + SCENE_REGISTER + ":" + email;
+        return RedisKeys.emailCooldown(SCENE_REGISTER, email);
     }
 }

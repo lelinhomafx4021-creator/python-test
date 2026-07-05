@@ -1,14 +1,7 @@
 <script setup lang="ts">
-/**
- * TerminalOverview.vue — 会员总览视图
- * 包含：账户总览、会员配额、股票列表、财经热点、板块与自选、最近委托
- * 新增：NewsFeed 新闻组件、PortfolioPieChart 持仓饼图、EquityCurve 权益曲线
- */
-import { ArrowRight, Bot, ChartColumn, CreditCard, Megaphone, Radar, Star, Ticket } from 'lucide-vue-next'
-import { Crown } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
+import { ArrowRight, Bell, Bot, Crown, Megaphone, Newspaper, ShieldCheck, Star } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
-import { onMounted, ref, watch } from 'vue'
-import { formatMoney, formatNumber, formatPercent, formatTime } from '../utils/format'
 import axios from 'axios'
 import type {
   Announcement,
@@ -24,10 +17,10 @@ import type {
   SessionSummary,
   Watchlist,
 } from '../types/terminal'
+import { formatMoney, formatNumber, formatPercent, formatTime } from '../utils/format'
 import NewsFeed from '../components/NewsFeed.vue'
 import PortfolioPieChart from '../components/PortfolioPieChart.vue'
 import EquityCurve from '../components/EquityCurve.vue'
-
 import { API } from '../api/index'
 
 const router = useRouter()
@@ -51,24 +44,34 @@ const emit = defineEmits<{
   open: ['chat' | 'watchlist' | 'paper' | 'handoff' | 'news']
 }>()
 
+const enrichedNews = ref<NewsFeedItem[]>([])
+const equityData = ref<Array<{ date: string; equity: number; benchmark?: number }>>([])
+
+const headlineStats = computed(() => [
+  { label: '总资产', value: formatMoney(props.paperAccount?.totalAsset) },
+  {
+    label: '累计盈亏',
+    value: formatMoney(props.paperAccount?.totalPnl),
+    tone: (props.paperAccount?.totalPnl || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600',
+  },
+  { label: '持仓', value: `${props.positions.length}` },
+  { label: '工单', value: `${props.handoffCount}` },
+])
+
+const quickLinks = computed(() => [
+  { key: 'chat', title: 'AI', meta: `${props.sessions.length} 会话`, icon: Bot, action: () => emit('open', 'chat') },
+  { key: 'watchlist', title: '自选', meta: `${props.watchlists.length} 分组`, icon: Star, action: () => emit('open', 'watchlist') },
+  { key: 'news', title: '快讯', meta: `${props.hotNews.length} 条`, icon: Newspaper, action: () => emit('open', 'news') },
+])
+
 const quotaLabel = (code: string) => {
   const map: Record<string, string> = {
-    ai_chat_daily: '智能问答日额度',
+    ai_chat_daily: 'AI 问答额度',
     watchlist_count: '自选分组上限',
     alert_count: '提醒数量上限',
   }
   return map[code] || code
 }
-
-const infraCards = [
-  { key: 'sentinel', title: 'Sentinel', meta: '8858', icon: Radar, url: import.meta.env.VITE_SENTINEL_URL || 'http://127.0.0.1:8858' },
-  { key: 'langfuse', title: 'Langfuse', meta: '3000', icon: Bot, url: import.meta.env.VITE_LANGFUSE_URL || 'http://127.0.0.1:3000' },
-  { key: 'watchlist', title: '自选分组', meta: `${props.watchlists.length} 组`, icon: Star, url: '' },
-  { key: 'handoff', title: '人工工单', meta: `${props.handoffCount} 条`, icon: Ticket, url: '' },
-]
-
-/* ─── 增强版新闻列表（含情绪标签和VIP标识） ─── */
-const enrichedNews = ref<NewsFeedItem[]>([])
 
 const toNewsFeedItem = (item: HotNewsItem): NewsFeedItem => ({
   title: item.title,
@@ -85,41 +88,22 @@ const syncEnrichedNews = () => {
   enrichedNews.value = (props.hotNews || []).slice(0, 5).map(toNewsFeedItem)
 }
 
-/* ─── 权益曲线数据 ─── */
-interface EquityPoint {
-  date: string
-  equity: number
-  benchmark?: number
-}
-
-const equityData = ref<EquityPoint[]>([])
-const equityLoading = ref(false)
-
-/** 根据当前账户状态生成近30天模拟权益曲线 */
-const generateMockEquityCurve = (): EquityPoint[] => {
+const generateMockEquityCurve = () => {
   const currentAsset = props.paperAccount?.totalAsset || 100000
-  const baseAsset = currentAsset * 0.95 // 初始资金约为当前的95%
-  const points: EquityPoint[] = []
+  const baseAsset = currentAsset * 0.95
+  const points: Array<{ date: string; equity: number }> = []
   const now = new Date()
 
-  for (let i = 29; i >= 0; i--) {
+  for (let i = 29; i >= 0; i -= 1) {
     const date = new Date(now)
     date.setDate(date.getDate() - i)
     const dateStr = date.toISOString().slice(0, 10)
-
-    // 模拟从baseAsset逐渐增长到currentAsset
     const progress = (29 - i) / 29
     const base = baseAsset + (currentAsset - baseAsset) * progress
-    const noise = (Math.random() - 0.5) * base * 0.015
-    const equity = Math.max(base + noise, baseAsset * 0.9)
-
-    points.push({
-      date: dateStr,
-      equity: parseFloat(equity.toFixed(2)),
-    })
+    const noise = (Math.random() - 0.5) * base * 0.012
+    points.push({ date: dateStr, equity: parseFloat(Math.max(base + noise, baseAsset * 0.92).toFixed(2)) })
   }
 
-  // 最后一天使用真实值
   if (points.length > 0 && props.paperAccount?.totalAsset) {
     points[points.length - 1].equity = props.paperAccount.totalAsset
   }
@@ -128,11 +112,9 @@ const generateMockEquityCurve = (): EquityPoint[] => {
 }
 
 const fetchEquityData = async () => {
-  equityLoading.value = true
   try {
-    // 尝试从API获取每日资产快照
     if (props.paperAccount?.id) {
-      const res = await axios.get(`${API}/paper/accounts/${props.paperAccount.id}/daily-assets`, {})
+      const res = await axios.get(`${API}/paper/accounts/${props.paperAccount.id}/daily-assets`)
       const raw = res.data?.data || res.data || []
       if (Array.isArray(raw) && raw.length > 0) {
         equityData.value = raw.map((d: any) => ({
@@ -143,51 +125,21 @@ const fetchEquityData = async () => {
         return
       }
     }
-    // 如果API不可用，使用模拟数据
-    equityData.value = generateMockEquityCurve()
   } catch {
-    equityData.value = generateMockEquityCurve()
-  } finally {
-    equityLoading.value = false
+    // fallback to demo curve
   }
+  equityData.value = generateMockEquityCurve()
 }
 
-/* ─── 将持仓转为饼图所需格式（含板块信息） ─── */
-const piePositions = ref<Array<{
-  symbol: string
-  name: string
-  marketValue: number
-  sectorName?: string
-}>>([])
+const positionPie = computed(() => props.positions.map((position) => ({
+  name: position.name || position.symbol,
+  value: position.marketValue || 0,
+})))
 
-const buildPieData = () => {
-  // 使用板块列表进行简单映射
-  const sectorMap = new Map<string, string>()
-  for (const s of props.sectors) {
-    sectorMap.set(s.sectorCode, s.sectorName)
-  }
+const topWatchlist = computed(() => props.watchlists.slice(0, 2))
+const topSectors = computed(() => props.sectors.slice(0, 8))
 
-  piePositions.value = props.positions.map((p) => ({
-    symbol: p.symbol,
-    name: p.name,
-    marketValue: p.marketValue || 0,
-    sectorName: sectorMap.get(p.symbol) || guessSector(p.symbol),
-  }))
-}
-
-/** 根据股票代码猜测板块（简化版） */
-const guessSector = (symbol: string): string => {
-  const prefix = symbol.slice(0, 3)
-  if (prefix === '600' || prefix === '601' || prefix === '603') return '沪市主板'
-  if (prefix === '000' || prefix === '001') return '深市主板'
-  if (prefix === '300' || prefix === '301') return '创业板'
-  if (prefix === '688') return '科创板'
-  return '其他'
-}
-
-/* ─── 生命周期 ─── */
 onMounted(async () => {
-  buildPieData()
   syncEnrichedNews()
   await fetchEquityData()
 })
@@ -197,446 +149,221 @@ watch(() => props.hotNews, syncEnrichedNews, { deep: true, immediate: true })
 
 <template>
   <div class="space-y-3">
-    <!-- 系统公告横幅 -->
-    <div
-      v-if="announcements.length"
-      class="rounded-2xl border border-blue-200 bg-blue-50/60 px-5 py-3"
-    >
-      <div class="flex items-center gap-2">
-        <Megaphone class="h-4 w-4 shrink-0 text-blue-600" />
+    <div v-if="announcements.length" class="data-sheet overflow-hidden">
+      <div class="flex items-center gap-3 px-3 py-2">
+        <Megaphone class="h-4 w-4 text-[#b9822f]" />
         <div class="min-w-0 flex-1 overflow-hidden">
-          <div class="flex animate-marquee gap-8 whitespace-nowrap">
-            <span
-              v-for="ann in announcements"
-              :key="ann.id"
-              class="inline-flex items-center gap-2 text-[13px]"
-            >
-              <span
-                class="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
-                :class="{
-                  'bg-blue-100 text-blue-700': ann.type === 'notice',
-                  'bg-amber-100 text-amber-700': ann.type === 'maintenance',
-                  'bg-red-100 text-red-700': ann.type === 'urgent',
-                }"
-              >{{ ann.type === 'notice' ? '通知' : ann.type === 'maintenance' ? '维护' : '紧急' }}</span>
-              <span class="font-medium text-slate-800">{{ ann.title }}</span>
-              <span class="text-slate-500">{{ ann.content }}</span>
+          <div class="flex animate-marquee gap-8 whitespace-nowrap text-[12px] text-neutral-600">
+            <span v-for="ann in announcements" :key="ann.id" class="inline-flex items-center gap-2">
+              <span class="badge-neutral">{{ ann.type }}</span>
+              <span class="font-medium text-neutral-950">{{ ann.title }}</span>
+              <span>{{ ann.content }}</span>
             </span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- VIP 升级横幅（非VIP用户显示） -->
-    <div
-      v-if="!membership || membership.planCode !== 'vip'"
-      class="rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/[0.06] to-orange-500/[0.04] px-5 py-4"
-    >
-      <div class="flex items-center justify-between gap-4">
+    <div v-if="!membership || membership.planCode !== 'vip'" class="data-sheet px-3 py-2">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-            <Crown class="h-5 w-5 text-amber-500" />
-          </div>
+          <Crown class="h-4 w-4 text-[#b9822f]" />
           <div>
-            <div class="text-[14px] font-semibold text-slate-900">
-              升级专业版，解锁完整 AI 投研能力
-            </div>
-            <div class="mt-0.5 text-[12px] text-slate-500">
-              无限 AI 问答 · 深度财务分析 · 并行数据引擎 · 优先工单响应
-            </div>
+            <div class="text-[13px] font-semibold text-neutral-950">升级专业版</div>
+            <div class="text-[11px] text-neutral-500">提高额度，开放会员审核与协同能力。</div>
           </div>
         </div>
-        <button
-          class="shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-all duration-150 hover:brightness-110 active:scale-[0.97]"
-          @click="router.push('/vip-apply')"
-        >
-          立即升级
-        </button>
+        <button class="secondary-button !min-h-8" @click="router.push('/vip-apply')">升级</button>
       </div>
     </div>
 
-    <section class="grid gap-3 xl:grid-cols-[1.45fr_0.75fr]">
-      <div class="rounded-2xl border border-indigo-200/50 bg-gradient-to-br from-white to-indigo-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-indigo-300/50">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <div class="text-[11px] text-slate-400">
-              账户总览
-            </div>
-            <div class="mt-1 text-[26px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">
-              {{ formatMoney(paperAccount?.totalAsset) }}
-            </div>
-            <div class="mt-0.5 text-[11px]" :class="(paperAccount?.totalPnl || 0) >= 0 ? 'text-rose-500' : 'text-emerald-500'">
-              {{ (paperAccount?.totalPnl || 0) >= 0 ? '↑' : '↓' }} {{ formatMoney(Math.abs(paperAccount?.totalPnl || 0)) }}
-            </div>
-          </div>
-          <button
-            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-white hover:shadow-sm active:scale-[0.98]"
-            @click="emit('open', 'paper')"
-          >
-            进入交易
-            <ArrowRight class="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div class="mt-3 grid gap-2 md:grid-cols-4">
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
-            <div class="text-[11px] text-slate-400">
-              可用资金
-            </div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">
-              {{ formatMoney(paperAccount?.cashBalance) }}
-            </div>
-          </div>
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
-            <div class="text-[11px] text-slate-400">
-              累计盈亏
-            </div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums transition-colors duration-300" :class="(paperAccount?.totalPnl || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
-              {{ formatMoney(paperAccount?.totalPnl) }}
-            </div>
-          </div>
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
-            <div class="text-[11px] text-slate-400">
-              持仓数量
-            </div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">
-              {{ positions.length }}
-            </div>
-          </div>
-          <div class="rounded-xl bg-slate-50/80 px-3 py-2.5 transition-all duration-200 hover:bg-white hover:shadow-sm hover:scale-[1.02]">
-            <div class="text-[11px] text-slate-400">
-              会话数量
-            </div>
-            <div class="mt-1 text-[16px] font-semibold tabular-nums text-slate-950 transition-colors duration-300">
-              {{ sessions.length }}
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-3 overflow-hidden rounded-xl border border-slate-200 transition-colors duration-300">
-          <div class="grid grid-cols-[88px_1fr_100px_90px_120px] bg-slate-50/80 px-3 py-2 text-[11px] font-medium text-slate-500 transition-colors duration-300">
-            <div>代码</div>
-            <div>名称</div>
-            <div class="text-right">
-              最新价
-            </div>
-            <div class="text-right">
-              涨跌幅
-            </div>
-            <div class="text-right">
-              浮盈
-            </div>
-          </div>
-
-          <div v-if="positions.length">
-            <div
-              v-for="position in positions"
-              :key="position.id"
-              class="grid grid-cols-[88px_1fr_100px_90px_120px] items-center border-t border-slate-50 px-3 py-2 text-[12px] transition-colors duration-100 hover:bg-slate-50/60"
-            >
-              <div class="font-medium text-slate-900 transition-colors duration-300">
-                {{ position.symbol }}
-              </div>
-              <div class="truncate text-slate-600 transition-colors duration-300">
-                {{ position.name }}
-              </div>
-              <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">
-                {{ formatNumber(position.latestPrice) }}
-              </div>
-              <div
-                class="text-right tabular-nums"
-                :class="(position.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'"
-              >
-                {{ formatPercent(position.changePercent) }}
-              </div>
-              <div
-                class="text-right tabular-nums"
-                :class="position.floatingPnl >= 0 ? 'text-rose-600' : 'text-emerald-600'"
-              >
-                {{ formatMoney(position.floatingPnl) }}
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-else
-            class="px-3 py-4 text-center text-[12px] text-slate-400"
-          >
-            当前没有持仓。
-          </div>
-        </div>
-      </div>
-
-      <div class="rounded-2xl border border-amber-200/50 bg-gradient-to-br from-white to-amber-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <div class="text-[11px] text-amber-600">
-              会员与配额
-            </div>
-            <div class="mt-1 text-[22px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">
-              {{ membership?.planName || '普通版' }}
-            </div>
-          </div>
-          <div class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors duration-300">
-            {{ membership?.planCode === 'vip' ? '会员版' : '普通版' }}
-          </div>
-        </div>
-
-        <div class="mt-3 space-y-2">
-          <div
-            v-for="quota in quotas"
-            :key="quota.featureCode"
-            class="rounded-xl border border-slate-200 px-3 py-2.5 transition-all duration-150 hover:border-slate-300 hover:shadow-sm"
-          >
-            <div class="flex items-center justify-between gap-3 text-[12px]">
-              <div class="font-medium text-slate-800 transition-colors duration-300">
-                {{ quotaLabel(quota.featureCode) }}
-              </div>
-              <div class="tabular-nums text-slate-500 transition-colors duration-300">
-                {{ quota.usedCount }} / {{ quota.limitCount }}
-              </div>
-            </div>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 transition-colors duration-300">
-              <div
-                class="h-1.5 rounded-full bg-slate-900 transition-all duration-500 ease-out"
-                :style="{ width: `${Math.min(100, (quota.usedCount / Math.max(1, quota.limitCount)) * 100)}%` }"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-3 grid grid-cols-2 gap-2">
-          <a
-            v-for="card in infraCards"
-            :key="card.key"
-            :href="card.url || undefined"
-            :target="card.url ? '_blank' : undefined"
-            rel="noreferrer"
-            class="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 transition-all duration-150 hover:border-slate-300 hover:bg-white hover:shadow-sm"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <component
-                :is="card.icon"
-                class="h-4 w-4 text-slate-500"
-              />
-              <div class="text-[11px] tabular-nums text-slate-400">{{ card.meta }}</div>
-            </div>
-            <div class="mt-2 text-[12px] font-medium text-slate-900 transition-colors duration-300">{{ card.title }}</div>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <!-- 第二行：股票列表 + 新闻Feed -->
-    <section class="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-      <div class="rounded-2xl border border-emerald-200/50 bg-gradient-to-br from-white to-emerald-50/20 shadow-sm transition-all duration-300 hover:shadow-md">
-        <div class="flex items-center justify-between border-b border-emerald-100/50 px-5 py-4 transition-colors duration-300">
-          <div class="flex items-center gap-2">
-            <ChartColumn class="h-4 w-4 text-emerald-500" />
+    <section class="data-sheet-strong overflow-hidden">
+      <div class="grid gap-0 xl:grid-cols-[1fr_320px]">
+        <div class="border-b border-neutral-200 p-3 xl:border-b-0 xl:border-r">
+          <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">
-                市场脉搏
+              <div class="badge-brand">工作台</div>
+              <div class="mt-2 text-[24px] font-semibold tracking-tight text-neutral-950">{{ formatMoney(paperAccount?.totalAsset) }}</div>
+              <div class="mt-1 text-[12px]" :class="(paperAccount?.totalPnl || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                {{ formatMoney(paperAccount?.totalPnl) }} 累计盈亏
               </div>
-              <div class="text-[11px] text-slate-400">
-                直接看价格、涨跌和成交额
-              </div>
             </div>
+            <button class="secondary-button" @click="emit('open', 'paper')">
+              交易终端
+              <ArrowRight class="h-4 w-4" />
+            </button>
           </div>
-          <button
-            class="text-[12px] text-slate-500 transition-all duration-150 hover:text-slate-900 active:scale-[0.98]"
-            @click="emit('open', 'watchlist')"
-          >
-            查看自选
-          </button>
-        </div>
 
-        <div class="grid grid-cols-[80px_minmax(80px,1fr)_90px_80px_90px_70px_80px] bg-slate-50/80 px-4 py-2 text-[11px] font-medium text-slate-500 transition-colors duration-300">
-          <div>代码</div>
-          <div>名称</div>
-          <div class="text-right">
-            最新价
+          <div class="mt-3 grid gap-2 md:grid-cols-4">
+            <div v-for="item in headlineStats" :key="item.label" class="metric-card">
+              <div class="metric-label">{{ item.label }}</div>
+              <div class="metric-value" :class="item.tone">{{ item.value }}</div>
+            </div>
           </div>
-          <div class="text-right">
-            涨跌幅
-          </div>
-          <div class="text-right">
-            成交额
-          </div>
-          <div class="text-right">
-            振幅
-          </div>
-          <div class="text-right">
-            更新时间
-          </div>
-        </div>
 
-        <div>
-          <div
-            v-for="quote in quotes"
-            :key="quote.symbol"
-            class="grid grid-cols-[80px_minmax(80px,1fr)_90px_80px_90px_70px_80px] items-center border-t border-slate-50 px-4 py-2 text-[12px] transition-colors duration-100 hover:bg-slate-50/60"
-          >
-            <div class="font-medium text-slate-900 transition-colors duration-300">
-              {{ quote.symbol }}
-            </div>
-            <div class="whitespace-nowrap text-slate-600 transition-colors duration-300">
-              {{ quote.name }}
-            </div>
-            <div class="text-right tabular-nums text-slate-900 transition-colors duration-300">
-              {{ formatNumber(quote.lastPrice) }}
-            </div>
-            <div
-              class="text-right tabular-nums"
-              :class="(quote.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'"
+          <div class="mt-3 grid gap-2 sm:grid-cols-3">
+            <button
+              v-for="item in quickLinks"
+              :key="item.key"
+              class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white/60 px-3 py-2 text-left hover:bg-white"
+              @click="item.action"
             >
-              {{ formatPercent(quote.changePercent) }}
-            </div>
-            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">
-              {{ formatNumber((quote.turnover || 0) / 100000000) }} 亿
-            </div>
-            <div class="text-right tabular-nums text-slate-500 transition-colors duration-300">
-              {{ formatNumber(quote.amplitude) }}%
-            </div>
-            <div class="text-right text-[11px] tabular-nums text-slate-400">
-              {{ formatTime(quote.quoteTime) }}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- NewsFeed 新闻组件 -->
-      <div>
-        <NewsFeed :items="enrichedNews" />
-      </div>
-    </section>
-
-    <!-- 第三行：持仓饼图 + 原有热点板块 -->
-    <section class="grid gap-3 xl:grid-cols-[1fr_1fr]">
-      <!-- 持仓分布饼图 -->
-      <PortfolioPieChart
-        :items="positions.map(p => ({
-          name: guessSector(p.symbol),
-          value: p.marketValue || 0,
-        }))"
-      />
-
-      <div class="rounded-2xl border border-violet-200/50 bg-gradient-to-br from-white to-violet-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
-        <div class="flex items-center gap-2">
-          <Star class="h-4 w-4 text-violet-500" />
-          <div>
-            <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">
-              板块与自选
-            </div>
-            <div class="text-[11px] text-slate-400">
-              后端板块列表和自选分组都已接入
-            </div>
+              <div class="flex items-center gap-2">
+                <component :is="item.icon" class="h-4 w-4 text-neutral-500" />
+                <div>
+                  <div class="text-[12px] font-semibold text-neutral-950">{{ item.title }}</div>
+                  <div class="text-[10px] text-neutral-500">{{ item.meta }}</div>
+                </div>
+              </div>
+              <ArrowRight class="h-3.5 w-3.5 text-neutral-400" />
+            </button>
           </div>
         </div>
 
-        <div class="mt-3 flex flex-wrap gap-1.5">
-          <span
-            v-for="(sector, idx) in sectors.slice(0, 8)"
-            :key="sector.sectorCode"
-            class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-200 hover:scale-105"
-            :class="idx % 3 === 0 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : idx % 3 === 1 ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'"
-          >
-            {{ sector.sectorName }}
-          </span>
-        </div>
+        <div class="p-3">
+          <div class="flex items-center gap-2">
+            <ShieldCheck class="h-4 w-4 text-neutral-500" />
+            <div class="text-[13px] font-semibold text-neutral-950">{{ membership?.planName || '普通版' }}</div>
+          </div>
+          <div class="mt-3 space-y-2">
+            <div v-for="quota in quotas.slice(0, 3)" :key="quota.featureCode">
+              <div class="flex items-center justify-between gap-2 text-[11px]">
+                <span class="text-neutral-700">{{ quotaLabel(quota.featureCode) }}</span>
+                <span class="text-neutral-500">{{ quota.usedCount }} / {{ quota.limitCount }}</span>
+              </div>
+              <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                <div
+                  class="h-1.5 rounded-full bg-[#b9822f]"
+                  :style="{ width: `${Math.min(100, (quota.usedCount / Math.max(1, quota.limitCount)) * 100)}%` }"
+                />
+              </div>
+            </div>
+          </div>
 
-        <div class="mt-3 space-y-2">
-          <div
-            v-for="watchlist in watchlists"
-            :key="watchlist.id"
-            class="rounded-xl border border-slate-200 px-3 py-2.5 transition-all duration-150 hover:border-slate-300 hover:shadow-sm"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div class="text-[12px] font-medium text-slate-900 transition-colors duration-300">
-                {{ watchlist.name }}
-              </div>
-              <div class="text-[11px] tabular-nums text-slate-400">
-                {{ watchlist.items.length }} 只股票
-              </div>
+          <div class="mt-4 border-t border-neutral-200 pt-3">
+            <div class="flex items-center gap-2">
+              <Star class="h-4 w-4 text-neutral-500" />
+              <div class="text-[13px] font-semibold">重点观察</div>
             </div>
             <div class="mt-2 flex flex-wrap gap-1.5">
-              <span
-                v-for="item in watchlist.items.slice(0, 6)"
-                :key="item.id"
-                class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 transition-colors duration-300"
-              >
-                {{ item.name || item.symbol }}
+              <span v-for="sector in topSectors" :key="sector.sectorCode" class="rounded-md bg-neutral-100 px-2 py-1 text-[10px] text-neutral-600">
+                {{ sector.sectorName }}
               </span>
             </div>
+            <div v-if="topWatchlist.length" class="mt-2 space-y-2">
+              <div v-for="watchlist in topWatchlist" :key="watchlist.id" class="rounded-lg bg-[#f8f7f3]/90 px-2.5 py-2">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="text-[12px] font-medium text-neutral-900">{{ watchlist.name }}</div>
+                  <div class="text-[10px] text-neutral-400">{{ watchlist.items.length }} 项</div>
+                </div>
+                <div class="mt-1 flex flex-wrap gap-1.5">
+                  <span v-for="item in watchlist.items.slice(0, 4)" :key="item.id" class="rounded-md bg-white px-2 py-1 text-[10px] text-neutral-600">
+                    {{ item.name || item.symbol }}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 第四行：权益曲线 -->
-    <section>
-      <EquityCurve
-        :data="equityData"
-      />
-    </section>
-
-    <!-- 第五行：最近委托 -->
-    <section>
-      <div class="rounded-2xl border border-cyan-200/50 bg-gradient-to-br from-white to-cyan-50/30 px-5 py-5 shadow-sm transition-all duration-300 hover:shadow-md">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-2">
-            <CreditCard class="h-4 w-4 text-cyan-500" />
-            <div>
-              <div class="text-[15px] font-semibold text-slate-950 transition-colors duration-300">
-                最近委托
-              </div>
-              <div class="text-[11px] text-slate-400">
-                保留最近交易流水
-              </div>
-            </div>
+    <section class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div class="data-table">
+        <div class="flex items-center justify-between border-b border-neutral-200 px-3 py-2.5">
+          <div>
+            <div class="section-title">持仓与行情</div>
+            <div class="section-subtitle">先看仓位，再扫市场。</div>
           </div>
-          <button
-            class="text-[12px] text-slate-500 transition-all duration-150 hover:text-slate-900 active:scale-[0.98]"
-            @click="emit('open', 'paper')"
-          >
-            进入交易
-          </button>
+          <button class="secondary-button !min-h-8" @click="emit('open', 'watchlist')">自选</button>
         </div>
 
-        <div
-          v-if="orders.length"
-          class="mt-3 space-y-2"
-        >
+        <div class="grid grid-cols-[84px_1fr_100px_90px_120px] data-table-header">
+          <div>代码</div>
+          <div>名称</div>
+          <div class="text-right">现价</div>
+          <div class="text-right">涨跌</div>
+          <div class="text-right">浮盈亏</div>
+        </div>
+
+        <div v-if="positions.length">
           <div
-            v-for="order in orders.slice(0, 5)"
-            :key="order.id"
-            class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-[12px] transition-all duration-150 hover:border-slate-300 hover:shadow-sm"
+            v-for="position in positions"
+            :key="position.id"
+            class="grid grid-cols-[84px_1fr_100px_90px_120px] items-center border-t border-neutral-100 px-3 py-2 text-[12px] hover:bg-[#f8f7f3]/70"
           >
-            <div>
-              <div class="font-medium text-slate-900 transition-colors duration-300">
-                {{ order.symbol }}
-              </div>
-              <div class="mt-1 text-[11px] text-slate-400">
-                {{ formatTime(order.createdAt) }}
-              </div>
+            <div class="font-medium text-neutral-900">{{ position.symbol }}</div>
+            <div class="truncate text-neutral-600">{{ position.name }}</div>
+            <div class="text-right tabular-nums text-neutral-900">{{ formatNumber(position.latestPrice) }}</div>
+            <div class="text-right tabular-nums" :class="(position.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+              {{ formatPercent(position.changePercent) }}
             </div>
-            <div class="text-right">
-              <div :class="order.side === 'BUY' ? 'text-rose-600' : 'text-emerald-600'">
-                {{ order.side === 'BUY' ? '买入' : '卖出' }}
-              </div>
-              <div class="mt-1 text-[11px] tabular-nums text-slate-400">
-                {{ order.orderQty }} 股
-              </div>
+            <div class="text-right tabular-nums" :class="position.floatingPnl >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+              {{ formatMoney(position.floatingPnl) }}
             </div>
           </div>
         </div>
+        <div v-else class="empty-state m-3">当前没有持仓数据。</div>
 
-        <div
-          v-else
-          class="mt-3 rounded-xl bg-slate-50/80 px-3 py-3 text-center text-[12px] text-slate-400 transition-colors duration-300"
-        >
-          当前没有委托记录。
+        <div class="border-t border-neutral-200">
+          <div class="grid grid-cols-[84px_1fr_100px_90px_90px_80px] data-table-header">
+            <div>代码</div>
+            <div>名称</div>
+            <div class="text-right">现价</div>
+            <div class="text-right">涨跌</div>
+            <div class="text-right">成交额</div>
+            <div class="text-right">时间</div>
+          </div>
+          <div v-if="quotes.length">
+            <div
+              v-for="quote in quotes.slice(0, 8)"
+              :key="quote.symbol"
+              class="grid grid-cols-[84px_1fr_100px_90px_90px_80px] items-center border-t border-neutral-100 px-3 py-2 text-[12px] hover:bg-[#f8f7f3]/70"
+            >
+              <div class="font-medium text-neutral-900">{{ quote.symbol }}</div>
+              <div class="truncate text-neutral-600">{{ quote.name }}</div>
+              <div class="text-right tabular-nums text-neutral-900">{{ formatNumber(quote.lastPrice) }}</div>
+              <div class="text-right tabular-nums" :class="(quote.changePercent || 0) >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                {{ formatPercent(quote.changePercent) }}
+              </div>
+              <div class="text-right tabular-nums text-neutral-500">{{ formatNumber((quote.turnover || 0) / 100000000) }} 亿</div>
+              <div class="text-right text-[11px] text-neutral-400">{{ formatTime(quote.quoteTime) }}</div>
+            </div>
+          </div>
+          <div v-else class="empty-state m-3">当前没有行情数据。</div>
         </div>
       </div>
+
+      <div class="space-y-3">
+        <NewsFeed :items="enrichedNews" />
+
+        <div class="data-sheet p-3">
+          <div class="flex items-center gap-2">
+            <Bell class="h-4 w-4 text-neutral-500" />
+            <div class="section-title">最近委托</div>
+          </div>
+          <div v-if="orders.length" class="mt-2 divide-y divide-neutral-100">
+            <div v-for="order in orders.slice(0, 4)" :key="order.id" class="flex items-center justify-between gap-3 py-2">
+              <div>
+                <div class="text-[12px] font-semibold text-neutral-950">{{ order.symbol }}</div>
+                <div class="text-[10px] text-neutral-400">{{ formatTime(order.createdAt) }}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-[11px] font-medium" :class="order.side === 'BUY' ? 'text-rose-600' : 'text-emerald-600'">
+                  {{ order.side === 'BUY' ? '买入' : '卖出' }}
+                </div>
+                <div class="text-[10px] text-neutral-400">{{ order.orderQty }} 股</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-state mt-3">当前没有委托记录。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid gap-3 xl:grid-cols-[0.88fr_1.12fr]">
+      <PortfolioPieChart :items="positionPie" title="持仓分布" />
+      <EquityCurve :data="equityData" title="资产曲线" />
     </section>
   </div>
 </template>

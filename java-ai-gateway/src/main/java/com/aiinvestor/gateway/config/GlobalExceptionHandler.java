@@ -1,10 +1,11 @@
 package com.aiinvestor.gateway.config;
 
-import cn.dev33.satoken.exception.NotLoginException;
 import com.aiinvestor.gateway.modules.shared.vo.ApiResult;
 import com.aiinvestor.gateway.modules.shared.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -42,15 +43,21 @@ public class GlobalExceptionHandler {
      * 触发场景：
      *   - 前端不带 token 访问需要登录的接口
      *   - token 过期
-     *   - Sa-Token 校验失败
+     *   - Bearer Token 校验失败
      *
-     * @param e NotLoginException 异常对象
+     * @param e AuthenticationException 异常对象
      * @return 401 状态码 + 错误提示
      */
-    @ExceptionHandler(NotLoginException.class)
+    @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)          // HTTP 401
-    public ApiResult<Void> handleNotLoginException(NotLoginException e) {
+    public ApiResult<Void> handleAuthenticationException(AuthenticationException e) {
         return ApiResult.fail(401, "请先登录后再继续操作");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResult<Void> handleAccessDeniedException(AccessDeniedException e) {
+        return ApiResult.fail(403, e.getMessage() == null ? "无权访问该资源" : e.getMessage());
     }
 
     /**

@@ -29,7 +29,7 @@ import java.util.Map;
  * @author AI Investor Team
  */
 @RestController
-@RequestMapping("/api/v1/transactions")
+@RequestMapping({"/api/v1/transactions", "/api/v1/paper/transactions"})
 @LoginRequired
 @Tag(name = "交易流水", description = "查询交易流水记录，包含下单、成交、撤单、充值、提现等事件")
 public class TransactionLogController {

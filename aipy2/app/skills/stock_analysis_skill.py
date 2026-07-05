@@ -20,8 +20,8 @@ class StockAnalysisSkillInput(BaseModel):
     【智能体的指令集】 -> 【类比 Java】：这就相当于 @RequestBody 接收的 DTO 类
     Pydantic 提供了极强的字段校验能力，类似 Hibernate Validator (@NotNull, @Min)
     """
-    # 教学修改：这就是刚才的课后作业，加了 max_length=100，防止恶意用户输入超长文本把大模型搞崩溃
-    query: str = Field(..., min_length=1, max_length=100, description="用户最初输入的那个问题")
+    # 聊天场景里用户经常会输入较长的上下文，不能在进入检索前就把问题挡掉。
+    query: str = Field(..., min_length=1, max_length=2000, description="用户最初输入的那个问题")
     queries: list[str] = Field(default_factory=list, description="Agent 拆解出来的多个精确搜索词")
     top_k: int = Field(default=3, ge=1, le=8, description="召回条数，类似 @Min(1) @Max(8)")
 

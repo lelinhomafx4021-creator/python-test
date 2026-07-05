@@ -2,6 +2,7 @@ export type NavKey =
   | 'overview'
   | 'chat'
   | 'watchlist'
+  | 'kline'
   | 'paper'
   | 'transactions'
   | 'news'
@@ -332,6 +333,13 @@ export type VipApplication = {
 /* ─── K线 / 图表 / 新闻相关类型 ─── */
 
 /** K线数据点 */
+export type KLinePatternTag = {
+  code: string
+  name: string
+  direction?: 'bullish' | 'bearish' | 'neutral'
+  score?: number
+}
+
 export type KLineDataPoint = {
   date: string
   open: number
@@ -339,6 +347,7 @@ export type KLineDataPoint = {
   high: number
   low: number
   volume: number
+  patterns?: KLinePatternTag[]
 }
 
 /** 技术指标类型 */

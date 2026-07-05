@@ -1,259 +1,182 @@
-<!-- LandingPage - 宣传页 · 极简+微装饰 -->
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import {
-  ArrowRight,
-  Bot,
-  ChevronRight,
-  LineChart,
-  Newspaper,
-  TrendingUp,
-  WalletCards,
-} from 'lucide-vue-next'
-import { ref, onMounted } from 'vue'
+import { ArrowRight, BarChart3, CheckCircle2, LayoutDashboard, ShieldCheck, TrendingUp } from 'lucide-vue-next'
 
 const router = useRouter()
+
 const goToVip = () => router.push('/vip-apply')
 const goToApp = () => router.push('/overview')
 
-// 登录状态由路由守卫统一处理，不在组件内重复跳转
-
-const show = ref(false)
-onMounted(() => { setTimeout(() => show.value = true, 50) })
-
-const quoteRows = [
-  { code: '600519', name: '贵州茅台', price: '1,384.79', change: '-1.17%', up: false },
-  { code: '000001', name: '平安银行', price: '11.49', change: '-0.26%', up: false },
-  { code: '300750', name: '宁德时代', price: '436.00', change: '+2.02%', up: true },
-  { code: '601318', name: '中国平安', price: '52.80', change: '+0.86%', up: true },
+const tape = [
+  { code: 'SH000001', name: '上证指数', value: '3128.42', change: '+0.64%' },
+  { code: 'SZ399001', name: '深证成指', value: '9836.21', change: '+0.41%' },
+  { code: 'AI SIGNAL', name: '策略提醒', value: '12', change: '待处理' },
+  { code: 'OPS', name: '会员审核', value: '3', change: '进行中' },
 ]
 
-const features = [
-  { icon: LineChart, title: '行情看板', desc: '实时行情、板块热力、资金流向一屏掌握', color: 'from-blue-500 to-cyan-500', bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
-  { icon: Bot, title: '智能研究', desc: '基于真实数据的深度投研问答', color: 'from-indigo-500 to-purple-500', bgColor: 'bg-indigo-50', iconColor: 'text-indigo-600' },
-  { icon: WalletCards, title: '模拟交易', desc: '下单、持仓、资金流水、盈亏统计全链路', color: 'from-emerald-500 to-teal-500', bgColor: 'bg-emerald-50', iconColor: 'text-emerald-600' },
-  { icon: Newspaper, title: '热点追踪', desc: '多源财经新闻聚合，利好利空一目了然', color: 'from-amber-500 to-orange-500', bgColor: 'bg-amber-50', iconColor: 'text-amber-600' },
+const rows = [
+  { label: '研究工作台', text: '行情、自选、资讯和问答放在同一条研究路径里，先扫市场，再深入分析。' },
+  { label: '模拟交易', text: '持仓、委托、资产曲线和交易记录统一展示，减少页面切换。' },
+  { label: '会员运营', text: '扫码支付、凭证上传、人工审核、公告和工单由后台统一承接。' },
+]
+
+const terminalRows = [
+  { code: '600519', name: '贵州茅台', price: '1688.00', change: '+1.82%', tone: 'text-rose-600' },
+  { code: '300750', name: '宁德时代', price: '201.50', change: '+2.31%', tone: 'text-rose-600' },
+  { code: '000858', name: '五粮液', price: '132.40', change: '-0.62%', tone: 'text-emerald-600' },
+  { code: '601318', name: '中国平安', price: '43.18', change: '+0.24%', tone: 'text-rose-600' },
 ]
 
 const plans = [
-  {
-    name: '体验版',
-    price: '免费',
-    items: ['行情看板 + 自选股', '基础研究问答', '模拟交易', '财经热点'],
-    featured: false,
-  },
-  {
-    name: '专业版',
-    price: '¥199/月',
-    items: ['无限研究问答', '深度数据分析', '专属数据引擎', '优先响应'],
-    featured: true,
-  },
+  { name: '免费版', price: '免费', desc: '进入终端，完成基础研究和模拟交易。', action: '进入终端' },
+  { name: '专业版', price: '¥199 / 月', desc: '提高问答额度，开启会员审核和运营协同。', action: '查看升级' },
 ]
 </script>
 
 <template>
-  <div class="min-h-screen bg-white text-slate-900">
-    <!-- Header -->
-    <header class="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur-md">
-      <div class="mx-auto flex max-w-[1100px] items-center justify-between px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900">
-            <TrendingUp class="h-4 w-4 text-white" />
+  <div class="min-h-screen bg-[#f7f6f2] text-neutral-950">
+    <header class="glass-nav sticky top-0 z-50 border-b">
+      <div class="mx-auto flex max-w-[1180px] items-center justify-between px-5 py-3">
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-950 text-white">
+            <TrendingUp class="h-4 w-4" />
           </div>
-          <span class="text-[16px] font-semibold">星策智投</span>
+          <div>
+            <div class="text-[15px] font-semibold">星策智投</div>
+            <div class="text-[11px] text-neutral-500">金融研究终端与会员运营系统</div>
+          </div>
         </div>
 
-        <nav class="hidden items-center gap-6 text-[13px] text-slate-500 md:flex">
-          <a
-            href="#preview"
-            class="transition hover:text-slate-900"
-          >产品</a>
-          <a
-            href="#features"
-            class="transition hover:text-slate-900"
-          >功能</a>
-          <a
-            href="#pricing"
-            class="transition hover:text-slate-900"
-          >价格</a>
+        <nav class="hidden items-center gap-7 text-[13px] text-neutral-500 lg:flex">
+          <a href="#flow" class="hover:text-neutral-950">结构</a>
+          <a href="#terminal" class="hover:text-neutral-950">终端</a>
+          <a href="#pricing" class="hover:text-neutral-950">升级</a>
         </nav>
 
-        <button
-          class="rounded-lg bg-slate-900 px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-slate-800 active:scale-[0.98]"
-          @click="goToApp"
-        >
-          进入终端
-        </button>
+        <div class="flex items-center gap-2">
+          <button class="secondary-button hidden sm:inline-flex" @click="goToVip">会员升级</button>
+          <button class="primary-button" @click="goToApp">进入终端</button>
+        </div>
       </div>
     </header>
 
-    <main
-      :class="show ? 'opacity-100' : 'opacity-0'"
-      style="transition: opacity 0.6s ease"
-    >
-      <!-- Hero -->
-      <section class="relative overflow-hidden">
-        <!-- 渐变网格背景装饰 -->
-        <div class="pointer-events-none absolute inset-0">
-          <div class="absolute right-[-10%] top-[-20%] h-[500px] w-[500px] rounded-full bg-gradient-to-br from-indigo-100 to-blue-50 blur-[100px] opacity-60" />
-          <div class="absolute bottom-[-10%] left-[-5%] h-[400px] w-[400px] rounded-full bg-gradient-to-tr from-emerald-50 to-teal-50 blur-[80px] opacity-50" />
-          <!-- 网格线条 -->
-          <div class="absolute inset-0 opacity-[0.03]" style="background-image: linear-gradient(rgba(15,23,42,1) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,1) 1px, transparent 1px); background-size: 60px 60px;" />
-        </div>
-
-        <div class="relative mx-auto max-w-[1100px] px-6 pb-20 pt-24 text-center">
-          <div class="mx-auto max-w-[640px]">
-            <div class="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-3.5 py-1.5 text-[12px] text-slate-500 shadow-sm backdrop-blur-sm">
-              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              行情 · 研究 · 交易 · 新闻
-            </div>
-            <h1 class="mt-6 text-[48px] font-bold leading-[1.15] tracking-tight text-slate-950">
-              一个终端，<span class="bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">搞定投研</span>
-            </h1>
-            <p class="mt-5 text-[16px] leading-[1.8] text-slate-500">
-              行情、自选、研究、模拟交易、新闻追踪——<br class="hidden sm:block">
-              不在多个工具之间反复切换。
-            </p>
-            <div class="mt-8 flex items-center justify-center gap-3">
-              <button
-                class="group rounded-lg bg-slate-900 px-6 py-3 text-[14px] font-medium text-white transition-all hover:bg-slate-800 active:scale-[0.98]"
-                @click="goToApp"
-              >
-                免费体验
-                <ArrowRight class="ml-1 inline h-4 w-4 align-[-2px] transition-transform group-hover:translate-x-0.5" />
-              </button>
-              <a
-                href="#preview"
-                class="rounded-lg border border-slate-200 px-6 py-3 text-[14px] font-medium text-slate-600 transition-all hover:bg-slate-50 active:scale-[0.98]"
-              >
-                了解更多
-              </a>
-            </div>
+    <main>
+      <section class="mx-auto max-w-[1180px] px-5 pb-14 pt-14 md:pb-20 md:pt-18">
+        <div class="max-w-[860px]">
+          <div class="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/60 px-3 py-1.5 text-[12px] text-neutral-500 backdrop-blur">
+            <span class="h-1.5 w-1.5 rounded-full bg-[#b9822f]" />
+            一个入口，连起研究、交易和运营
           </div>
-
-          <!-- 数据亮点 -->
-          <div class="mx-auto mt-14 grid max-w-[480px] grid-cols-3 gap-4">
-            <div
-              v-for="stat in [{ n: '8+', l: '核心模块' }, { n: '40+', l: '测试用例' }, { n: '2 端', l: '用户+管理' }]"
-              :key="stat.l"
-              class="rounded-xl border border-slate-200 bg-white/60 px-3 py-3 backdrop-blur-sm"
-            >
-              <div class="text-[18px] font-bold text-slate-900">
-                {{ stat.n }}
-              </div>
-              <div class="mt-0.5 text-[11px] text-slate-400">
-                {{ stat.l }}
-              </div>
-            </div>
+          <h1 class="mt-6 text-[42px] font-semibold leading-[1.05] tracking-tight text-neutral-950 md:text-[70px]">
+            星策智投
+            <span class="block text-neutral-400">把投资工作流收进一块屏幕。</span>
+          </h1>
+          <p class="mt-5 max-w-[660px] text-[15px] leading-8 text-neutral-600">
+            不做花哨包装。让行情、策略、持仓、问答、会员审核按真实工作顺序展开，用户打开后能立刻开始判断。
+          </p>
+          <div class="mt-7 flex flex-wrap items-center gap-3">
+            <button class="primary-button !px-5" @click="goToApp">
+              免费进入
+              <ArrowRight class="h-4 w-4" />
+            </button>
+            <button class="secondary-button !px-5" @click="goToVip">查看专业版</button>
           </div>
         </div>
-      </section>
 
-      <!-- Preview -->
-      <section
-        id="preview"
-        class="mx-auto max-w-[1100px] px-6 pb-24"
-      >
-        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <!-- 顶栏 -->
-          <div class="flex items-center gap-2 border-b border-slate-100 px-5 py-3">
-            <div class="flex gap-1.5">
-              <div class="h-2.5 w-2.5 rounded-full bg-slate-200" />
-              <div class="h-2.5 w-2.5 rounded-full bg-slate-200" />
-              <div class="h-2.5 w-2.5 rounded-full bg-slate-200" />
-            </div>
-            <div class="ml-3 flex-1 rounded-md bg-slate-50 px-3 py-1 text-center text-[11px] text-slate-400">
-              xingce-invest.local
+        <div class="mt-12 overflow-hidden rounded-lg border border-neutral-200/80 bg-white/60 shadow-[0_20px_70px_rgba(23,23,23,0.06)] backdrop-blur">
+          <div class="terminal-strip">
+            <div v-for="item in tape" :key="item.code" class="flex shrink-0 items-center gap-2">
+              <span class="font-medium text-white">{{ item.code }}</span>
+              <span>{{ item.name }}</span>
+              <span class="tabular-nums text-white">{{ item.value }}</span>
+              <span class="text-[#d7a45b]">{{ item.change }}</span>
             </div>
           </div>
 
-          <!-- 内容 -->
-          <div class="grid gap-4 p-5 lg:grid-cols-[1.3fr_0.7fr]">
-            <!-- 行情表 -->
-            <div>
-              <div class="mb-3 flex items-center justify-between">
-                <div class="text-[14px] font-semibold text-slate-900">
-                  盘中观察
+          <div class="grid gap-0 lg:grid-cols-[1.12fr_0.88fr]">
+            <div class="border-b border-neutral-200/80 p-4 lg:border-b-0 lg:border-r">
+              <div class="flex items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+                <div>
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-neutral-400">Terminal Preview</div>
+                  <div class="mt-1 text-[18px] font-semibold text-neutral-950">研究工作台</div>
                 </div>
-                <div class="flex items-center gap-1.5 text-[11px] text-emerald-600">
-                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  实时
+                <span class="badge-brand">实时扫描</span>
+              </div>
+
+              <div class="mt-4 grid gap-2 sm:grid-cols-4">
+                <div class="metric-card">
+                  <div class="metric-label">总资产</div>
+                  <div class="metric-value">¥128,540</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">累计盈亏</div>
+                  <div class="metric-value text-rose-600">+¥8,210</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">持仓</div>
+                  <div class="metric-value">12</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">工单</div>
+                  <div class="metric-value">3</div>
                 </div>
               </div>
-              <div class="overflow-hidden rounded-xl border border-slate-100">
-                <div class="grid grid-cols-[72px_1fr_80px_68px] bg-slate-50 px-4 py-2 text-[11px] text-slate-400">
+
+              <div class="mt-4 data-table">
+                <div class="grid grid-cols-[86px_1fr_96px_80px] data-table-header">
                   <div>代码</div>
                   <div>名称</div>
-                  <div class="text-right">
-                    现价
-                  </div>
-                  <div class="text-right">
-                    涨跌
-                  </div>
+                  <div class="text-right">现价</div>
+                  <div class="text-right">涨跌</div>
                 </div>
                 <div
-                  v-for="row in quoteRows"
+                  v-for="row in terminalRows"
                   :key="row.code"
-                  class="grid grid-cols-[72px_1fr_80px_68px] items-center border-t border-slate-50 px-4 py-2.5 text-[12px] transition hover:bg-slate-50"
+                  class="grid grid-cols-[86px_1fr_96px_80px] items-center border-t border-neutral-100 px-3 py-2 text-[12px]"
                 >
-                  <div class="font-mono text-slate-500">
-                    {{ row.code }}
-                  </div>
-                  <div class="text-slate-700">
-                    {{ row.name }}
-                  </div>
-                  <div class="text-right font-mono text-slate-900">
-                    {{ row.price }}
-                  </div>
-                  <div
-                    class="text-right font-mono"
-                    :class="row.up ? 'text-emerald-600' : 'text-rose-500'"
-                  >
-                    {{ row.change }}
-                  </div>
+                  <div class="font-medium">{{ row.code }}</div>
+                  <div class="truncate text-neutral-600">{{ row.name }}</div>
+                  <div class="text-right tabular-nums">{{ row.price }}</div>
+                  <div class="text-right tabular-nums" :class="row.tone">{{ row.change }}</div>
                 </div>
               </div>
             </div>
 
-            <!-- AI 对话预览 -->
-            <div class="flex flex-col gap-4">
-              <div class="flex-1 rounded-xl border border-slate-100 p-4">
-                <div class="mb-3 flex items-center gap-2 text-[13px] font-medium text-slate-900">
-                  <div class="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100">
-                    <Bot class="h-3.5 w-3.5 text-slate-600" />
+            <div class="p-4">
+              <div class="grid gap-3">
+                <div class="rounded-lg border border-neutral-200 bg-[#f8f7f3]/80 p-3">
+                  <div class="flex items-center gap-2 text-[13px] font-semibold">
+                    <BarChart3 class="h-4 w-4 text-[#b9822f]" />
+                    策略信号
                   </div>
-                  智能研究
-                </div>
-                <div class="space-y-3">
-                  <div class="flex justify-end">
-                    <div class="max-w-[80%] rounded-xl rounded-br-sm bg-slate-900 px-3.5 py-2 text-[12px] text-white">
-                      分析一下宁德时代的基本面
-                    </div>
-                  </div>
-                  <div class="flex justify-start">
-                    <div class="max-w-[90%] rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[12px] text-slate-600">
-                      宁德时代（300750）当前 PE 22.4x，营收同比 +28.6%，处于 52 周区间中上沿...
-                    </div>
+                  <div class="mt-3 space-y-2 text-[12px] text-neutral-600">
+                    <div class="flex justify-between"><span>消费龙头回撤</span><span class="text-neutral-950">观察</span></div>
+                    <div class="flex justify-between"><span>新能源放量</span><span class="text-rose-600">增强</span></div>
+                    <div class="flex justify-between"><span>银行低波动</span><span class="text-neutral-950">防守</span></div>
                   </div>
                 </div>
-              </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="rounded-xl border border-slate-100 p-3 text-center transition hover:bg-slate-50">
-                  <WalletCards class="mx-auto mb-1.5 h-4 w-4 text-slate-400" />
-                  <div class="text-[12px] font-medium text-slate-700">
-                    模拟交易
+
+                <div class="rounded-lg border border-neutral-200 bg-[#f8f7f3]/80 p-3">
+                  <div class="flex items-center gap-2 text-[13px] font-semibold">
+                    <ShieldCheck class="h-4 w-4 text-[#b9822f]" />
+                    会员流程
                   </div>
-                  <div class="text-[10px] text-slate-400">
-                    持仓+委托
+                  <div class="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] text-neutral-600">
+                    <div class="rounded-md bg-white/70 px-2 py-2">扫码支付</div>
+                    <div class="rounded-md bg-white/70 px-2 py-2">上传凭证</div>
+                    <div class="rounded-md bg-white/70 px-2 py-2">后台审核</div>
                   </div>
                 </div>
-                <div class="rounded-xl border border-slate-100 p-3 text-center transition hover:bg-slate-50">
-                  <Newspaper class="mx-auto mb-1.5 h-4 w-4 text-slate-400" />
-                  <div class="text-[12px] font-medium text-slate-700">
-                    财经热点
+
+                <div class="rounded-lg border border-neutral-200 bg-[#f8f7f3]/80 p-3">
+                  <div class="flex items-center gap-2 text-[13px] font-semibold">
+                    <LayoutDashboard class="h-4 w-4 text-[#b9822f]" />
+                    后台待办
                   </div>
-                  <div class="text-[10px] text-slate-400">
-                    多源聚合
+                  <div class="mt-3 space-y-2 text-[12px]">
+                    <div class="flex justify-between"><span class="text-neutral-600">VIP 审核</span><span>12</span></div>
+                    <div class="flex justify-between"><span class="text-neutral-600">人工工单</span><span>6</span></div>
+                    <div class="flex justify-between"><span class="text-neutral-600">公告草稿</span><span>4</span></div>
                   </div>
                 </div>
               </div>
@@ -262,124 +185,72 @@ const plans = [
         </div>
       </section>
 
-      <!-- Features -->
-      <section
-        id="features"
-        class="relative mx-auto max-w-[1100px] px-6 pb-24"
-      >
-        <div class="mx-auto max-w-[500px] text-center">
-          <div class="text-[12px] font-medium uppercase tracking-widest text-slate-400">
-            功能
+      <section id="flow" class="section-band">
+        <div class="mx-auto grid max-w-[1180px] gap-8 px-5 py-14 lg:grid-cols-[0.8fr_1.2fr]">
+          <div>
+            <div class="text-[11px] uppercase tracking-[0.14em] text-neutral-400">Flow</div>
+            <h2 class="mt-3 text-[30px] font-semibold tracking-tight">按工作流组织，不按卡片堆叠。</h2>
           </div>
-          <h2 class="mt-3 text-[32px] font-bold tracking-tight text-slate-950">
-            该有的，都有
-          </h2>
-          <p class="mt-2 text-[14px] text-slate-500">
-            从发现机会到执行决策，一个入口搞定。
-          </p>
-        </div>
-
-        <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div
-            v-for="f in features"
-            :key="f.title"
-            class="group rounded-2xl border border-slate-200/80 bg-white/50 p-6 backdrop-blur-sm transition-all duration-300 hover:border-transparent hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 hover:-translate-y-0.5"
-          >
-            <div :class="`flex h-11 w-11 items-center justify-center rounded-xl ${f.bgColor} transition-all duration-300 group-hover:scale-110`">
-              <component
-                :is="f.icon"
-                :class="`h-5 w-5 ${f.iconColor}`"
-              />
-            </div>
-            <div class="mt-4 text-[15px] font-semibold text-slate-900">
-              {{ f.title }}
-            </div>
-            <div class="mt-1.5 text-[13px] leading-6 text-slate-500">
-              {{ f.desc }}
+          <div class="divide-y divide-neutral-200 border-y border-neutral-200">
+            <div v-for="row in rows" :key="row.label" class="grid gap-3 py-5 md:grid-cols-[150px_1fr]">
+              <div class="text-[16px] font-semibold">{{ row.label }}</div>
+              <div class="text-[13px] leading-7 text-neutral-600">{{ row.text }}</div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Pricing -->
-      <section
-        id="pricing"
-        class="mx-auto max-w-[1100px] px-6 pb-24"
-      >
-        <div class="mx-auto max-w-[500px] text-center">
-          <div class="text-[12px] font-medium uppercase tracking-widest text-slate-400">
-            价格
+      <section id="terminal" class="mx-auto max-w-[1180px] px-5 py-14">
+        <div class="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-200 pb-5">
+          <div>
+            <div class="text-[11px] uppercase tracking-[0.14em] text-neutral-400">Modules</div>
+            <h2 class="mt-3 text-[30px] font-semibold tracking-tight">保留必要功能，减少装饰面积。</h2>
           </div>
-          <h2 class="mt-3 text-[32px] font-bold tracking-tight text-slate-950">
-            先体验，再决定
-          </h2>
+          <div class="max-w-[420px] text-[13px] leading-6 text-neutral-500">
+            用表格、横条和终端视窗承担信息展示，卡片只留给真正需要分组的内容。
+          </div>
         </div>
 
-        <div class="mx-auto mt-10 grid max-w-[700px] gap-5 sm:grid-cols-2">
-          <div
-            v-for="plan in plans"
-            :key="plan.name"
-            class="relative rounded-2xl border p-6 transition-all duration-300"
-            :class="plan.featured ? 'border-indigo-500 bg-gradient-to-br from-slate-900 to-slate-950 text-white shadow-xl shadow-indigo-500/10 scale-[1.02]' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5'"
-          >
-            <div
-              v-if="plan.featured"
-              class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-3 py-0.5 text-[11px] font-medium text-white shadow-sm"
-            >
-              推荐
+        <div class="grid gap-0 divide-y divide-neutral-200">
+          <div v-for="row in rows" :key="`module-${row.label}`" class="grid gap-4 py-6 md:grid-cols-[40px_170px_1fr] md:items-start">
+            <CheckCircle2 class="h-5 w-5 text-[#b9822f]" />
+            <div class="text-[17px] font-semibold">{{ row.label }}</div>
+            <div class="max-w-[660px] text-[13px] leading-7 text-neutral-600">{{ row.text }}</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" class="section-band">
+        <div class="mx-auto max-w-[1180px] px-5 py-14">
+          <div class="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+            <div>
+              <div class="text-[11px] uppercase tracking-[0.14em] text-neutral-400">Upgrade</div>
+              <h2 class="mt-3 text-[30px] font-semibold tracking-tight">先进入，再决定是否升级。</h2>
+              <p class="mt-3 text-[13px] leading-7 text-neutral-600">二维码入口保留在升级流程里，付款、截图、审核三步清楚可执行。</p>
             </div>
-            <div
-              class="text-[16px] font-semibold"
-              :class="plan.featured ? 'text-white' : 'text-slate-900'"
-            >
-              {{ plan.name }}
-            </div>
-            <div
-              class="mt-3 text-[28px] font-bold"
-              :class="plan.featured ? 'text-white' : 'text-slate-950'"
-            >
-              {{ plan.price }}
-            </div>
-            <div class="mt-4 space-y-2">
-              <div
-                v-for="item in plan.items"
-                :key="item"
-                class="flex items-center gap-2 text-[13px]"
-                :class="plan.featured ? 'text-slate-300' : 'text-slate-500'"
-              >
-                <span
-                  class="h-1 w-1 rounded-full"
-                  :class="plan.featured ? 'bg-emerald-400' : 'bg-slate-400'"
-                />
-                {{ item }}
+
+            <div class="data-table">
+              <div class="grid grid-cols-[1fr_130px_120px] data-table-header">
+                <div>方案</div>
+                <div>价格</div>
+                <div class="text-right">操作</div>
+              </div>
+              <div v-for="plan in plans" :key="plan.name" class="grid grid-cols-[1fr_130px_120px] items-center border-t border-neutral-100 px-3 py-4 text-[13px]">
+                <div>
+                  <div class="font-semibold">{{ plan.name }}</div>
+                  <div class="mt-1 text-[12px] text-neutral-500">{{ plan.desc }}</div>
+                </div>
+                <div class="font-semibold">{{ plan.price }}</div>
+                <div class="text-right">
+                  <button class="secondary-button" @click="plan.name === '专业版' ? goToVip() : goToApp()">
+                    {{ plan.action }}
+                  </button>
+                </div>
               </div>
             </div>
-            <button
-              class="mt-6 w-full rounded-xl py-2.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98]"
-              :class="plan.featured ? 'bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30' : 'border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'"
-              @click="plan.featured ? goToVip() : goToApp()"
-            >
-              {{ plan.featured ? '升级专业版' : '免费开始' }}
-              <ChevronRight class="ml-0.5 inline h-3.5 w-3.5 align-[-2px]" />
-            </button>
           </div>
         </div>
       </section>
-
-      <!-- Footer -->
-      <footer class="border-t border-slate-100 py-8">
-        <div class="mx-auto flex max-w-[1100px] items-center justify-between px-6 text-[12px] text-slate-400">
-          <div>© 2026 星策智投</div>
-          <div class="flex gap-4">
-            <span>行情</span>
-            <span>·</span>
-            <span>研究</span>
-            <span>·</span>
-            <span>交易</span>
-          </div>
-        </div>
-      </footer>
     </main>
   </div>
 </template>
-

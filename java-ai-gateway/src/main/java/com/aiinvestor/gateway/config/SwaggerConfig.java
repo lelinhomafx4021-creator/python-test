@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
  * SpringDoc OpenAPI (Swagger UI) 全局配置。
  * <p>
  * 该配置类定义了 API 文档的基本信息（标题、描述、版本）以及
- * 全局认证方案（Sa-Token 通过 Header 传递 token）。
+ * 全局认证方案（Authorization: Bearer <token>）。
  * <p>
  * 配置完成后，可通过以下地址访问文档：
  *   - Swagger UI:  http://localhost:8080/swagger-ui.html
@@ -30,8 +30,7 @@ public class SwaggerConfig {
      */
     @Bean
     public OpenAPI customOpenAPI() {
-        // 全局认证方案：通过 satoken 请求头传递 Token
-        final String securitySchemeName = "satoken";
+        final String securitySchemeName = "bearerAuth";
 
         return new OpenAPI()
                 .info(new Info()
@@ -48,6 +47,6 @@ public class SwaggerConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("UUID")
-                                .description("Sa-Token 登录后返回的 Token，通过 satoken 请求头传递"));
+                                .description("登录后返回的 Bearer Token，请通过 Authorization: Bearer <token> 传递"));
     }
 }

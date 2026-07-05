@@ -1,72 +1,105 @@
-# 系统架构深度解析（Architecture Deep Dive）
+# Architecture
 
-本项目采用了典型的 **异构分布式 AI 架构**，旨在解决大模型应用中的响应延迟、状态持久化与高并发审计问题。
+## 1. 分层原则
 
-## 1. 全链路流程图 (Full-Stack Flow)
+这个项目刻意拆成 `Java 业务层 + Python AI 层`。
+
+- `Java Gateway` 负责稳定业务能力：鉴权、会员、配额、行情、交易、会话历史、人工工单、审计。
+- `Python AI Service` 负责不稳定且迭代快的 AI 能力：模型调用、LangGraph 编排、RAG、流式输出、质量评审。
+- `Frontend` 只面向统一网关，不直接访问 AI 服务。
+
+这样拆分的价值是：业务边界清晰、技术栈各司其职，面试时也更容易说明为什么不是“全部堆在一个服务里”。
+
+## 2. 系统拓扑
 
 ```mermaid
 graph LR
-    subgraph Frontend ["前端 (Vue 3)"]
-        UI["Chat Interface"]
-        SSE_Rec["SSE Stream Handler"]
-    end
-
-    subgraph Gateway ["网关 (Java Spring Boot)"]
-        Auth["鉴权/限流"]
-        Audit["异步审计 (CompletableFuture)"]
-        Hist["历史管理 (MyBatis-Plus)"]
-        MQ_Prod["MQ 生产者"]
-    end
-
-    subgraph AICore ["AI 核心 (Python FastAPI)"]
-        App["FastAPI App"]
-        Graph["LangGraph 状态群"]
-        Checkpointer["Postgres 持久化器"]
-    end
-
-    subgraph Storage ["存储层"]
-        PG[("PostgreSQL + pgvector")]
-        MySQL[("MySQL 业务库")]
-        RabbitMQ["RabbitMQ 消息队列"]
-        LangFuse["LangFuse (Tracing)"]
-    end
-
-    UI -- HTTP Stream --> Auth
-    Auth -- Async Req --> App
-    App -- Thread ID --> Checkpointer
-    Checkpointer -- Save/Load --> PG
-    
-    # --- 新增观测链路 ---
-    Graph -- Callback --> LangFuse
-    
-    Audit -- Log --> MySQL
-    Audit -- Event --> MQ_Prod
-    MQ_Prod --> RabbitMQ
+    U[User] --> F[Vue Frontend]
+    F --> J[Java Gateway]
+    J --> P[Python AI Service]
+    J --> M[(MySQL)]
+    J --> R[(Redis)]
+    J --> Q[(RabbitMQ)]
+    J --> S[Sentinel]
+    P --> PG[(Postgres + pgvector)]
+    P --> L[Langfuse]
 ```
 
-## 2. 核心设计决策 (Design Decisions)
+## 3. 各层职责
 
-### 2.1 为什么采用 Java + Python 双后端？
-- **Java (Gateway)**：处理高并发 IO、数据库审计、消息队列非常成熟。在校招面试中，这展示了你对**企业级解耦**的理解。
-- **Python (AI Core)**：AI 生态（LangChain/LangGraph/PyTorch）无出其右。
-- **价值**：避免了 Python 在处理重业务逻辑时的性能瓶颈，也避免了 Java 处理大模型编排时的繁琐。
+### Frontend
 
-### 2.2 SSE（Server-Sent Events） vs WebSocket
-- **选择理由**：SSE 是单向流（Server 到 Client），对于 LLM 问答这种“一问一答，持续输出”的场景最轻量、最稳定。
-- **面试点**：对比 Websocket 的双向握手开销，SSE 更符合 RESTful 风格，且内置了掉线自动重连机制。
+- 页面工作台、登录态管理、业务模块切换。
+- AI 会话通过 `fetch + ReadableStream` 处理 `SSE`，避免 `EventSource` 不能带自定义 Header 的限制。
+- 对用户只暴露一个统一入口，降低前端和后端耦合。
 
-## 3. 关键交互时序
+### Java Gateway
 
-1. **用户提问**：Vue 建立 EventSource 连接。
-2. **网关拦截**：Java 鉴权通过，向 Python 转发并透传 `TraceId`。
-3. **AI 思考**：LangGraph 运行，期间不断推送 `stage` 事件（rewrite/search/reasoning）。
-4. **异步审计**：Java 收到完整回复后，立即通过 CompletableFuture 启动后台任务，录入 MySQL 并下发 MQ。
-5. **UI 更新**：前端解析 Markdown 流并展示。
+- 统一鉴权与用户上下文，采用 `Spring Security + Bearer Token + Redis` 维护登录态。
+- 处理会员、行情、自选股、模拟交易、聊天历史、人工工单。
+- 将 AI 请求透传到 Python 服务，并补充 `userId / role / traceId / sessionId` 等业务上下文。
+- 持久化聊天记录与审计数据，必要时异步投递消息。
 
-## 4. 可观测性设计 (Observability)
+### Python AI Service
 
-- **LangFuse 深度追踪**：通过私有化部署 LangFuse，实现了对 Agent 内部每一个 Node（从 rewrite 到 critic）的秒级监控。包括：
-    - **Token 使用量分析**：精确计算每一轮对话的成本。
-    - **Prompt 迭代历史**：记录不同版本 Prompt 的效果。
-    - **耗时瀑布图**：一目了然定位检索或推理的瓶颈。
-- **关联一致性**：将业务层的 `TraceId` 与 AI 层的 `SessionId` 强绑定。面试时可以演示如何根据一个订单号，倒查出 AI 当时的整个思维过程。
+- 接收网关转发的 AI 请求。
+- 使用 LangGraph 组织 `rewrite -> search/fetch -> answer -> critic` 工作流。
+- 根据用户角色决定走精简流还是完整流。
+- 将会话状态和检索数据持久化到 Postgres / pgvector。
+
+## 4. 核心请求链路
+
+### AI 流式问答链路
+
+1. 前端发起 AI 问答请求。
+2. Java 网关完成鉴权、生成 `traceId`、记录会话上下文。
+3. Java 调用 Python AI 服务的流式接口。
+4. Python LangGraph 按阶段执行重写、检索、生成、评审。
+5. Python 以 SSE 持续返回阶段事件和正文增量。
+6. Java 透传 SSE 给前端，并在结束后更新聊天记录、触发审计或工单逻辑。
+
+### 人工兜底链路
+
+1. AI 不确定，或者用户主动要求转人工。
+2. Java 侧创建工单并保存 `traceId`、会话上下文和问题内容。
+3. 管理端处理工单。
+4. 处理结果回流到原会话，形成闭环。
+
+## 5. 中间件为什么存在
+
+- `MySQL`：业务主数据，适合账号、会员、交易、工单、历史记录。
+- `Redis`：热点缓存、验证码、冷却时间、下单锁。
+- `RabbitMQ`：解耦审计和后续异步消费，避免主链路阻塞。
+- `Postgres + pgvector`：AI 侧状态持久化与向量检索。
+- `Sentinel`：流控、限流、降级保护，避免热点接口压垮网关。
+- `Langfuse`：观测 Agent 链路、耗时、Prompt 和模型调用。
+
+## 6. 已落地的工程点
+
+### 统一限流返回
+
+Sentinel 被拦截时不返回默认页面，而是统一返回 `429 + JSON`，便于前端处理和面试说明。
+
+### Redis key 规范
+
+通过统一方法管理 Redis key 命名，避免在业务代码里散落字符串常量。
+
+### traceId 贯穿链路
+
+同一个 `traceId` 可关联：
+
+- Java 网关日志
+- 聊天历史表
+- 人工工单
+- 审计消费日志
+- Python AI 链路
+
+### 压测脚本
+
+根目录 `stress_test.py` 可对登录态接口和核心业务接口做一轮简单压测，适合补一页工程化结果。
+
+## 7. 面试时推荐讲法
+
+- 先讲“为什么拆成 Java + Python”，不要先讲模型。
+- 再讲“AI 不是直连前端，而是必须经过业务网关”。
+- 最后讲“中间件不是为了堆技术，而是分别解决缓存、异步解耦、向量检索、限流、观测”。

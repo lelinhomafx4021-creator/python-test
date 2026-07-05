@@ -1,11 +1,8 @@
-<!-- TerminalHeader - 终端顶部导航栏 -->
-<!-- 显示当前页面标题、会员标识、刷新、实时时钟和用户菜单 -->
 <script setup lang="ts">
-import { BellRing, ChevronDown, Clock, Menu, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { BellRing, ChevronDown, Clock, Menu, RefreshCw } from 'lucide-vue-next'
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { AuthUser, MembershipInfo, NavKey } from '../types/terminal'
 
-// 实时时钟
 const currentTime = ref('')
 let clockTimer: ReturnType<typeof setInterval> | null = null
 
@@ -16,7 +13,6 @@ const updateClock = () => {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   })
 }
 
@@ -44,113 +40,92 @@ const emit = defineEmits<{
   logout: []
 }>()
 
-// 各导航页面的标题映射
 const titleMap: Record<NavKey, string> = {
-  overview: '会员总览',
+  overview: '工作台',
   chat: '智能副驾',
   watchlist: '自选列表',
+  kline: 'K线详情',
   paper: '交易终端',
+  transactions: '交易记录',
   news: '财经热点',
   handoff: '人工工单',
   profile: '个人中心',
   admin: '管理后台',
   'admin-tickets': '工单处理',
-  transactions: '交易记录',
 }
 
-// 各导航页面的副标题描述
 const subtitleMap: Record<NavKey, string> = {
-  overview: '资产、行情、自选和会话状态同屏查看',
-  chat: '研究问答、历史会话和思考过程统一处理',
-  watchlist: '按分组维护关注股票，并可直接发起下单',
-  paper: '委托、持仓和资产重算集中处理',
-  news: '集中浏览市场新闻，适合晨会和盘中快速扫描',
-  handoff: '查看转人工记录和原始会话',
-  profile: '维护基础资料、风险偏好和头像',
-  admin: '集中查看用户、会员、账户和后台运行概况',
-  'admin-tickets': '集中处理转人工工单、查看摘要并推进状态流转',
-  transactions: '查看所有模拟交易和资金变动的完整流水记录',
+  overview: '资产、持仓、行情、待办集中在一屏内扫描。',
+  chat: '研究问答、历史会话和人工转接统一处理。',
+  watchlist: '按分组维护关注标的，并支持快速发起交易。',
+  kline: '独立查看标的走势、成交量和技术形态。',
+  paper: '委托、持仓、资金流水在同一终端内处理。',
+  transactions: '查看模拟交易和资金流动的完整记录。',
+  news: '适合盘前和盘中的市场热点扫描。',
+  handoff: '查看人工工单与处理结果。',
+  profile: '维护账户资料和风险偏好。',
+  admin: '集中处理用户、会员、公告和运营状态。',
+  'admin-tickets': '按状态处理需要人工接管的工单。',
 }
 
-// 根据会员信息返回会员版本文本
 const membershipText = (membership?: MembershipInfo | null) => {
   if (!membership) return '普通版'
-  return membership.planCode === 'vip' ? '会员版' : '普通版'
+  if (membership.planCode === 'vip') return '会员版'
+  if (membership.planCode === 'admin') return '管理员'
+  return membership.planName || '普通版'
 }
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 overflow-visible border-b border-slate-200/80 bg-white/80 backdrop-blur-xl transition-colors duration-300">
-    <div class="relative flex flex-wrap items-center justify-between gap-3 overflow-visible px-4 py-3 lg:px-6">
-      <div class="flex items-center gap-3">
-        <button
-          class="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition-all duration-150 hover:bg-slate-50 active:scale-[0.95]"
-          @click="emit('toggle')"
-        >
+  <header class="glass-nav sticky top-0 z-30 border-b">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 lg:px-5">
+      <div class="flex min-w-0 items-center gap-3">
+        <button class="toolbar-button p-2.5" aria-label="切换导航" @click="emit('toggle')">
           <Menu class="h-4 w-4" />
         </button>
 
-        <div>
-          <div class="mb-1 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-500 transition-colors duration-300">
-            <Sparkles class="h-3.5 w-3.5" />
-            {{ membershipText(membership) }}
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="badge-brand">{{ membershipText(membership) }}</span>
+            <span class="hidden text-[11px] text-neutral-400 sm:inline">星策智投 / Data Terminal</span>
           </div>
-          <h2 class="text-[28px] font-semibold tracking-tight text-slate-950 transition-colors duration-300">
-            {{ titleMap[activeView] }}
-          </h2>
-          <p class="text-[13px] text-slate-500 transition-colors duration-300">
-            {{ subtitleMap[activeView] }}
-          </p>
+          <div class="mt-1 flex min-w-0 flex-wrap items-baseline gap-3">
+            <h2 class="text-[20px] font-semibold tracking-tight text-neutral-950">{{ titleMap[activeView] }}</h2>
+            <p class="max-w-[560px] truncate text-[12px] text-neutral-500">{{ subtitleMap[activeView] }}</p>
+          </div>
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <!-- 实时时钟 -->
-        <div class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-mono text-slate-700">
-          <Clock class="h-3.5 w-3.5 text-slate-400" />
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <div class="toolbar-button hidden md:inline-flex">
+          <Clock class="h-3.5 w-3.5 text-neutral-400" />
           {{ currentTime }}
         </div>
 
-        <button
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-600 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.98]"
-          @click="emit('refresh')"
-        >
+        <button class="toolbar-button" @click="emit('refresh')">
           <RefreshCw class="h-3.5 w-3.5" />
           刷新
         </button>
 
-
-        <div class="hidden items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-600 md:flex transition-colors duration-300">
-          <BellRing class="h-3.5 w-3.5 text-slate-400" />
-          跟踪自选与委托变化
+        <div class="toolbar-button hidden xl:inline-flex">
+          <BellRing class="h-3.5 w-3.5 text-neutral-400" />
+          监控自选与委托变化
         </div>
 
-        <div
-          class="relative"
-          @click.stop
-        >
-          <button
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm active:scale-[0.97]"
-            @click="emit('toggleUserMenu')"
-          >
+        <div class="relative" @click.stop>
+          <button class="toolbar-button" @click="emit('toggleUserMenu')">
             {{ authUser.nickname || authUser.username }}
-            <ChevronDown class="h-3.5 w-3.5 text-slate-400" />
+            <ChevronDown class="h-3.5 w-3.5 text-neutral-400" />
           </button>
 
           <div
             v-if="userMenuOpen"
-            class="absolute right-0 top-[calc(100%+8px)] z-[80] w-40 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.16)] transition-colors duration-300"
+            class="absolute right-0 top-[calc(100%+8px)] z-[80] w-44 rounded-lg border border-white/70 bg-[rgba(255,255,255,0.9)] p-1.5 shadow-[0_18px_40px_rgba(23,23,23,0.08)] backdrop-blur-2xl"
           >
-            <button
-              class="flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] text-slate-700 transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
-              @click="emit('openProfile')"
-            >
+            <button class="flex w-full items-center rounded-md px-3 py-2 text-left text-[13px] text-neutral-700 hover:bg-neutral-50" @click="emit('openProfile')">
               个人中心
             </button>
-            <button
-              class="mt-1 flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] text-rose-600 transition-all duration-150 hover:bg-rose-50 active:scale-[0.98]"
-              @click="emit('logout')"
-            >
+            <button class="mt-1 flex w-full items-center rounded-md px-3 py-2 text-left text-[13px] text-rose-600 hover:bg-rose-50" @click="emit('logout')">
               退出登录
             </button>
           </div>

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿$ErrorActionPreference = "Stop"
+﻿﻿﻿﻿$ErrorActionPreference = "Stop"
 
 # 本地一键启动脚本：
 # 1. 拉起根目录 docker compose 中的中间件
@@ -25,54 +25,7 @@ function Write-Step {
 
 function Assert-Command {
     param(
-        [string]$Name,
-        [string]$Hint
-    )
-
-    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-        throw "$Name 不可用。$Hint"
-    }
-}
-
-function Get-DockerComposeInvoker {
-    if (Get-Command "docker-compose" -ErrorAction SilentlyContinue) {
-        return @{
-            FilePath = (Get-Command "docker-compose").Source
-            Arguments = "up -d"
-        }
-    }
-
-    if (Get-Command "docker" -ErrorAction SilentlyContinue) {
-        return @{
-            FilePath = (Get-Command "docker").Source
-            Arguments = "compose up -d"
-        }
-    }
-
-    throw "未找到 docker-compose 或 docker compose。"
-}
-
-function Wait-HttpOk {
-    param(
-        [string]$Name,
-        [string]$Url,
-        [int]$TimeoutSeconds = 120
-    )
-
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    while ((Get-Date) -lt $deadline) {
-        try {
-            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
-            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
-                Write-Host "$Name 已就绪：$Url" -ForegroundColor Green
-                return
-            }
-        }
-        catch {
-            Start-Sleep -Seconds 2
-        }
-    }
-
+        [string]$Nam0
     throw "$Name 启动超时，请检查日志：$Url"
 }
 
